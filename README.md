@@ -1,1 +1,1 @@
-# learnning-linux
+# learning-linux
