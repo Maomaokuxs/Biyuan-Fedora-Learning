@@ -8,10 +8,10 @@
 
 ## 基础知识
 
-- [Linux组成]([Linux组成](./linux组成.md))
+- [Linux组成](/docs/linux组成.md)
 
 ## 常见问题
 
-- [Fedora-Linux-修复启动分区](./Fedora-linux-修复启动分区.md)
+- [Fedora-Linux-修复启动分区](/docs/Fedora-linux-修复启动分区.md)
 
 ## 疑难杂症
