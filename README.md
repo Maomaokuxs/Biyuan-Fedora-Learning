@@ -10,4 +10,6 @@
 
 - 这是一个为满足自己分享欲并在学习中总结而建立的仓库，当作参考使用，且中内容目的是解决我当前的问题和论坛上看到的一些问题，早期的内容目录结构并不是很完善，文章标题就已经写明了相关问题，方便查看，后续会有所改善。
 
+- 对于使用 Fedora 新手建议先看一下这一部分[建议](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki/%E4%BD%BF%E7%94%A8fedora%E7%9A%84%E5%BB%BA%E8%AE%AE)。
+
 - 仓库主目录没有什么文件,后续文档已经完善了就添加至主仓库，当前请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki)页面查看。
