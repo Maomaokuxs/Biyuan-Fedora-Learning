@@ -33,4 +33,4 @@ eval "$(starship init bash)"
 
 # 自动同步配置文件脚本
 # Stow 版 dpush 别名
-alias dpush='cd ~/Documents/github/Biyuan-Fedora-Learning && git add . && git commit -m "Update dotfiles: $(date +%Y-%m-%d\ %H:%M)" && git push origin main'
+alias dpush='cd ~/Documents/github/Biyuan-Fedora-Learning && git add . && git commit -m "Update" && git push origin main'
