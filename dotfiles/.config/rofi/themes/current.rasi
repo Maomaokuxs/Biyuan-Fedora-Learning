@@ -1,0 +1,110 @@
+/* 引入 Hellwal 生成的颜色变量 */
+/* 可以使用绝对路径以及相对路径，不能使用$HOME 参数来替代 */
+@import "~/.cache/hellwal/colors-rofi.rasi"
+
+/* 全局变量 */
+
+* {
+    /* 定义变量：这样你改颜色只需要改这里 */
+    background-color: transparent;
+    text-color: @fg;
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+}
+
+/* 配置窗口 */
+
+window {
+    /* 1. 位置对齐 */
+    /* 定位到顶部中央*/
+    anchor:     north;
+    location:   north;
+    
+    /*设置宽度为横跨屏幕*/
+    width:      100%;
+    
+    /* 2. 垂直偏移：根据waybar 的高度调整，确保不遮挡 Waybar */
+    /* 如果你的 Waybar 有外边距(margin)，记得要把 margin 也加进来 */
+    y-offset:   0px; 
+    
+    background-color: @bg;
+    /* 边框设计：只留底边框 */
+    border:     0px 0px 2px 0px;
+    border-color: @accent;
+    
+    /* 使用水平容器 */
+    children:   [ horibox ];
+}
+
+/* 创建一个包含应用水平包装 */
+
+horibox {
+    orientation: horizontal;
+    children:   [ inputbar, listview ];
+    background-color: @bg;
+
+}
+
+/* 输入框 */
+
+inputbar {
+    width:      20%; /* 搜索框占据左侧 20% */
+    padding:    5px 15px;
+    spacing:    10px;
+    children:   [ prompt, entry ];
+    background-color: @muted; /* 稍微深一点的背景区分搜索区 */
+}
+
+/* 提示符 */
+
+prompt {
+    vertical-align: 0.5;
+    text-color: @accent;
+}
+
+/* 提示词 */
+
+entry {
+    vertical-align: 0.5;
+    placeholder: "Search...";
+    placeholder-color: #585b70;
+}
+
+/* 改为水平布局，控制应用程序图标按水平排布*/
+
+listview {
+    layout:     horizontal;
+    spacing:    5px;
+    lines:      12;
+    padding:    5px;
+    border-radius: 4px;
+}
+
+
+/* 选中效果 */
+
+element {
+    padding:    0px 15px;
+    spacing:    8px;
+    border-radius: 4px;
+    text-color: @fg;
+
+    /* 选中鼠标样式 */
+    cursor: pointer;
+}
+
+element selected {
+    background-color: @accent;
+    text-color: @bg;
+}
+
+element-icon {
+    size:       20px;
+    vertical-align: 0.5;
+}
+
+element-text {
+    vertical-align: 0.5;
+}
+

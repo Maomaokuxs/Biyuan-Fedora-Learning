@@ -1,0 +1,241 @@
+/* * Waybar 终极整合版：流光胶囊仪表盘
+ * 适配 Niri 桌面环境 & Hellwal 动态配色
+ * 维护者: Biyuan
+ */
+
+/* --- 1. 引入 Hellwal 生成的颜色变量 --- */
+/* 需要使用绝对路径确保 Waybar 在启动时能准确加载 */
+@import url("/home/biyuan/.cache/hellwal/colors-waybar.css");
+
+/* --- 2. 全局基础设置 --- */
+* {
+    font-family: "Iosevka Nerd Font", "JetBrainsMono Nerd Font";
+    font-size: 14px;
+    min-height: 0;
+}
+
+window#waybar {
+    background-color: @bg; /* 使用 Hellwal 提取的安全底色 */
+    color: @fg;            /* 全局文字颜色 */
+    border-bottom: 2px solid @muted; /* 底部暗线过渡，增加立体感 */
+    transition: all 0.5s ease-in-out;
+}
+
+/* --- 3. 通用胶囊模块样式 (核心对齐逻辑) --- */
+/* 统一所有模块的高度、圆角和背景，确保横向排布一致 */
+#cpu, 
+#memory,
+#bluetooth,
+#pulseaudio, 
+#network, 
+#clock,
+#tray,
+#custom-fcitx, 
+#custom-updates,
+#custom-weather,
+#custom-cava,
+#custom-launcher,
+#custom-music,
+#custom-music.playing,
+#custom-power{
+    padding: 0 12px;
+    margin: 4px 3px;         /* 上下 4px 留白，左右 3px 间距 */
+    min-height: 28px;        /* 28px + 4px*2 = 36px，完美填充 Waybar */
+    border-radius: 15px;     /* 彻底圆角化，形成胶囊状 */
+    background-color: rgba(255, 255, 255, 0.05); /* 微弱透明背景 */
+    box-shadow: inset 0 -2px 0 0 rgba(255, 255, 255, 0.1); /* 内部阴影增加质感 */
+    transition: background-color 0.3s ease;
+}
+
+/* --- 4. 左侧启动器：Rofi 入口 --- */
+#custom-launcher {
+    background-color: transparent; /* 启动器保持简洁 */
+    box-shadow: none;
+    font-size: 30px;
+    text-shadow: 0px 0px 5px @accent;
+    color: @accent;
+    padding-right: 0px;
+    margin-left: 0px;
+}
+
+/* --- 5. 弹性几何工作区指示器 (Workspace) --- */
+#workspaces {
+    background: transparent;
+    margin: 0 5px;
+    padding: 0;
+}
+
+#workspaces button {
+    /* 1. 基础状态：极简细线 */
+    padding: 0px;
+    margin: 15px 4px;      /* 调整 margin 使 6px 的线条精准居中 (15+6+15=36) */
+    min-width: 15px;
+    min-height: 6px;       /* 初始线条厚度 */
+    background-color: rgba(255, 255, 255, 0.2);
+    border: none;
+    border-radius: 4px;
+    transition: all 0.3s ease-in-out; 
+}
+
+#workspaces button.active,
+#workspaces button.focused {
+    background-color: @accent; /* 使用动态强调色 */
+    min-width: 45px;           /* 激活时拉长，产生视觉引导 */
+    min-height: 8px;           /* 激活时稍微加厚 */
+    margin-top: 14px;          /* 相应调整间距保持总高 (14+8+14=36) */
+    margin-bottom: 14px;
+    box-shadow: 0 0 8px @accent;
+}
+
+/* 鼠标悬停预览 */
+#workspaces button:hover {
+    background-color: rgba(255, 255, 255, 0.5);
+    min-width: 25px;
+}
+
+/* 屏蔽内部文字 Label */
+#workspaces button label {
+    color: transparent;
+    font-size: 0px;
+}
+
+/* --- 6. 系统状态细节微调 --- */
+
+/* 内存模块：左侧颜色锚点 */
+#memory {
+}
+
+/* 托盘区 */
+/* 防止托盘因为图标缺失变成一个 0 宽度的黑洞 */
+
+#tray {
+    min-width: 20px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 0 8px;
+}
+
+/* 如果图标加载失败，至少保留一个位置占位 */
+#tray > widget {
+    min-width: 16px;
+}
+
+/* Cava 频谱分析仪 */
+#custom-cava {
+    color: @accent;
+    font-family: "JetBrainsMono Nerd Font";
+    font-size: 16px;
+    text-shadow: 0px 0px 5px @accent;
+    padding: 0 10px;
+}
+
+/* 天气模块 */
+#custom-weather {
+    font-weight: bold;
+    color: @fg;
+}
+
+/* 更新提醒模块 */
+#custom-updates.uptodate {
+    color: @fg;
+}
+
+/* 🔴 内核更新提醒：变红并闪烁 */
+#custom-updates.kernel {
+    background-color: #f38ba8; 
+    color: #11111b;
+    font-weight: bold;
+    animation: blinker 2s linear infinite;
+}
+
+@keyframes blinker {
+    50% { opacity: 0.7; }
+}
+
+/* --- Fcitx5 输入法状态胶囊 --- */
+#custom-fcitx {
+    color: @fg; /* 使用强调色突出当前状态 */
+    font-weight: bold;
+    padding: 0 15px;
+    margin: 4px 3px;
+    min-height: 28px;
+    border-radius: 15px;
+}
+
+/* --- 7. 右侧电源按钮 --- */
+#custom-power {
+    background-color: transparent;
+    box-shadow: none;
+    color: @fg;
+    font-size: 16px;
+    padding-right: 20px;
+}
+
+/* --- 8. 交互反馈 --- */
+/* 鼠标悬停时胶囊变亮，并显示强调色底线 */
+#cpu:hover, 
+#memory:hover, 
+#pulseaudio:hover, 
+#network:hover, 
+#clock:hover,
+#custom-fcitx:hover,
+#custom-updates:hover,
+#custom-cava:hover,
+#custom-weather:hover{
+    background-color: rgba(255, 255, 255, 0.15);
+    box-shadow: inset 0 -2px 0 0 @accent;
+}
+
+/* --- 视频录制提示模块 --- */
+
+/* 基础胶囊样式 (与你的 CPU/Memory 模块对齐) */
+    
+#custom-recorder {
+    min-width: 110px;           /* 给一个略宽的固定值，容纳图标和计时 */
+    padding: 0;
+    margin: 4px 3px;
+    min-height: 28px;
+    border-radius: 15px;
+    font-size: 14px;
+    font-weight: 600;       /* 保持字重永久一致 */
+    border: 2px solid transparent; /* 闲置时占位，防止录制时尺寸突变 */
+    transition: background-color 0.3s ease;
+}
+
+#custom-recorder.recording {
+    /* 使用 hellwal 定义的颜色 */
+    background-color: @accent; 
+    color: #11111b;
+    /* 🔴 这里的边框宽度必须和上面的 2px 完全一致 */
+    border: 2px solid @accent; 
+}
+
+/* 停止状态 */
+#custom-recorder.stopped {
+
+    }
+
+/* 优化后的动画：只改变背景色，不添加阴影扩散 */
+@keyframes blink_solid_red {
+    0%   { background-color: #f38ba8; }
+    50%  { background-color: #ff5e81; } /* 切换到另一个坚实的红色，不带模糊 */
+    100% { background-color: #f38ba8; }
+}
+
+#custom-music {
+    padding: 0 15px;
+    margin: 4px 3px;
+    border-radius: 15px;
+    min-height: 28px;
+    transition: all 0.3s ease;
+}
+
+/* 正在播放时的样式：加深边框颜色 */
+#custom-music.playing {
+}
+
+/* 暂停时的样式：颜色变暗 */
+#custom-music.paused {
+    color: @muted;
+    border-bottom: none;
+}
