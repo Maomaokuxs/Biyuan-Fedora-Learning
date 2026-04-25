@@ -1,0 +1,30 @@
+configuration {
+    /* 基础功能设置 */
+    modes: [ drun, run, window ];
+    show-icons: true;
+    display-drun: "󰀻  Apps";
+    display-run: "  Run";
+    display-window: "󱂬  Window";
+    drun-display-format: "{name}";
+    
+    /* 绑定你的终端，方便一些需要终端运行的程序 */
+    terminal: "konsole"; 
+}
+
+/* 关键步骤：引入你的自定义主题 */
+@theme "themes/current.rasi"
+element {
+    /* 确保图标和文字水平排列 */
+    orientation: horizontal;
+    children: [ element-icon, element-text ];
+}
+
+element-icon {
+    size: 24px;
+    cursor: inherit;
+}
+
+element-text {
+    vertical-align: 0.5;
+    cursor: inherit;
+}

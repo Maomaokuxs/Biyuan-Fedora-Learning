@@ -1,0 +1,83 @@
+/* 引入全局动态调色板 */
+@import "~/.cache/hellwal/colors-rofi.rasi"
+
+* {
+    background-color: transparent;
+    text-color: @fg;
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+    /* 保持与你系统一致的字体，确保图标正常渲染 */
+    font: "JetBrainsMono Nerd Font 12"; 
+}
+
+/* ==========================================
+ * 1. 窗口层：100% 宽度，贴紧顶部
+ * ========================================== */
+window {
+    anchor:     north;
+    location:   north;
+    width:      100%;
+    y-offset:   0px; 
+    
+    background-color: @bg;
+    /* 严格照搬你的边框设计 */
+    border:     0px 0px 2px 0px;
+    border-color: @accent;
+    
+    padding:    0px;
+}
+
+/* ==========================================
+ * 2. 主容器：水平排列
+ * ========================================== */
+mainbox {
+    orientation: horizontal;
+    background-color: @bg;
+    children:   [ inputbar, listview ];
+}
+
+/* ==========================================
+ * 3. 左侧区域 (歌名)：占 70% 宽度
+ * ========================================== */
+inputbar {
+    width:      70%;
+    padding:    5px 15px;
+    children:   [ prompt ];
+}
+
+prompt {
+    vertical-align: 0.5;
+    text-color:     @accent;
+    font:           "JetBrainsMono Nerd Font Bold 11";
+}
+
+/* ==========================================
+ * 4. 右侧区域 (控件)：占 30% 宽度
+ * ========================================== */
+listview {
+    width:      30%;
+    layout:     horizontal;
+    spacing:    15px;      
+    padding:    5px;  
+    lines:      4;         
+}
+
+/* 单个按钮的外观 */
+element {
+    padding:        0px 15px; 
+    border-radius:  4px;
+    text-color:     @fg;
+    cursor:         pointer;
+}
+
+element selected {
+    background-color: @accent;
+    text-color:       @bg;
+}
+
+element-text {
+    vertical-align:   0.5;
+    horizontal-align: 0.5;
+    text-color:       inherit;
+}

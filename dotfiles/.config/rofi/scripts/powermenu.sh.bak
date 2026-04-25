@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# ==========================================
+# 1. 定义主菜单选项名称和图标
+# ==========================================
+lock="󰌾 Lock"
+logout="󰍃 Logout"
+sleep="󰒲 Sleep"
+reboot="󰜉 Reboot"
+shutdown="⏻ Shutdown"
+
+# ==========================================
+# 2. 定义确认菜单选项
+# ==========================================
+yes=" Yes"
+no=" No"
+
+# ==========================================
+# 3. 呼出主电源菜单
+# ==========================================
+selected=$(echo -e "$lock\n$logout\n$sleep\n$reboot\n$shutdown" | \
+           rofi -dmenu -i -p "System" -theme ~/.config/rofi/themes/powermenu.rasi)
+
+# ==========================================
+# 4. 二次确认函数逻辑
+# ==========================================
+confirm_action() {
+    # 弹出一个新的 Rofi 窗口询问 "Are you sure?"
+    local result=$(echo -e "$yes\n$no" | rofi -dmenu -i -p "Are you sure?" -theme ~/.config/rofi/themes/powermenu.rasi)
+    echo "$result"
+}
+
+# ==========================================
+# 5. 根据选择执行对应命令
+# ==========================================
+case "$selected" in
+    "$lock")
+        # 锁屏通常不需要确认，直接执行
+        loginctl lock-session 
+        ;;
+    "$sleep")
+        # 睡眠也可以直接执行
+        systemctl suspend 
+        ;;
+    "$logout")
+        # 退出 Niri 前询问
+        ans=$(confirm_action)
+        if [[ "$ans" == "$yes" ]]; then
+            niri msg action quit
+        fi
+        ;;
+    "$reboot")
+        # 重启前询问
+        ans=$(confirm_action)
+        if [[ "$ans" == "$yes" ]]; then
+            systemctl reboot
+        fi
+        ;;
+    "$shutdown")
+        # 关机前询问
+        ans=$(confirm_action)
+        if [[ "$ans" == "$yes" ]]; then
+            systemctl poweroff
+        fi
+        ;;
+esac

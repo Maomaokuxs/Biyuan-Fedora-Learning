@@ -1,0 +1,165 @@
+{
+    "layer": "top",
+    "position": "top",
+    "height": 45, // 必须与 Rofi 的 y-offset 对齐
+    "spacing": 4,
+
+    // 模块分布情况
+
+    "modules-left": ["custom/launcher","custom/recorder","custom/music","custom/cava","niri/window"],
+    "modules-center": ["niri/workspaces"],
+    "modules-right": ["custom/updates","custom/weather","pulseaudio", "network","bluetooth", "cpu", "memory", "battery", "clock", "tray","custom/fcitx","custom/power"],
+
+    "custom/launcher": {
+        "format": " 󰣛 ",
+        "on-click": "rofi -show drun",
+	"on-click-right": "pkill rofi",
+        "tooltip": false
+    },
+
+    "niri/workspaces": {
+    "format": "{icon}",
+    "format-icons": {
+        "default": " ", // 默认状态是一个空占位
+        "active": " ",  // 激活状态也是空占位
+        "focused": " "
+    },
+    "on-click": "activate"
+    },
+
+        "niri/window": {
+        "format": "󰖲 {title}",
+        "max-length": 30
+    },
+
+    "clock": {
+        "format": "  {:%H:%M}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+
+    "cpu": { "format": " {usage}%" },
+    
+    "memory": {
+        "interval": 5,
+        "format": " {used:0.1f}G",
+        "tooltip-format": "内存已用: {used}GiB / {total}GiB",
+        "on-click": "kitty --title 'System Monitor' btop",
+        "on-click-right": "pkill btop"
+    },
+
+   "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "󰝟 Muted",
+        "format-icons": {
+            "headphone": "",
+            "hands-free": "",
+            "headset": "",
+            "phone": "",
+            "portable": "",
+            "car": "",
+            "default": ["", "", ""]
+        },
+        "on-click": "pavucontrol"
+    },
+
+
+    "bluetooth": {
+    "format": " {status}",
+    "format-disabled": "󰂲", // 禁用时的图标
+    "format-connected": " {device_alias}",
+    "format-connected-battery": " {device_alias} {device_battery_percentage}%",
+    "tooltip-format": "{controller_alias}\t{controller_address}",
+    "tooltip-format-connected": "{controller_alias}\t{controller_address}\n\n{device_enumerate}",
+    "tooltip-format-enumerate-connected": "{device_alias}\t{device_address}",
+    
+    // 核心配置：点击图标打开图形化管理界面
+    "on-click": "blueman-manager",
+    
+    // 右键点击可以快速切换电源开关（可选）
+    "on-click-right": "rfkill toggle bluetooth"
+},
+
+    "network": {
+        "format-wifi": "  {essid}",
+        "format-disconnected": "󰤮 Disconnected"
+    },
+
+    "battery": {
+        "states": { "warning": 30, "critical": 15 },
+        "format": "{icon} {capacity}%",
+        "format-icons": ["", "", "", "", ""]
+    },
+
+    "custom/cava": {
+        "exec": "~/.config/waybar/scripts/cava.sh",
+        "format": "{}",
+        "tooltip": false,
+	/* 开启媒体管理工具 */
+	"on-click": "~/.config/rofi/scripts/music-menu.sh",
+        "on-click-right": "pkill rofi"
+    },
+
+    "custom/power": {
+        "format": "⏻",
+        "on-click": "~/.config/rofi/scripts/powermenu.sh", // 这里的路径要对应下一步的脚本
+        "on-click-right": "pkill rofi",
+	"tooltip": false
+    },
+
+    "custom/fcitx": {
+    "interval": 1,
+    "exec": "~/.config/waybar/scripts/fcitx_status.sh",
+    "on-click": "fcitx5-remote -s", // 点击切换下一个输入法
+    "on-click-right": "fcitx5-configtool", // 右键打开配置界面
+    "tooltip": false
+    },
+
+    "tray": {
+    "icon-size": 18,    // 调小图标尺寸，间距感会更强
+    "spacing": 10,      // 直接设置图标之间的像素间距
+    "show-passive-items": true
+    },
+
+    "custom/updates": {
+    "format": "{}",
+    "exec": "~/.config/waybar/scripts/check-updates.sh",
+    "return-type": "json",
+    "on-click": "kitty --hold sudo dnf upgrade", // 点击直接开终端更新
+    "interval": 3600, // 每小时检查一次
+    "signal": 8       // 允许通过 pkill -RTMIN+8 waybar 手动刷新
+    },
+
+    "custom/weather": {
+    "format": "{}",
+    "tooltip": true,
+    "interval": 1800, // 每 30 分钟更新一次，避免请求太频繁
+    "exec": "~/.config/waybar/scripts/weather.py",
+    "return-type": "json",
+    "on-click": "kitty --hold curl wttr.in" // 点击时弹出终端显示详细的网页版天气图
+    },
+
+    "custom/recorder": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 9,
+    "exec": "if [ -f /tmp/recording_status ]; then TIME=$(cat /tmp/recording_status); echo \"{\\\"text\\\": \\\"󰑊 $TIME\\\", \\\"class\\\": \\\"recording\\\"}\"; else echo \"{\\\"text\\\": \\\"󰑋 OFF\\\", \\\"class\\\": \\\"stopped\\\"}\"; fi",
+    "on-click": "~/.config/rofi/scripts/recorder.sh",
+    "on-click-right": "pkill -INT -f gpu-screen-recorder",
+    "tooltip": false
+    },    
+
+  "custom/music": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 2,
+    "exec": "python3 ~/.config/waybar/scripts/music.py",
+    "on-click": "playerctl -p splayer play-pause",
+    "on-click-right": "playerctl -p splayer next",
+    "on-scroll-up": "playerctl -p splayer volume 0.05+",
+    "on-scroll-down": "playerctl -p splayer volume 0.05-",
+    "max-length": 30,
+    "tooltip": true
+} 
+
+}

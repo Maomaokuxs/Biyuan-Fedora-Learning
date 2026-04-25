@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# 1. 获取壁纸路径
+WALLPAPER=$1
+[ -z "$WALLPAPER" ] && echo "用法: $0 /路径/到/壁纸.png" && exit 1
+
+# 2. 切换壁纸 (swww)
+swww img "$WALLPAPER" --transition-type grow --transition-pos center --transition-duration 2
+
+# 3. 提取颜色 (利用 Hellwal 的 JSON 模式，稳定抓取 color4)
+# 确保你已经安装了 jq (sudo dnf install jq)
+NEW_COLOR=$(hellwal -i "$WALLPAPER" -j | jq -r '.colors.color4')
+
+# 4. 安全校验：只有拿到正确的十六进制颜色才执行修改
+if [[ "$NEW_COLOR" =~ ^#[0-9A-Fa-f]{6}$ ]]; then
+    echo "成功提取颜色: $NEW_COLOR"
+
+    # --- A. 更新 Niri 颜色 (采用层级嵌套格式) ---
+    cat <<EOF > ~/.config/niri/colors.kdl
+layout {
+    focus-ring {
+        active-color "$NEW_COLOR"
+    }
+}
+EOF
+    # 通知 Niri 刷新配置
+    niri msg action load-config-file
+
+    # --- B. 更新 Waybar 变量 ---
+    # 生成 CSS 变量供 Waybar 的 style.css @import
+    echo "@define-color accent $NEW_COLOR;" > ~/.cache/hellwal/colors-waybar.css
+    pkill -USR2 waybar
+
+    # --- C. 更新 Rofi 变量 ---
+    # 生成 Rasi 变量供 current.rasi @import
+    echo "* { accent: $NEW_COLOR; }" > ~/.cache/hellwal/colors-rofi.rasi
+
+    echo "✨ 全系统配色已同步完成！"
+else
+    echo "错误：无法从 Hellwal 提取有效的颜色值。"
+    exit 1
+fi
