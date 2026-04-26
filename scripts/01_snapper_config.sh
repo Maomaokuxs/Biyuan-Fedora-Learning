@@ -1,125 +1,131 @@
 #!/bin/bash
+# 文件位置: scripts/01_snapper_config.sh
 
-setup_snapper() {
+setup_snapper_and_backup() {
     echo -e "${BLUE}=====================================================${NC}"
-    echo -e "${GREEN}  [系统阶段 1] 快照防护与双源全量配置管理${NC}"
+    echo -e "${GREEN}  [系统阶段 1] 磁盘防护初始化与时间轴备份${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
-    local BACKUP_ROOT="$HOME/.dotfiles_backup"
+    sudo -v || { echo -e "${RED}❌ 无法获取管理员权限，脚本退出。${NC}"; exit 1; }
+
+    # --- 1. 环境预检 ---
+    if ! command -v snapper &> /dev/null; then
+        echo -e "${YELLOW}>> 未检测到 snapper，正在为您安装基础防护组件...${NC}"
+        sudo dnf install -y snapper
+    fi
+
+    echo -e "${BLUE}>> 正在分析磁盘 Btrfs 拓扑与快照配置...${NC}"
     
-    # --- 1. Snapper 快照模块 ---
-    if ! command -v snapper &> /dev/null || [ ! "$(ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
-        echo -e "${YELLOW}>> 准备初始化 Snapper...${NC}"
-        if ! command -v snapper &> /dev/null; then sudo dnf install -y snapper &> /dev/null; fi
-        mapfile -t subvolumes < <(findmnt -nt btrfs -o TARGET)
-        if [ ${#subvolumes[@]} -gt 0 ]; then
-            for i in "${!subvolumes[@]}"; do echo "  $((i+1))) ${subvolumes[i]}"; done
-            read -p "选择配置编号 (多选空格, 0跳过): " snap_choices
-            if [[ -n "$snap_choices" && "$snap_choices" != "0" ]]; then
-                for idx in $snap_choices; do
-                    [ "$idx" -lt 1 ] || [ "$idx" -gt "${#subvolumes[@]}" ] && continue
-                    local target_vol="${subvolumes[$((idx-1))]}"
-                    local config_name=$(echo "$target_vol" | sed 's/\///g')
-                    [ -z "$config_name" ] && config_name="root"
-                    sudo snapper -c "$config_name" create-config "$target_vol"
-                done
-            fi
-        fi
-    fi
+    mapfile -t all_mounts_raw < <(findmnt -t btrfs -n -o TARGET)
+    
+    # 【核心修复】无视中间的制表符，直接抓取第一列($1)和最后一列($NF)
+    configured_data=$(sudo snapper list-configs 2>/dev/null | awk 'NR>2 {print $1, $NF}')
 
-    if command -v snapper &> /dev/null && [ "$(ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
-        read -p "🚨 是否在操作前为系统创建一个底层安全快照？[y/N]: " do_snap
-        if [[ $do_snap == [yY] ]]; then
-            local target_c=$(sudo snapper list-configs | awk 'NR==3 {print $1}')
-            [ -z "$target_c" ] && target_c="root"
-            sudo snapper -c "$target_c" create --description "Pre_Deployment_Backup"
-            echo -e "${GREEN}✅ 系统快照已创建。${NC}"
-        fi
-    fi
+    display_names=()   
+    clean_paths=()     
+    status_tags=()     
+    config_names=()    
 
-    echo -e "\n${BLUE}-----------------------------------------------------${NC}"
-
-    # --- 2. 自动化模块备份模块 (不污染仓库) ---
-    mkdir -p "$BACKUP_ROOT"
-    read -p "📦 是否自动备份本地所有涉及到的应用配置？[y/N]: " auto_backup
-    if [[ $auto_backup == [yY] ]]; then
-        local date_tag=$(date +%Y%m%d_%H%M)
-        echo -e "${BLUE}>> 正在根据仓库模块扫描并备份本地配置...${NC}"
+    for raw in "${all_mounts_raw[@]}"; do
+        clean=$(echo "$raw" | grep -o '/.*')
+        conf=$(echo "$configured_data" | awk -v m="$clean" '$2==m {print $1}')
         
-        for module in $(ls "$DOTFILES_DIR"); do
-            local dest_dir="$BACKUP_ROOT/${module}_${date_tag}"
-            
-            # 备份逻辑：特殊处理颜色缓存
-            if [ "$module" == "colors" ] || [ "$module" == "hellwal" ]; then
-                if [ -d "$HOME/.cache/hellwal" ]; then
-                    mkdir -p "$dest_dir/.cache/hellwal"
-                    cp -r "$HOME/.cache/hellwal/." "$dest_dir/.cache/hellwal/"
-                    echo -e "${GREEN}  [OK] 备份颜色缓存${NC}"
+        display_names+=("$raw")
+        clean_paths+=("$clean")
+        
+        if [ -n "$conf" ]; then
+            status_tags+=("${GREEN}[已配置]${NC}")
+            config_names+=("$conf")
+        else
+            status_tags+=("${YELLOW}[未初始化]${NC}")
+            config_names+=("")
+        fi
+    done
+
+    # --- 2. 统一交互菜单 ---
+    echo -e "\n${YELLOW}>> 发现以下可快照子卷，请选择要备份/初始化的编号：${NC}"
+    for i in "${!display_names[@]}"; do
+        echo -e "  $((i+1))) ${status_tags[i]} ${display_names[i]}"
+    done
+    echo "  a) 全部执行 (一键配置并快照)"
+    echo "  0) ⏭️ 跳过"
+    
+    read -p "选择编号 [支持多选, 如 1 2 或 a]: " choices
+    
+    if [[ "$choices" != "0" && -n "$choices" ]]; then
+        [[ "$choices" == "a" ]] && choices=$(seq 1 ${#display_names[@]})
+
+        # --- 3. 结果导向的执行循环 ---
+        for idx in $choices; do
+            if [[ "$idx" -gt 0 ]] && [[ "$idx" -le "${#display_names[@]}" ]]; then
+                i=$((idx-1))
+                local raw_n="${display_names[i]}"
+                local path_n="${clean_paths[i]}"
+                local conf_n="${config_names[i]}"
+
+                # 智能生成配置名 (用于未配置或强制恢复的情况)
+                local target_conf="root"
+                [ "$path_n" != "/" ] && target_conf=$(echo "$path_n" | sed 's|^/||' | sed 's|/|-|g')
+
+                if [ -n "$conf_n" ]; then
+                    echo -e "${CYAN}>> 正在为 [$raw_n] 创建安全快照...${NC}"
+                    if sudo snapper -c "$conf_n" create --description "Manual_Pre_Deployment"; then
+                        echo -e "${GREEN}✅ [$raw_n] 快照完成。${NC}"
+                    else
+                        echo -e "${RED}❌ [$raw_n] 快照创建失败！${NC}"
+                    fi
+                else
+                    echo -e "${YELLOW}>> 正在尝试初始化子卷 [$raw_n] ...${NC}"
+                    output=$(sudo snapper -c "$target_conf" create-config "$path_n" 2>&1)
+                    
+                    if [ $? -eq 0 ]; then
+                        sudo sed -i "s/ALLOW_USERS=\"\"/ALLOW_USERS=\"$(whoami)\"/" "/etc/snapper/configs/$target_conf"
+                        sudo snapper -c "$target_conf" create --description "Initial_Snapshot"
+                        echo -e "${GREEN}✅ [$raw_n] 初始化并快照成功。${NC}"
+                    else
+                        # 结果导向：如果是被父级覆盖，提示并跳过；如果是已存在，直接强制打快照
+                        if echo "$output" | grep -q "subvolume already covered"; then
+                            echo -e "${BLUE}ℹ️  [$raw_n] 已被父级包含覆盖，该区域已安全，无需独立快照。${NC}"
+                        elif echo "$output" | grep -q "already exists"; then
+                            echo -e "${YELLOW}⚠️  配置文件已存在但未被系统缓存，尝试直接打快照...${NC}"
+                            sudo snapper -c "$target_conf" create --description "Forced_Snapshot" && echo -e "${GREEN}✅ [$raw_n] 强制快照成功！${NC}" || echo -e "${RED}❌ 快照失败！${NC}"
+                        else
+                            echo -e "${RED}❌ 无法处理 [$raw_n]: $output${NC}"
+                        fi
+                    fi
                 fi
-            elif [ -d "$HOME/.config/$module" ]; then
-                mkdir -p "$dest_dir/.config/$module"
-                cp -r "$HOME/.config/$module/." "$dest_dir/.config/$module/"
-                echo -e "${GREEN}  [OK] 备份本地配置: $module${NC}"
             fi
         done
-        echo -e "${YELLOW}>> 备份已存放至: $BACKUP_ROOT${NC}"
     fi
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 3. 双源链接切换与物理恢复模块 ---
-    echo -e "${YELLOW}当前配置源管理 (Stow 链接切换):${NC}"
-    echo "  1) ☁️  使用主仓库最新配置 (链接至 Git)"
-    echo "  2) 🕰️  使用历史备份配置 (链接至备份库)"
-    echo "  3) 📁  物理恢复并解除链接 (断开链接，原位复制)"
-    echo "  0) ⏭️  跳过此步骤"
-    read -p "请选择操作模式 [0-3]: " source_mode
-
-    if [[ "$source_mode" =~ ^[1-3]$ ]]; then
-        read -p "请输入要操作的模块名: " module_name
-        [ -z "$module_name" ] && return
-
-        local target_dir="$HOME/.config/$module_name"
-        [ "$module_name" == "colors" ] && target_dir="$HOME/.cache/hellwal"
-
-        # 彻底断开旧的关联
-        [ -L "$target_dir" ] || [ -d "$target_dir" ] && rm -rf "$target_dir"
-
-        case "$source_mode" in
-            1)
-                if [ -d "$DOTFILES_DIR/$module_name" ]; then
-                    cd "$DOTFILES_DIR"
-                    stow -t ~ "$module_name" 2>/dev/null
-                    echo -e "${GREEN}✅ 已链接至 Git 仓库版本。${NC}"
-                fi ;;
-            2)
-                mapfile -t backups < <(ls -d "$BACKUP_ROOT/${module_name}_"* 2>/dev/null)
-                if [ ${#backups[@]} -gt 0 ]; then
-                    for i in "${!backups[@]}"; do echo "  $((i+1))) $(basename "${backups[i]}")"; done
-                    read -p "选择回滚版本: " b_idx
-                    if [[ "$b_idx" -gt 0 ]] && [[ "$b_idx" -le "${#backups[@]}" ]]; then
-                        selected_pkg=$(basename "${backups[$((b_idx-1))]}")
-                        cd "$BACKUP_ROOT"
-                        stow -t ~ "$selected_pkg" 2>/dev/null
-                        echo -e "${GREEN}✅ 已链接至历史备份版本。${NC}"
-                    fi
-                fi ;;
-            3)
-                mapfile -t backups < <(ls -d "$BACKUP_ROOT/${module_name}_"* 2>/dev/null)
-                if [ ${#backups[@]} -gt 0 ]; then
-                    for i in "${!backups[@]}"; do echo "  $((i+1))) $(basename "${backups[i]}")"; done
-                    read -p "选择恢复版本: " b_idx
-                    if [[ "$b_idx" -gt 0 ]] && [[ "$b_idx" -le "${#backups[@]}" ]]; then
-                        selected_path="${backups[$((b_idx-1))]}"
-                        mkdir -p "$target_dir"
-                        if [ -d "$selected_path/.cache" ]; then
-                            cp -rf "$selected_path/.cache/hellwal/." "$target_dir/"
-                        else
-                            cp -rf "$selected_path/.config/$module_name/." "$target_dir/"
-                        fi
-                        echo -e "${GREEN}✅ 物理文件已恢复（独立运行）。${NC}"
-                    fi
-                fi ;;
-        esac
+    # --- 4. 时间轴全量静默备份 ---
+    local BACKUP_ROOT="$HOME/.dotfiles_backup"
+    local date_tag=$(date +%Y%m%d_%H%M%S)
+    local current_backup_dir="$BACKUP_ROOT/$date_tag"
+    
+    echo -e "${BLUE}>> 正在静默执行本地配置现状备份...${NC}"
+    if [ -d "$DOTFILES_DIR" ]; then
+        local backed_any=false
+        mkdir -p "$current_backup_dir"
+        
+        for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            local src="$HOME/.config/$module"
+            [[ "$module" == "colors" ]] && src="$HOME/.cache/hellwal"
+            if [ -d "$src" ]; then
+                local dest="$current_backup_dir/$module"
+                local rel=$(dirname "$src" | sed "s|$HOME||")
+                mkdir -p "$dest$rel"
+                cp -rf "$src" "$dest$rel/"
+                backed_any=true
+            fi
+        done
+        
+        if [ "$backed_any" = true ]; then
+             echo -e "${GREEN}✅ 配置文件已存至: $current_backup_dir${NC}"
+        else
+             rm -rf "$current_backup_dir"
+        fi
     fi
 }
