@@ -6,16 +6,20 @@ install_desktop_niri() {
     echo -e "${GREEN}  [系统阶段 2] Niri 桌面环境自动化部署${NC}"
     echo -e "${BLUE}=====================================================${NC}"
 
-    # --- 1. 调用独立显卡驱动脚本 (替换原来的冗余代码) ---
+    # --- 1. 调用独立显卡驱动脚本 ---
     local GPU_SCRIPT="$REPO_DIR/scripts/03_gpu_drivers.sh"
     if [ -f "$GPU_SCRIPT" ]; then
-        echo -e "${YELLOW}>> 正在调用外部显卡驱动配置模块...${NC}"
+        echo -e "${YELLOW}>> 正在加载外部显卡驱动配置模块...${NC}"
         chmod +x "$GPU_SCRIPT"
         source "$GPU_SCRIPT"
-        # 注意：这里假设 03_gpu_drivers.sh 中定义了 setup_gpu 或是直接执行逻辑
-        # 如果 03 脚本只是纯命令，source 它就会直接运行；如果里面是函数，请在此处调用函数名
+        
+        if command -v setup_gpu &> /dev/null; then
+            setup_gpu
+        else
+            echo -e "${RED}⚠️ 错误: 在 $GPU_SCRIPT 中找不到 setup_gpu 函数！${NC}"
+        fi
     else
-        echo -e "${RED}⚠️ 错误: 找不到显卡脚本 $GPU_SCRIPT，尝试继续安装桌面...${NC}"
+        echo -e "${RED}⚠️ 错误: 找不到显卡脚本 $GPU_SCRIPT${NC}"
     fi
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
@@ -54,17 +58,25 @@ install_desktop_niri() {
         done
         echo -e "${GREEN}✅ 所有的配置文件部署完毕！${NC}"
 
-        # --- 4. 自动化色彩与壁纸初始化 (核心新增) ---
-        echo -e "\n${BLUE}>> 正在初始化桌面视觉效果 (Hellwal & Wallpaper)...${NC}"
-        local INIT_WALL="$DOTFILES_DIR/niri/.config/niri/scripts/init-wallpaper.sh"
+        # --- 4. 自动化色彩与壁纸初始化 (核心调用部分) ---
+        # 此时配置已部署，通过用户目录下的路径调用脚本最为稳健
+        local INIT_SCRIPT="$HOME/.config/niri/scripts/init-wallpaper.sh"
         
-        if [ -f "$INIT_WALL" ]; then
-            chmod +x "$INIT_WALL"
-            # 使用 bash 执行以确保环境纯净
-            bash "$INIT_WALL"
-            echo -e "${GREEN}✅ 桌面色彩初始化完成。${NC}"
+        if [ -f "$INIT_SCRIPT" ]; then
+            echo -e "${BLUE}>> 正在激活视觉引擎...${NC}"
+            chmod +x "$INIT_SCRIPT"
+            # 显式使用 bash 调用，并确保它能通过 $0 定位到仓库
+            bash "$INIT_SCRIPT"
         else
-            echo -e "${RED}⚠️ 警告: 找不到初始化脚本 $INIT_WALL，跳过色彩生成。${NC}"
+            # 备选：如果链接尚未生效，尝试从仓库绝对路径直接调用
+            local ALT_INIT="$DOTFILES_DIR/niri/.config/niri/scripts/init-wallpaper.sh"
+            if [ -f "$ALT_INIT" ]; then
+                echo -e "${YELLOW}>> 提示: 通过仓库路径启动初始化...${NC}"
+                chmod +x "$ALT_INIT"
+                bash "$ALT_INIT"
+            else
+                echo -e "${RED}⚠️ 无法启动初始化脚本，请检查 dotfiles 结构。${NC}"
+            fi
         fi
     else
         echo -e "${YELLOW}>> 已跳过配置部署及壁纸初始化。${NC}"
