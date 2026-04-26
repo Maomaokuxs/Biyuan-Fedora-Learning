@@ -22,6 +22,13 @@ export YELLOW='\033[1;33m'
 export RED='\033[1;31m'
 export NC='\033[0m'
 
+# --- 系统校验 (新增) ---
+if [ ! -f /etc/fedora-release ]; then
+    echo -e "${RED}错误: 检测到当前系统不是 Fedora Linux。${NC}"
+    echo -e "${YELLOW}本脚本专为 Fedora 系统管理设计，已终止运行。${NC}"
+    exit 1
+fi
+
 # --- 3. 模块加载 (顺序加载) ---
 # 注意：这里只 source 包含函数的脚本，不直接执行
 source "$REPO_DIR/scripts/utils.sh"

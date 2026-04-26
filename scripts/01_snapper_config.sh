@@ -2,64 +2,81 @@
 
 setup_snapper() {
     echo -e "${BLUE}=====================================================${NC}"
-    echo -e "${GREEN}  [系统阶段 1] 系统底层保护与配置恢复检测${NC}"
+    echo -e "${GREEN}  [系统阶段 1] Snapper 底层防护与配置恢复管理${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
-    # --- 1. 本地备份恢复提醒 (核心新增) ---
-    if [ -d "$BACKUP_ROOT" ]; then
-        echo -e "${YELLOW}>> 检测到本地备份目录: $BACKUP_ROOT${NC}"
-        read -p "🚨 是否需要从本地备份中恢复之前的配置文件？[y/N]: " local_restore
-        if [[ $local_restore == [yY] ]]; then
-            echo -e "\n${BLUE}最近的本地备份记录 (按时间排序):${NC}"
-            ls -dt "$BACKUP_ROOT"/* | head -n 10
+    # --- 1. [Snapper 引导配置模块] ---
+    # 检查是否安装了 snapper 且是否存在任何配置
+    if ! command -v snapper &> /dev/null || [ ! "$(ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
+        echo -e "${YELLOW}>> [预检] 尚未检测到 Snapper 配置，准备进行初始化引导...${NC}"
+        
+        # 确保软件包已安装
+        if ! command -v snapper &> /dev/null; then 
+            echo -e "正在安装 Snapper 软件包..."
+            sudo dnf install -y snapper &> /dev/null
+        fi
+
+        # 扫描 Btrfs 挂载点
+        echo -e "正在检测可创建快照的 Btrfs 子卷..."
+        mapfile -t subvolumes < <(findmnt -nt btrfs -o TARGET)
+        
+        if [ ${#subvolumes[@]} -eq 0 ]; then
+            echo -e "${RED}!! 未检测到有效的 Btrfs 挂载点，无法建立 Snapper 保护。${NC}"
+        else
+            echo -e "${BLUE}发现以下可保护的挂载点:${NC}"
+            for i in "${!subvolumes[@]}"; do echo "  $((i+1))) ${subvolumes[i]}"; done
+            echo "  0) 跳过此步骤"
             
-            echo -e "\n${YELLOW}恢复方法：cp -rf \"$BACKUP_ROOT/目录名/*\" ~/.config/对应目录/${NC}"
-            read -p "是否现在打开备份文件夹进行查看？[y/N]: " open_dir
-            if [[ $open_dir == [yY] ]]; then
-                # 尝试用 dolphin 打开，如果没装就直接 ls
-                if command -v dolphin &> /dev/null; then
-                    dolphin "$BACKUP_ROOT" &
-                else
-                    ls -R "$BACKUP_ROOT" | less
-                fi
-                echo -e "${RED}请手动完成恢复后，回来按回车继续脚本。${NC}"
-                read -p "等待中..."
+            read -p "请输入要配置的编号 (多选请用空格隔开): " snap_choices
+            
+            if [[ -n "$snap_choices" && "$snap_choices" != "0" ]]; then
+                for idx in $snap_choices; do
+                    if ! [[ "$idx" =~ ^[0-9]+$ ]] || [ "$idx" -lt 1 ] || [ "$idx" -gt "${#subvolumes[@]}" ]; then continue; fi
+                    
+                    local target_vol="${subvolumes[$((idx-1))]}"
+                    # 生成配置名：去掉斜杠，如果为空（根目录）则设为 root
+                    local config_name=$(echo "$target_vol" | sed 's/\///g')
+                    [ -z "$config_name" ] && config_name="root"
+                    
+                    echo -e "正在为 $target_vol 创建配置 [$config_name]..."
+                    sudo snapper -c "$config_name" create-config "$target_vol" && echo -e "${GREEN}✅ $target_vol 配置成功。${NC}"
+                done
             fi
         fi
+    else
+        echo -e "${GREEN}>> [状态] 检测到已有 Snapper 配置，跳过初始化。${NC}"
     fi
 
-    # --- 2. Snapper 状态检测与快照回滚 ---
+    # --- 2. [快照询问模块] ---
+    # 只要环境就绪，就询问是否创建快照
     if command -v snapper &> /dev/null && [ "$(ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
-        echo -e "\n${YELLOW}>> 检测到 Snapper 配置已就绪。${NC}"
-        read -p "🚨 是否需要通过 Snapper 快照回滚系统或文件？[y/N]: " snap_restore
-        if [[ $snap_restore == [yY] ]]; then
-            echo -e "${BLUE}正在列出最近 10 条快照...${NC}"
-            sudo snapper -c root list | tail -n 11
-            echo -e "${YELLOW}回滚参考: sudo snapper -c root undochange <ID1>..<ID2> /路径${NC}"
-            read -p "按回车继续脚本 (如需手动操作请 Ctrl+C)..."
+        read -p "🚨 是否在部署前为系统创建一个安全快照？[y/N]: " do_snap
+        if [[ $do_snap == [yY] ]]; then
+            # 默认使用 root 配置进行快照
+            local target_c=$(sudo snapper list-configs | awk 'NR==3 {print $1}')
+            [ -z "$target_c" ] && target_c="root"
+            
+            echo -e "${YELLOW}>> 正在创建快照...${NC}"
+            sudo snapper -c "$target_c" create --description "Pre_Deployment_Backup" --userdata "origin=biyuan_wizard"
+            echo -e "${GREEN}✅ 快照创建完成！${NC}"
         fi
-
-        echo -e "${GREEN}>> ✅ 状态检测完毕，直接进入下一阶段。${NC}\n"
-        return
     fi
 
-    # --- 3. 初始配置逻辑 (若未配置过 Snapper) ---
-    if ! command -v snapper &> /dev/null; then sudo dnf install -y snapper; fi
-    # ... (后续 findmnt 逻辑保持不变)
-}
-    # --- 3. [恢复逻辑] 本地备份恢复 (非破坏性) ---
-    local B_PATH="$HOME/.dotfiles_backup"
-    if [ -d "$B_PATH" ] && [ "$(ls -A "$B_PATH" 2>/dev/null)" ]; then
-        echo -e "${YELLOW}>> [配置] 检测到本地历史备份记录。${NC}"
-        read -p "是否需要从本地备份恢复特定的配置文件？[y/N]: " local_restore
+    echo -e "\n${BLUE}-----------------------------------------------------${NC}"
+
+    # --- 3. [本地恢复模块] ---
+    # 放在快照保护之后，最安全
+    if [ -d "$BACKUP_ROOT" ] && [ "$(ls -A "$BACKUP_ROOT" 2>/dev/null)" ]; then
+        echo -e "${YELLOW}>> [配置] 检测到本地历史备份。${NC}"
+        read -p "是否从本地备份恢复配置文件？[y/N]: " local_restore
         
         if [[ $local_restore == [yY] ]]; then
-            mapfile -t backups < <(ls -dt "$B_PATH"/* 2>/dev/null)
+            mapfile -t backups < <(ls -dt "$BACKUP_ROOT"/* 2>/dev/null)
             echo -e "\n${BLUE}可用备份列表:${NC}"
             for i in "${!backups[@]}"; do
                 echo "  $((i+1))) $(basename "${backups[i]}")"
             done
-            read -p "请输入要恢复的编号 (0跳过): " b_choice
+            read -p "请输入编号 (0跳过): " b_choice
             
             if [[ "$b_choice" -gt 0 ]] && [[ "$b_choice" -le "${#backups[@]}" ]]; then
                 selected_path="${backups[$((b_choice-1))]}"
@@ -67,24 +84,22 @@ setup_snapper() {
                 module_name=$(echo "$dir_name" | rev | cut -d'_' -f1 | rev)
 
                 if [[ "$dir_name" == "$module_name" ]] || [ -z "$module_name" ]; then
-                    read -p "无法识别模块名，请输入 (如 niri): " module_name
+                    read -p "识别不到模块名，请输入 (如 niri): " module_name
                 fi
 
                 if [ -n "$module_name" ] && [ "$module_name" != "skip" ]; then
-                    echo -e "${BLUE}>> 正在精准恢复模块: $module_name${NC}"
-                    repo_path="$REPO_DIR/dotfiles/$module_name"
+                    echo -e "${BLUE}>> 正在同步: $module_name${NC}"
+                    repo_path="$DOTFILES_DIR/$module_name"
                     mkdir -p "$repo_path"
 
-                    # 物理拷贝 -> stow --adopt 采纳 -> 再次覆盖同步
                     cp -rf "$selected_path"/. "$repo_path/" 2>/dev/null
-                    cd "$REPO_DIR/dotfiles"
+                    cd "$DOTFILES_DIR"
                     stow -t ~ --adopt "$module_name" 2>/dev/null
                     cp -rf "$selected_path"/. "$repo_path/" 2>/dev/null
                     
-                    echo -e "${GREEN}✅ $module_name 配置恢复完成。${NC}"
+                    echo -e "${GREEN}✅ $module_name 恢复完成。${NC}"
                 fi
             fi
         fi
     fi
-    echo -e "\n"
 }
