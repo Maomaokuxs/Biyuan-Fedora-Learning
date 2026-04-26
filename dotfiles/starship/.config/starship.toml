@@ -2,28 +2,28 @@ format = """$os$username$directory$git_branch$git_status$time$character"""
 
 [os]
 disabled = false
-format = "[](#99a3c7)[ ](bg:#99a3c7 fg:#21131c)"
+format = "[](#89898c)[ ](bg:#89898c fg:#090913)"
 
 [username]
 show_always = true
-format = "[ $user ](bg:#99a3c7 fg:#21131c)[](fg:#99a3c7 bg:#8c5078)"
+format = "[ $user ](bg:#89898c fg:#090913)[](fg:#89898c bg:#282850)"
 
 [directory]
-format = "[ $path ](bg:#8c5078 fg:#ffffff)"
+format = "[ $path ](bg:#282850 fg:#ffffff)"
 truncation_length = 3
 
 [git_branch]
 symbol = ""
-format = "[ $symbol $branch ](fg:#99a3c7 bg:#8c5078)"
+format = "[ $symbol $branch ](fg:#89898c bg:#282850)"
 
 [git_status]
 # 修复了这里的格式：去掉了多余的嵌套括号
-format = "[$all_status$ahead_behind](fg:#99a3c7 bg:#8c5078)"
+format = "[$all_status$ahead_behind](fg:#89898c bg:#282850)"
 
 [time]
 disabled = false
-format = "[  $time ](bg:#8c5078 fg:#ffffff)[ ](fg:#8c5078)"
+format = "[  $time ](bg:#282850 fg:#ffffff)[ ](fg:#282850)"
 
 [character]
-success_symbol = '[❯](bold fg:#99a3c7)'
+success_symbol = '[❯](bold fg:#89898c)'
 error_symbol = '[❯](bold fg:red)'
