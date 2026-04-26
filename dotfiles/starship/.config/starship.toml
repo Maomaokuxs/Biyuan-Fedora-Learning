@@ -7,42 +7,41 @@ $os$username$directory$git_branch$git_status$nodejs$python$c$rust$golang$time$cm
 [os]
 disabled = false
 # 开头自带左圆角 
-format = "[](#57585a)[ ](bg:#57585a fg:#020202)"
+format = "[](#4a5755)[ ](bg:#4a5755 fg:#010101)"
 
 [username]
 show_always = true
 # 核心魔法：用户名结束后，自带向右的三角符号 ，平滑过渡到 MUTED 颜色
-format = "[ $user ](bg:#57585a fg:#020202)[](fg:#57585a bg:#0a0a0a)"
+format = "[ $user ](bg:#4a5755 fg:#010101)[](fg:#4a5755 bg:#060607)"
 
 [directory]
 # 目录以及后面的模块全部统一使用 MUTED 背景，消除多余的色块断层
-format = "[ $path ](bg:#0a0a0a fg:#faf7f4)"
+format = "[ $path ](bg:#060607 fg:#ccb891)"
 truncation_length = 3
 truncation_symbol = "…/"
 
 [git_branch]
 symbol = ""
 # Git 等动态模块保持背景一致，只用高亮颜色 (ACCENT) 突出图标，极其优雅
-format = "[ $symbol $branch ](fg:#57585a bg:#0a0a0a)"
+format = "[ $symbol $branch ](fg:#4a5755 bg:#060607)"
 
 [git_status]
-# 方案：移除复杂的嵌套，使用标准变量组
-format = '([\[$all_status$ahead_behind\] ](fg:#57585a bg:#0a0a0a))'
+format = "[[($all_status$ahead_behind )]](fg:#4a5755 bg:#060607)"
 
 [nodejs]
 symbol = ""
-format = "[ $symbol( $version) ](fg:#57585a bg:#0a0a0a)"
+format = "[ $symbol( $version) ](fg:#4a5755 bg:#060607)"
 
 [python]
 symbol = ""
-format = "[ $symbol( $version) ](fg:#57585a bg:#0a0a0a)"
+format = "[ $symbol( $version) ](fg:#4a5755 bg:#060607)"
 
 [time]
 disabled = false
 time_format = "%R"
 # 结尾自带右圆角 ，完美收尾
-format = "[  $time ](bg:#0a0a0a fg:#faf7f4)[ ](fg:#0a0a0a)"
+format = "[  $time ](bg:#060607 fg:#ccb891)[ ](fg:#060607)"
 
 [character]
-success_symbol = '[❯](bold fg:#57585a)'
+success_symbol = '[❯](bold fg:#4a5755)'
 error_symbol = '[❯](bold fg:red)'
