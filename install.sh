@@ -1,99 +1,59 @@
 #!/bin/bash
+# 文件位置: ./install.sh
 
-# --- 1. 系统校验与环境自愈 ---
-# 增加系统校验：确保是 Fedora
-if [ ! -f /etc/fedora-release ]; then
-    echo -e "\033[1;31m错误: 检测到当前系统不是 Fedora Linux。\033[0m"
-    echo -e "\033[1;33m本脚本包含针对 Btrfs 和 DNF 的深度定制，已终止运行。\033[0m"
-    exit 1
-fi
-
-echo "正在检查并修复基础运行环境..."
-for cmd in stow figlet git curl; do
-    if ! command -v $cmd &> /dev/null; then
-        echo -e "\033[1;33m>> 正在补充安装缺失工具: $cmd\033[0m"
-        sudo dnf install -y $cmd &> /dev/null
-    fi
-done
-
-# --- 2. 全局变量导出 ---
-export REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+SCRIPTS_DIR="$REPO_DIR/scripts"
 export DOTFILES_DIR="$REPO_DIR/dotfiles"
-export BACKUP_ROOT="$HOME/.dotfiles_backup"
 
-export BLUE='\033[1;34m'
-export GREEN='\033[1;32m'
-export YELLOW='\033[1;33m'
-export RED='\033[1;31m'
-export NC='\033[0m'
+# 色彩定义
+CYAN='\033[0;36m'; BLUE='\033[0;34m'; GREEN='\033[0;32m'; PURPLE='\033[0;35m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'; BOLD='\033[1m'
 
-# --- 3. 模块加载 ---
-# 确保在仓库目录下加载，防止路径错误
-source "$REPO_DIR/scripts/utils.sh"
-source "$REPO_DIR/scripts/01_snapper_config.sh"
-source "$REPO_DIR/scripts/02_base_env.sh"
-source "$REPO_DIR/scripts/03_gpu_drivers.sh"
-source "$REPO_DIR/scripts/04_desktop_niri.sh"
-source "$REPO_DIR/scripts/05_desktop_kde.sh"
-source "$REPO_DIR/scripts/06_desktop_gnome.sh"
+show_banner() {
+    clear
+    echo -e "${CYAN}${BOLD}"
+    echo "    ____  _                             "
+    echo "   / __ )(_)__  __ __  ______ _____     "
+    echo "  / __  / / / / / / / / / __ \`/ __ \    "
+    echo " / /_/ / / /_/ / /_/ / / /_/ / / / /    "
+    echo "/_____/_/\__, /\__,_/\__,_/_/ /_/       "
+    echo "        /____/  ${PURPLE}Fedora Learning Engine${NC}"
+    echo -e "${CYAN}------------------------------------------------------${NC}"
+    echo -e "  ⚡ 模块化极速部署 | 兼容: GNOME / KDE / Niri | 📅 2026"
+    echo -e "${CYAN}------------------------------------------------------${NC}\n"
+}
 
-# --- 4. 仓库预检与自动重载逻辑 ---
-clear
-print_header
+source_modules() {
+    for script in "$SCRIPTS_DIR"/*.sh; do
+        [ -f "$script" ] && source "$script"
+    done
+}
 
-echo -e "${BLUE}=====================================================${NC}"
-echo -e "${GREEN}  [系统预检] 仓库状态检查${NC}"
-echo -e "${BLUE}=====================================================${NC}"
+main() {
+    show_banner
+    source_modules
 
-cd "$REPO_DIR" || exit
-echo -e "${BLUE}>> 正在同步云端更新信息...${NC}"
-git fetch origin main -q
+    echo -e "${BLUE}[1/2]${NC} ${BOLD}🛡️  Security & Backup Layer${NC}"
+    command -v setup_snapper_and_backup &> /dev/null && setup_snapper_and_backup
+    echo ""
 
-LOCAL=$(git rev-parse HEAD)
-REMOTE=$(git rev-parse @{u})
+    echo -e "${BLUE}[2/2]${NC} ${BOLD}🔮 Desktop Experience & Drivers${NC}"
+    echo "请选择要部署的桌面环境 (系统更新与显卡驱动将自动包含):"
+    echo "  1) 🐧 GNOME (官方默认)"
+    echo "  2) 🐉 KDE Plasma"
+    echo "  3) 🪟 Niri (Wayland 平铺 + 自定义配置部署)"
+    echo "  0) 跳过"
+    read -p "选择 [0-3]: " de_choice
 
-if [ "$LOCAL" != "$REMOTE" ]; then
-    echo -e "${YELLOW}>> 检测到远程仓库有更新！${NC}"
-    read -p "是否现在同步并自动重新运行脚本？[y/N]: " pull_now
-    if [[ $pull_now == [yY] ]]; then
-        git pull origin main
-        echo -e "${GREEN}>> 脚本已更新，正在自动重启引擎...${NC}"
-        sleep 1
-        # 核心修改：使用 exec 替换当前进程实现自动重启
-        exec bash "$0" "$@"
-    fi
-else
-    echo -e "${GREEN}✅ 仓库已是最新状态，无需同步。${NC}"
-fi
-
-# --- 5. 正式执行流程 ---
-setup_snapper       # 阶段 1：底层快照与配置恢复 (包含颜色系统同步)
-setup_base          # 阶段 2：基础环境
-setup_gpu           # 阶段 3：显卡驱动
-
-# --- 6. 阶段 4：桌面环境路由选择 ---
-echo -e "${BLUE}=====================================================${NC}"
-echo -e "${GREEN}  [阶段 4] 视觉交互：桌面环境选择${NC}"
-echo -e "${BLUE}=====================================================${NC}"
-
-while true; do
-    echo "  1) Niri 桌面环境 (包含 Starship, Waybar, Rofi 等)"
-    echo "  2) KDE Plasma 桌面环境"
-    echo "  3) GNOME 桌面环境"
-    echo "  0) 结束并退出向导"
-    
-    read -p "请输入选项 [1-3, 0退出]: " dt_opt
-    [[ "$dt_opt" == "0" ]] && break
-
-    case $dt_opt in
-        1) install_desktop_niri ;;
-        2) install_desktop_kde ;;
-        3) install_desktop_gnome ;;
-        *) echo -e "${RED}无效选项${NC}" ;;
+    case "$de_choice" in
+        1) command -v install_desktop_gnome &> /dev/null && install_desktop_gnome ;;
+        2) command -v install_desktop_kde &> /dev/null && install_desktop_kde ;;
+        3) command -v install_desktop_niri &> /dev/null && install_desktop_niri ;;
+        0|*) echo "跳过桌面安装。" ;;
     esac
-done
 
-# 清理残留
-[ -f "1:30" ] && rm "1:30"
+    echo -e "\n${CYAN}------------------------------------------------------${NC}"
+    echo -e "${GREEN}${BOLD}✨ 部署任务圆满完成！建议重启系统。${NC}"
+    echo -e "${CYAN}------------------------------------------------------${NC}"
+}
 
-echo -e "\n${BLUE}✨ 部署任务全部完成！${NC}\n"
+main "$@"

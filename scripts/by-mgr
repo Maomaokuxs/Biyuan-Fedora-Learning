@@ -1,0 +1,115 @@
+#!/bin/bash
+# Biyuan 配置管理引擎 (by-mgr) - 时间轴驱动版
+
+REPO_DIR="$HOME/Documents/github/Biyuan-Fedora-Learning"
+DOTFILES_DIR="$REPO_DIR/dotfiles"
+BACKUP_ROOT="$HOME/.dotfiles_backup"
+
+BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
+    echo -e "${BLUE}Biyuan 系统维护引擎 (by-mgr)${NC}"
+    echo "用法: by-mgr    (启动配置调度菜单)"
+    exit 0
+fi
+
+# 1. 运行前先记录一个当前状态的时间戳快照
+date_tag=$(date +%Y%m%d_%H%M%S)
+current_backup_dir="$BACKUP_ROOT/$date_tag"
+mkdir -p "$current_backup_dir"
+backed_up_any=false
+for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+    src="$HOME/.config/$module"
+    [[ "$module" == "colors" ]] && src="$HOME/.cache/hellwal"
+    if [ -d "$src" ]; then
+        dest="$current_backup_dir/$module"
+        rel=$(dirname "$src" | sed "s|$HOME||")
+        mkdir -p "$dest$rel"
+        cp -rf "$src" "$dest$rel/"
+        backed_up_any=true
+    fi
+done
+[ "$backed_up_any" = false ] && rm -rf "$current_backup_dir"
+
+# 2. 预检测是否有可用的历史时间节点 (排除刚才静默生成的)
+HAS_HISTORY=false
+mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | grep -v "$date_tag")
+[ ${#time_list[@]} -gt 0 ] && HAS_HISTORY=true
+
+# 3. 渲染主菜单
+echo -e "\n${YELLOW}==== Biyuan 配置管理模式 ====${NC}"
+echo "  1) ☁️  同步仓库最新配置 (Git -> Local) [使用 Stow 软链接]"
+if [ "$HAS_HISTORY" = true ]; then
+    echo "  2) 🕰️  从历史时间点恢复链接 (Backup -> Local)"
+    echo "  3) 📁  物理脱离 (断开链接并还原指定时间的物理文件)"
+    echo "  4) 🔄  同步至 GitHub 仓库 (Backup -> Repo + 修复权限)"
+else
+    echo "  2) 📁  物理脱离 (当前无历史备份，只能脱离现有链接)"
+fi
+echo "  0) 退出"
+
+read -p "选择模式 [0-4]: " mode
+[[ "$mode" == "0" || -z "$mode" ]] && exit 0
+
+# --- 4. 动态二级菜单逻辑 ---
+if [ "$mode" == "1" ]; then
+    # 模式 1：从 Git 仓库拉取，直接列出仓库里的模块
+    mapfile -t repo_mods < <(ls -d "$DOTFILES_DIR"/* 2>/dev/null)
+    if [ ${#repo_mods[@]} -eq 0 ]; then echo -e "${RED}仓库为空！${NC}"; exit 1; fi
+    
+    echo -e "\n${YELLOW}>> 请选择要同步的仓库模块:${NC}"
+    for i in "${!repo_mods[@]}"; do echo "  $((i+1))) $(basename "${repo_mods[i]}")"; done
+    read -p "选择模块编号: " m_idx
+    mod="$(basename "${repo_mods[$((m_idx-1))]}")"
+    
+    target="$HOME/.config/$mod"
+    [[ "$mod" == "colors" ]] && target="$HOME/.cache/hellwal"
+    [ -e "$target" ] && rm -rf "$target"
+    
+    cd "$DOTFILES_DIR" && stow -t ~ "$mod" 2>/dev/null
+    echo -e "${GREEN}✅ 已通过 Stow 链接至 Git 仓库最新配置 ($mod)。${NC}"
+
+elif [[ "$mode" =~ ^[2-4]$ ]]; then
+    if [ "$HAS_HISTORY" = false ]; then echo -e "${RED}暂无历史备份，无法执行此操作。${NC}"; exit 1; fi
+
+    # 步骤 A：选择时间点
+    echo -e "\n${YELLOW}>> [1/2] 请选择历史备份点 (时间戳):${NC}"
+    for i in "${!time_list[@]}"; do echo "  $((i+1))) $(basename "${time_list[i]}")"; done
+    read -p "选择时间编号: " t_idx
+    selected_time="${time_list[$((t_idx-1))]}"
+
+    # 步骤 B：选择该时间点下的具体软件模块
+    mapfile -t mod_list < <(ls -d "$selected_time"/* 2>/dev/null)
+    if [ ${#mod_list[@]} -eq 0 ]; then echo -e "${RED}该备份点下为空！${NC}"; exit 1; fi
+    
+    echo -e "\n${YELLOW}>> [2/2] 请选择此时间点下的软件配置:${NC}"
+    for i in "${!mod_list[@]}"; do echo "  $((i+1))) $(basename "${mod_list[i]}")"; done
+    read -p "选择模块编号: " m_idx
+    selected_module_path="${mod_list[$((m_idx-1))]}"
+    mod="$(basename "$selected_module_path")"
+
+    target="$HOME/.config/$mod"
+    [[ "$mod" == "colors" ]] && target="$HOME/.cache/hellwal"
+    [ -e "$target" ] && rm -rf "$target"
+
+    # 执行最终操作
+    case "$mode" in
+        2)
+            # 因为 Stow 要求在包的父目录下执行，这里直接 cd 到选定的时间文件夹
+            cd "$selected_time" && stow -t ~ "$mod"
+            echo -e "${GREEN}✅ 已恢复并链接至 $selected_time 下的 $mod 配置。${NC}"
+            ;;
+        3)
+            mkdir -p "$target"
+            cp -rf "$(find "$selected_module_path" -name "$mod" -type d)/." "$target/"
+            echo -e "${GREEN}✅ 物理恢复完成，当前配置已脱离链接独立运行。${NC}"
+            ;;
+        4)
+            echo -e "${YELLOW}>> 正在修复权限并同步...${NC}"
+            sudo chown -R $(whoami):$(whoami) "$selected_module_path"
+            rm -rf "$DOTFILES_DIR/$mod" && mkdir -p "$DOTFILES_DIR/$mod"
+            cp -rf "$selected_module_path"/. "$DOTFILES_DIR/$mod/"
+            echo -e "${GREEN}✅ $mod 已同步至主仓库，请记得执行 git push！${NC}"
+            ;;
+    esac
+fi
