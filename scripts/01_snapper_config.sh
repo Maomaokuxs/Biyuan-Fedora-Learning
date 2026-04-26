@@ -1,75 +1,67 @@
 #!/bin/bash
 
 setup_snapper() {
+    # 强制局部变量防止丢失
+    local B_PATH="$HOME/.dotfiles_backup"
+
     echo -e "${BLUE}=====================================================${NC}"
-    echo -e "${GREEN}  [系统阶段 1] 配置恢复管理与 Snapper 检测${NC}"
+    echo -e "${GREEN}  [阶段 1] 配置恢复 (非破坏性模式)${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
-    # --- 模块 A：配置文件恢复管理 ---
-    if [ -d "$BACKUP_ROOT" ] && [ "$(ls -A "$BACKUP_ROOT" 2>/dev/null)" ]; then
-        echo -e "${YELLOW}>> 检测到本地存在历史备份记录。${NC}"
-        echo -e "你可以选择：[1] 恢复特定模块 [2] 恢复所有模块 [0] 跳过"
-        read -p "请输入选项: " recover_choice
+    if [ -d "$B_PATH" ] && [ "$(ls -A "$B_PATH" 2>/dev/null)" ]; then
+        echo -e "${YELLOW}>> 检测到本地历史备份。${NC}"
+        echo -e "选项: [1] 选择模块恢复 [2] 全部恢复 [0] 跳过"
+        read -p "选择: " r_choice
 
-        if [[ "$recover_choice" == "1" || "$recover_choice" == "2" ]]; then
-            mapfile -t backups < <(ls -dt "$BACKUP_ROOT"/*)
+        if [[ "$r_choice" == "1" || "$r_choice" == "2" ]]; then
+            mapfile -t backups < <(ls -dt "$B_PATH"/* 2>/dev/null)
             
-            # 如果是恢复特定模块，先列出清单
-            if [[ "$recover_choice" == "1" ]]; then
-                echo -e "\n${BLUE}可用备份清单:${NC}"
+            if [[ "$r_choice" == "1" ]]; then
+                echo -e "\n${BLUE}备份清单:${NC}"
                 for i in "${!backups[@]}"; do
                     echo "  $((i+1))) $(basename "${backups[i]}")"
                 done
-                read -p "请输入要恢复的编号 (空格分隔多选): " b_choices
+                read -p "输入编号 (空格多选): " b_idxs
             else
-                # 恢复所有：自动选中所有最新备份
-                b_choices=$(seq 1 ${#backups[@]})
+                b_idxs=$(seq 1 ${#backups[@]})
             fi
 
-            for idx in $b_choices; do
-                if [[ "$idx" -lt 1 ]] || [[ "$idx" -gt "${#backups[@]}" ]]; then continue; fi
-                
+            for idx in $b_idxs; do
+                [ -z "$idx" ] && continue
                 selected_path="${backups[$((idx-1))]}"
                 dir_name=$(basename "$selected_path")
-                module_name=$(echo "$dir_name" | cut -d'_' -f3-)
+                
+                # 增强型模块名提取：取最后一个下划线后的内容
+                module_name=$(echo "$dir_name" | rev | cut -d'_' -f1 | rev)
 
-                # 识别失败时的手动干预
-                if [ -z "$module_name" ]; then
-                    echo -e "${RED}无法识别备份 [$dir_name] 的模块名。${NC}"
-                    read -p "请输入对应的模块名 (或输入 skip 跳过): " module_name
-                    [[ "$module_name" == "skip" ]] && continue
+                # 手动校验
+                if [[ "$dir_name" == "$module_name" ]] || [ -z "$module_name" ]; then
+                    read -p "无法识别备份 [$dir_name] 的模块名，请输入 (如 starship): " module_name
                 fi
 
-                echo -e "${BLUE}>> 正在同步模块: $module_name${NC}"
-                
-                # --- 核心逻辑：非破坏性同步 ---
-                # 1. 将备份内容同步到仓库，不删除仓库原有结构
-                repo_module_path="$DOTFILES_DIR/$module_name"
-                mkdir -p "$repo_module_path"
-                cp -rf "$selected_path"/. "$repo_module_path/" 2>/dev/null
+                if [ -n "$module_name" ]; then
+                    echo -e "${BLUE}>> 正在同步: $module_name${NC}"
+                    repo_path="$REPO_DIR/dotfiles/$module_name"
+                    mkdir -p "$repo_path"
 
-                # 2. 安全链接：使用 stow --adopt
-                # --adopt 的神奇之处在于：如果家目录有物理文件，它会把物理文件“吸”进仓库作为链接目标
-                # 配合我们刚 cp 进去的备份文件，它能强制建立链接而不报错，也不需要 rm -rf
-                cd "$DOTFILES_DIR"
-                stow -t ~ --adopt "$module_name" 2>/dev/null
-                
-                # 3. 再次重置仓库状态，确保仓库内是备份的版本而不是刚才被“吸”进来的旧版
-                cp -rf "$selected_path"/. "$repo_module_path/" 2>/dev/null
-                
-                echo -e "${GREEN}✅ 模块 $module_name 已重新链接并恢复完成。${NC}"
+                    # 1. 物理同步到仓库 (不删除任何东西)
+                    cp -rf "$selected_path"/. "$repo_path/" 2>/dev/null
+
+                    # 2. 核心：Stow --adopt (采纳现有的物理文件，建立链接)
+                    cd "$REPO_DIR/dotfiles"
+                    # --adopt 会处理家目录已存在的物理文件，将其与仓库关联
+                    stow -t ~ --adopt "$module_name" 2>/dev/null
+                    
+                    # 3. 二次覆盖仓库：确保仓库里的内容是备份里的版本，而不是被 adopt 强制吸纳的旧版本
+                    cp -rf "$selected_path"/. "$repo_path/" 2>/dev/null
+                    echo -e "${GREEN}✅ $module_name 链接已建立。${NC}"
+                fi
             done
-            echo -e "${GREEN}>> 恢复流程结束，未触及其他无关配置。${NC}\n"
         fi
     fi
 
-    # --- 模块 B：Snapper 状态检测 ---
+    # Snapper 检测部分
     if command -v snapper &> /dev/null && [ "$(ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
-        echo -e "${YELLOW}>> Snapper 配置已激活。${NC}"
-        echo -e "${GREEN}>> ✅ 已就绪。${NC}\n"
-    else
-        # ... (Snapper 初始化的 Btrfs 检测逻辑，此处保持不变)
-        if ! command -v snapper &> /dev/null; then sudo dnf install -y snapper; fi
-        # [保留你原来的 findmnt 循环逻辑]
+        echo -e "${YELLOW}>> Snapper 已就绪。${NC}"
     fi
 }
