@@ -1,13 +1,10 @@
 #!/bin/bash
 # 文件位置: dotfiles/niri/.config/niri/scripts/init-wallpaper.sh
 
-# --- 1. 动态获取仓库根目录 (更鲁棒的方案) ---
-# 获取脚本所在的实际物理目录
-CURRENT_DIR=$(cd "$(dirname "$(readlink -f "$0")")" && pwd)
-REPO_ROOT="$CURRENT_BACKUP"
-
-# 向上循环查找包含 .git 或 assets 的目录作为根目录
-search_dir="$CURRENT_DIR"
+# 1. 动态获取仓库根目录
+SCRIPT_PATH=$(readlink -f "$0")
+search_dir=$(dirname "$SCRIPT_PATH")
+REPO_ROOT=""
 while [[ "$search_dir" != "/" ]]; do
     if [[ -d "$search_dir/assets" ]] || [[ -d "$search_dir/.git" ]]; then
         REPO_ROOT="$search_dir"
@@ -16,55 +13,32 @@ while [[ "$search_dir" != "/" ]]; do
     search_dir=$(dirname "$search_dir")
 done
 
-if [[ -z "$REPO_ROOT" ]]; then
-    echo -e "\033[0;31m❌ 错误: 无法定位仓库根目录！\033[0m"
-    exit 1
-fi
-
-# --- 2. 定义路径变量 ---
+# 2. 路径定义
 DEFAULT_WALL_SRC="$REPO_ROOT/assets/default_wallpaper.png"
-WALL_SRC_DIR="$REPO_ROOT/dotfiles/niri/wallpapers"
+THEME_SYNC_SCRIPT="$REPO_ROOT/scripts/theme-sync.sh"
 WALL_DEST_DIR="$HOME/Pictures/Wallpapers"
+mkdir -p "$WALL_DEST_DIR"
 
-echo -e ">> 仓库根目录定位成功: \033[0;32m$REPO_ROOT\033[0m"
-
-# --- 3. 检查并创建目标文件夹 ---
-if [ ! -d "$WALL_DEST_DIR" ]; then
-    echo ">> 正在创建壁纸目录: $WALL_DEST_DIR"
-    mkdir -p "$WALL_DEST_DIR"
-fi
-
-# --- 4. 智能同步逻辑 (增加调试信息) ---
-
-# A. 部署默认壁纸
+# 3. 部署默认壁纸
+FINAL_WALLPAPER="$WALL_DEST_DIR/default_wallpaper.png"
 if [ -f "$DEFAULT_WALL_SRC" ]; then
-    echo ">> 正在部署默认壁纸..."
-    cp -n "$DEFAULT_WALL_SRC" "$WALL_DEST_DIR/default_wallpaper.png"
-else
-    echo -e "\033[0;33m⚠️  未找到默认壁纸源文件: $DEFAULT_WALL_SRC\033[0m"
+    cp -n "$DEFAULT_WALL_SRC" "$FINAL_WALLPAPER"
 fi
 
-# B. 增量同步壁纸库
-if [ -d "$WALL_SRC_DIR" ]; then
-    # 检查源目录是否为空
-    if [ "$(ls -A "$WALL_SRC_DIR" 2>/dev/null)" ]; then
-        echo ">> 正在同步壁纸库资源..."
-        # 显式使用 ./* 确保复制内容
-        cp -rn "$WALL_SRC_DIR"/. "$WALL_DEST_DIR/"
-        echo -e "\033[0;32m✅ 壁纸同步成功。\033[0m"
+# 4. 激活视觉引擎
+if [ -f "$THEME_SYNC_SCRIPT" ]; then
+    echo ">> 发现取色引擎: $THEME_SYNC_SCRIPT"
+    chmod +x "$THEME_SYNC_SCRIPT"
+    bash "$THEME_SYNC_SCRIPT" "$FINAL_WALLPAPER"
+else
+    echo -e "\033[0;31m⚠️ 错误: 找不到 $THEME_SYNC_SCRIPT，尝试备选路径...\033[0m"
+    # 备选：如果在仓库没找到，尝试在当前家目录配置中找
+    ALT_SYNC="$HOME/.config/niri/scripts/theme-sync.sh"
+    if [ -f "$ALT_SYNC" ]; then
+        bash "$ALT_SYNC" "$FINAL_WALLPAPER"
     else
-        echo -e "\033[0;33m⚠️  壁纸源目录为空: $WALL_SRC_DIR\033[0m"
+        swww img "$FINAL_WALLPAPER"
     fi
-else
-    echo -e "\033[0;31m❌ 找不到壁纸源目录: $WALL_SRC_DIR\033[0m"
 fi
 
-# --- 5. 执行壁纸应用命令 ---
-if command -v swww &> /dev/null; then
-    # 确保 swww daemon 正在运行
-    swww query &>/dev/null || swww init &>/dev/null
-    sleep 0.5
-    swww img "$WALL_DEST_DIR/default_wallpaper.png" --transition-type center
-fi
-
-echo "✨ 壁纸初始化任务结束。"
+echo "✨ 视觉系统初始化结束。"
