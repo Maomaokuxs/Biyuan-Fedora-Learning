@@ -67,3 +67,9 @@ export PATH="$HOME/.local/bin:$PATH"
 
 # Biyuan CLI Tools
 export PATH="$HOME/.local/bin:$PATH"
+
+# Biyuan CLI Tools
+export PATH="$HOME/.local/bin:$PATH"
+
+# Biyuan CLI Tools
+export PATH="$HOME/.local/bin:$PATH"

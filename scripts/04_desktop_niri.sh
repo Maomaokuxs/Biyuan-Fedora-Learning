@@ -93,13 +93,23 @@ install_desktop_niri() {
         cp "$REPO_DIR/scripts/by-mgr" "$BIN_DIR/by-mgr"
         chmod +x "$BIN_DIR/by-mgr"
         
+        # 智能识别当前 Shell 配置文件
         local SHELL_RC="$HOME/.bashrc"
-        [[ $SHELL == *"zsh"* ]] && SHELL_RC="$HOME/.zshrc"
+        [[ "$SHELL" == *"zsh"* ]] && SHELL_RC="$HOME/.zshrc"
         
-        if ! grep -q "$BIN_DIR" "$SHELL_RC"; then
-            echo -e "\n# Biyuan CLI Tools" >> "$SHELL_RC"
-            echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$SHELL_RC"
+        # 定义要注入的标准行
+        local PATH_LINE="export PATH=\"\$HOME/.local/bin:\$PATH\""
+
+        # --- 核心优化：幂等检查 ---
+        if [ -f "$SHELL_RC" ]; then
+            if grep -Fq "$PATH_LINE" "$SHELL_RC"; then
+                echo -e "${CYAN}>> 环境变量已存在于 $SHELL_RC，跳过重复添加。${NC}"
+            else
+                echo -e "\n# Biyuan CLI Tools" >> "$SHELL_RC"
+                echo "$PATH_LINE" >> "$SHELL_RC"
+                echo -e "${GREEN}✅ 已成功将路径添加至 $SHELL_RC。${NC}"
+            fi
         fi
-        echo -e "${GREEN}✅ 命令部署成功。重启终端输入 'by-mgr' 即可使用。${NC}"
+        echo -e "${GREEN}✅ 命令部署成功。${NC}"
     fi
 }
