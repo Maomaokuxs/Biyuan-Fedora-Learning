@@ -3,39 +3,25 @@
 
 install_desktop_niri() {
     echo -e "${BLUE}=====================================================${NC}"
-    echo -e "${GREEN}  [系统阶段 2] 显卡驱动探测与 Niri 桌面部署${NC}"
+    echo -e "${GREEN}  [系统阶段 2] Niri 桌面环境自动化部署${NC}"
     echo -e "${BLUE}=====================================================${NC}"
 
-    # --- 1. 智能显卡硬件检测与驱动安装 ---
-    echo -e "${YELLOW}>> 正在扫描本机显卡硬件...${NC}"
-    
-    # 使用 lspci 抓取 VGA/3D 控制器信息
-    GPU_INFO=$(lspci | grep -iE 'vga|3d')
-    echo -e "${CYAN}发现图形硬件: ${GPU_INFO}${NC}"
-
-    if echo "$GPU_INFO" | grep -iq "nvidia"; then
-        echo -e "${YELLOW}>> 检测到 NVIDIA 显卡。准备安装专有驱动与内核模块 (akmod)...${NC}"
-        echo -e "${BLUE}ℹ️  提示: 安装 akmod-nvidia 前会自动更新系统内核，以确保模块编译成功。${NC}"
-        
-        sudo dnf update -y
-        # 安装 NVIDIA 驱动、CUDA 依赖以及 Wayland 支持包
-        sudo dnf install -y akmod-nvidia xorg-x11-drv-nvidia-cuda egl-wayland
-        
-        echo -e "${GREEN}✅ NVIDIA 驱动安装指令已执行。(需重启后生效)${NC}"
-
-    elif echo "$GPU_INFO" | grep -iq "amd"; then
-        echo -e "${GREEN}✅ 检测到 AMD 显卡。Fedora 内置的开源驱动 (amdgpu/Mesa) 已完美支持 Wayland，无需额外安装专有驱动。${NC}"
-    elif echo "$GPU_INFO" | grep -iq "intel"; then
-        echo -e "${GREEN}✅ 检测到 Intel 显卡。内置开源驱动已就绪。${NC}"
+    # --- 1. 调用独立显卡驱动脚本 (替换原来的冗余代码) ---
+    local GPU_SCRIPT="$REPO_DIR/scripts/03_gpu_drivers.sh"
+    if [ -f "$GPU_SCRIPT" ]; then
+        echo -e "${YELLOW}>> 正在调用外部显卡驱动配置模块...${NC}"
+        chmod +x "$GPU_SCRIPT"
+        source "$GPU_SCRIPT"
+        # 注意：这里假设 03_gpu_drivers.sh 中定义了 setup_gpu 或是直接执行逻辑
+        # 如果 03 脚本只是纯命令，source 它就会直接运行；如果里面是函数，请在此处调用函数名
     else
-        echo -e "${YELLOW}⚠️  未匹配到特定独立显卡型号，将使用系统默认驱动栈。${NC}"
+        echo -e "${RED}⚠️ 错误: 找不到显卡脚本 $GPU_SCRIPT，尝试继续安装桌面...${NC}"
     fi
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
     # --- 2. 安装 Niri 及核心组件 ---
     echo -e "${YELLOW}>> 正在安装 Niri 窗口管理器及周边生态环境...${NC}"
-    # 推荐安装 rofi-wayland 替代原版 rofi 以获得更好的原生体验
     sudo dnf install -y niri waybar rofi-wayland kitty fcitx5 fcitx5-chinese-addons stow
     echo -e "${GREEN}✅ 基础软件包安装完毕。${NC}"
 
@@ -55,7 +41,6 @@ install_desktop_niri() {
             local target_dir="$HOME/.config/$module"
             [[ "$module" == "colors" ]] && target_dir="$HOME/.cache/hellwal"
 
-            # 预清理可能存在的冲突
             [ -e "$target_dir" ] && rm -rf "$target_dir"
 
             if [ "$deploy_mode" == "1" ]; then
@@ -68,13 +53,26 @@ install_desktop_niri() {
             fi
         done
         echo -e "${GREEN}✅ 所有的配置文件部署完毕！${NC}"
+
+        # --- 4. 自动化色彩与壁纸初始化 (核心新增) ---
+        echo -e "\n${BLUE}>> 正在初始化桌面视觉效果 (Hellwal & Wallpaper)...${NC}"
+        local INIT_WALL="$DOTFILES_DIR/niri/.config/niri/scripts/init-wallpaper.sh"
+        
+        if [ -f "$INIT_WALL" ]; then
+            chmod +x "$INIT_WALL"
+            # 使用 bash 执行以确保环境纯净
+            bash "$INIT_WALL"
+            echo -e "${GREEN}✅ 桌面色彩初始化完成。${NC}"
+        else
+            echo -e "${RED}⚠️ 警告: 找不到初始化脚本 $INIT_WALL，跳过色彩生成。${NC}"
+        fi
     else
-        echo -e "${YELLOW}>> 已跳过配置文件部署。${NC}"
+        echo -e "${YELLOW}>> 已跳过配置部署及壁纸初始化。${NC}"
     fi
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 4. 注册全局维护命令 by-mgr ---
+    # --- 5. 注册全局维护命令 by-mgr ---
     echo -e "${BLUE}>> 正在注册全局系统维护命令: by-mgr${NC}"
     local BIN_DIR="$HOME/.local/bin"
     mkdir -p "$BIN_DIR"
@@ -90,8 +88,6 @@ install_desktop_niri() {
             echo -e "\n# Biyuan CLI Tools" >> "$SHELL_RC"
             echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >> "$SHELL_RC"
         fi
-        echo -e "${GREEN}✅ 命令部署成功。以后可直接输入 'by-mgr' 唤起高级维护菜单！${NC}"
-    else
-        echo -e "${RED}⚠️ 警告: 找不到 scripts/by-mgr，跳过命令部署。请检查文件是否存在。${NC}"
+        echo -e "${GREEN}✅ 命令部署成功。重启终端输入 'by-mgr' 即可使用。${NC}"
     fi
 }
