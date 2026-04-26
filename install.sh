@@ -14,8 +14,8 @@ export NC='\033[0m'
 # --- 严格匹配你的脚本目录加载所有模块 ---
 source "$REPO_DIR/scripts/utils.sh"
 source "$REPO_DIR/scripts/01_snapper_config.sh"
-source "$REPO_DIR/scripts/02_gpu_drivers.sh"
-source "$REPO_DIR/scripts/03_base_env.sh"
+source "$REPO_DIR/scripts/02_base_env.sh"      # 提前到第二位
+source "$REPO_DIR/scripts/03_gpu_drivers.sh"   # 后移到第三位
 source "$REPO_DIR/scripts/04_desktop_niri.sh"
 source "$REPO_DIR/scripts/05_desktop_kde.sh"
 source "$REPO_DIR/scripts/06_desktop_gnome.sh"
@@ -23,10 +23,10 @@ source "$REPO_DIR/scripts/06_desktop_gnome.sh"
 # --- 执行主线任务 ---
 clear
 print_header
-sync_and_snapshot          # 云端同步与预检快照 (utils.sh)
-setup_snapper              # 第一关：配置快照 (01)
-setup_gpu                  # 第二关：显卡驱动 (02)
-setup_base                 # 第三关：基础环境 (03)
+sync_and_snapshot          # 预检
+setup_snapper              # 阶段 1: 快照 (最优先，作为回滚点)
+setup_base                 # 阶段 2: 基础环境 (包含系统更新)
+setup_gpu                  # 阶段 3: 显卡驱动
 
 # --- 第四关：桌面环境路由选择 ---
 echo -e "${BLUE}=====================================================${NC}"
