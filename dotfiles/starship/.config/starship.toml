@@ -26,7 +26,7 @@ symbol = ""
 format = "[ $symbol $branch ](fg:#4a5755 bg:#060607)"
 
 [git_status]
-format = '[($all_status$ahead_behind )](fg:#4a5755 bg:#060607)'
+format = "[[($all_status$ahead_behind )]](fg:#4a5755 bg:#060607)"
 
 [nodejs]
 symbol = ""
