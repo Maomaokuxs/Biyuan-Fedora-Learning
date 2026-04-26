@@ -1,93 +1,94 @@
 #!/bin/bash
 
-# --- 1. 基础环境自愈 (筑基) ---
-# 无论如何，先确保这几个关键工具存在，否则后续 source 都会报错
-echo "正在检查并修复基础运行环境..."
-for cmd in stow figlet git curl; do
-    if ! command -v $cmd &> /dev/null; then
-        echo -e "\033[1;33m>> 正在补充安装缺失工具: $cmd\033[0m"
-        sudo dnf install -y $cmd &> /dev/null
-    fi
-done
-
-# --- 2. 全局变量导出 ---
-export REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
-export DOTFILES_DIR="$REPO_DIR/dotfiles"
-export BACKUP_ROOT="$HOME/.dotfiles_backup"
-
-# 导出颜色变量供子脚本使用
-export BLUE='\033[1;34m'
-export GREEN='\033[1;32m'
-export YELLOW='\033[1;33m'
-export RED='\033[1;31m'
-export NC='\033[0m'
-
-# --- 系统校验 (新增) ---
-if [ ! -f /etc/fedora-release ]; then
-    echo -e "${RED}错误: 检测到当前系统不是 Fedora Linux。${NC}"
-    echo -e "${YELLOW}本脚本专为 Fedora 系统管理设计，已终止运行。${NC}"
-    exit 1
-fi
-
-# --- 3. 模块加载 (顺序加载) ---
-# 注意：这里只 source 包含函数的脚本，不直接执行
-source "$REPO_DIR/scripts/utils.sh"
-source "$REPO_DIR/scripts/01_snapper_config.sh"
-source "$REPO_DIR/scripts/02_base_env.sh"
-source "$REPO_DIR/scripts/03_gpu_drivers.sh"
-source "$REPO_DIR/scripts/04_desktop_niri.sh"
-source "$REPO_DIR/scripts/05_desktop_kde.sh"
-source "$REPO_DIR/scripts/06_desktop_gnome.sh"
-
-# --- 4. 严格执行逻辑流 (核心修复) ---
-# 我们不再在 sync_and_snapshot 里使用 exec，而是通过逻辑控制
-clear
-print_header
-
-# [预检阶段] 仅执行同步，不在此处重启
-echo -e "${BLUE}=====================================================${NC}"
-echo -e "${GREEN}  [系统预检] 仓库状态检查${NC}"
-echo -e "${BLUE}=====================================================${NC}"
-cd "$REPO_DIR" || exit
-git fetch origin main -q
-if [ "$(git rev-parse HEAD)" != "$(git rev-parse @{u})" ]; then
-    echo -e "${YELLOW}>> 检测到远程仓库有更新。${NC}"
-    read -p "是否现在同步并应用新脚本？[y/N]: " pull_now
-    if [[ $pull_now == [yY] ]]; then
-        git pull origin main
-        echo -e "${GREEN}>> 脚本已更新，请重新运行 ./install.sh 以应用改动。${NC}"
-        exit 0  # 安全退出，由用户手动重新运行，确保加载最新函数
-    fi
-fi
-
-# [正式执行阶段] 锁死顺序，任何一个失败或跳过都会按照函数内部逻辑处理
-setup_snapper       # 阶段 1：恢复与快照
-setup_base          # 阶段 2：基础环境
-setup_gpu           # 阶段 3：显卡驱动
-
-# --- 5. 阶段 4：桌面环境路由选择 ---
-echo -e "${BLUE}=====================================================${NC}"
-echo -e "${GREEN}  [阶段 4] 视觉交互：桌面环境选择${NC}"
-echo -e "${BLUE}=====================================================${NC}"
-
-while true; do
-    echo "  1) Niri 桌面环境 (包含 Starship, Waybar, Rofi 等)"
-    echo "  2) KDE Plasma 桌面环境"
-    echo "  3) GNOME 桌面环境"
-    echo "  0) 结束并退出向导"
+setup_snapper() {
+    echo -e "${BLUE}=====================================================${NC}"
+    echo -e "${GREEN}  [系统阶段 1] Snapper 底层防护与颜色/配置恢复管理${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
     
-    read -p "请输入选项 [1-3, 0退出]: " dt_opt
-    [[ "$dt_opt" == "0" ]] && break
+    # --- 1. Snapper 引导与快照创建 ---
+    if command -v snapper &> /dev/null && [ "$(ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
+        echo -e "${GREEN}>> [状态] Snapper 底层快照配置已激活。${NC}"
+        read -p "🚨 是否在部署前为当前系统创建一个安全快照？[y/N]: " do_snap
+        if [[ $do_snap == [yY] ]]; then
+            local target_c=$(sudo snapper list-configs | awk 'NR==3 {print $1}')
+            [ -z "$target_c" ] && target_c="root"
+            echo -e "${YELLOW}>> 正在创建快照...${NC}"
+            sudo snapper -c "$target_c" create --description "Pre_Deployment_Backup"
+            echo -e "${GREEN}✅ 快照创建完成！${NC}"
+        fi
+    else
+        echo -e "${YELLOW}>> [提示] 尚未检测到 Snapper 配置，准备进行初始化...${NC}"
+        if ! command -v snapper &> /dev/null; then sudo dnf install -y snapper &> /dev/null; fi
 
-    case $dt_opt in
-        1) install_desktop_niri ;;
-        2) install_desktop_kde ;;
-        3) install_desktop_gnome ;;
-        *) echo -e "${RED}无效选项${NC}" ;;
-    esac
-done
+        mapfile -t subvolumes < <(findmnt -nt btrfs -o TARGET)
+        if [ ${#subvolumes[@]} -gt 0 ]; then
+            echo -e "发现以下挂载点:"
+            for i in "${!subvolumes[@]}"; do echo "  $((i+1))) ${subvolumes[i]}"; done
+            read -p "请选择要保护的编号 (多选空格隔开): " snap_choices
+            if [[ -n "$snap_choices" && "$snap_choices" != "0" ]]; then
+                for idx in $snap_choices; do
+                    [ "$idx" -lt 1 ] || [ "$idx" -gt "${#subvolumes[@]}" ] && continue
+                    local target_vol="${subvolumes[$((idx-1))]}"
+                    local config_name=$(echo "$target_vol" | sed 's/\///g')
+                    [ -z "$config_name" ] && config_name="root"
+                    sudo snapper -c "$config_name" create-config "$target_vol"
+                done
+                echo -e "${GREEN}✅ Snapper 配置已建立。${NC}"
+            fi
+        fi
+    fi
 
-# 清理那个奇怪的报错残留文件
-[ -f "1:30" ] && rm "1:30"
+    echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-echo -e "\n${BLUE}✨ 部署任务全部完成！建议重启系统以应用更改。${NC}\n"
+    # --- 2. 颜色缓存与 Dotfiles 恢复模块 ---
+    local B_PATH="$HOME/.dotfiles_backup"
+    if [ -d "$B_PATH" ] && [ "$(ls -A "$B_PATH" 2>/dev/null)" ]; then
+        echo -e "${YELLOW}>> [配置] 检测到本地历史备份。${NC}"
+        read -p "是否从本地备份恢复配置文件（含颜色系统）？[y/N]: " local_restore
+        
+        if [[ $local_restore == [yY] ]]; then
+            mapfile -t backups < <(ls -dt "$B_PATH"/* 2>/dev/null)
+            echo -e "\n${BLUE}可用备份列表:${NC}"
+            for i in "${!backups[@]}"; do
+                echo "  $((i+1))) $(basename "${backups[i]}")"
+            done
+            read -p "请输入要恢复的编号 (多选空格隔开, 0跳过): " b_choices
+            
+            for b_idx in $b_choices; do
+                [[ "$b_idx" == "0" ]] && break
+                selected_path="${backups[$((b_idx-1))]}"
+                dir_name=$(basename "$selected_path")
+                # 提取模块名 (2026_niri -> niri)
+                module_name=$(echo "$dir_name" | rev | cut -d'_' -f1 | rev)
+
+                if [[ "$dir_name" == "$module_name" ]]; then
+                    read -p "无法识别备份 [$dir_name] 的模块名，请输入 (如 colors, niri): " module_name
+                fi
+
+                if [ -n "$module_name" ] && [ "$module_name" != "skip" ]; then
+                    echo -e "${BLUE}>> 正在同步模块: $module_name${NC}"
+                    repo_module_path="$DOTFILES_DIR/$module_name"
+                    mkdir -p "$repo_module_path"
+
+                    # 核心逻辑：物理拷贝内容到仓库
+                    cp -rf "$selected_path"/. "$repo_module_path/" 2>/dev/null
+
+                    # --- 特殊路径判定 ---
+                    # 默认 stow 是基于家目录 (~) 的。
+                    # 如果模块里包含 .cache 结构，stow 会自动在 ~/.cache 下创建链接
+                    cd "$DOTFILES_DIR"
+                    
+                    # 使用 --adopt 采纳家目录现有文件（特别是 .cache/hellwal）
+                    # 如果目录不存在，先创建父目录防止 stow 报错
+                    [ "$module_name" == "colors" ] && mkdir -p "$HOME/.cache"
+                    
+                    stow -t ~ --adopt "$module_name" 2>/dev/null
+                    
+                    # 二次同步仓库，确保备份版本覆盖家目录被吸纳的版本
+                    cp -rf "$selected_path"/. "$repo_module_path/" 2>/dev/null
+                    echo -e "${GREEN}✅ $module_name 恢复并建立链接。${NC}"
+                fi
+            done
+        fi
+    fi
+}
