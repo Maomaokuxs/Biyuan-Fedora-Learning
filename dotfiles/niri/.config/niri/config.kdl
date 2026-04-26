@@ -678,10 +678,6 @@ binds {
   // 自动同步配置文件脚本
   spawn-at-startup "~/.local/bin/dot-sync"
 
-  //默认壁纸
-  spawn-at-startup "swww-daemon" // 推荐使用 swww 处理动态切换
-  spawn-at-startup "~/.config/niri/scripts/init-wallpaper.sh"
-
   // 锁屏
   // 1. 同步环境：告诉系统底层当前的显示协议和桌面环境
   spawn-at-startup "dbus-update-activation-environment" "--systemd" "WAYLAND_DISPLAY" "XDG_CURRENT_DESKTOP"
