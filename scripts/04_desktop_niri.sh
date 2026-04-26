@@ -5,40 +5,34 @@ install_desktop_niri() {
     echo -e "${GREEN}  [阶段 4] 部署 Niri 桌面环境与色彩初始化${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
-    # --- 1. 默认壁纸初始化与取色 ---
-    local USER_WALL_DIR="$HOME/Pictures/Wallpapers"
+    # --- 1. 壁纸初始化 (小写 wallpapers) ---
+    local USER_WALL_DIR="$HOME/Pictures/wallpapers"
     mkdir -p "$USER_WALL_DIR"
     
-    # 指向仓库中的默认资源 (请确保仓库下有 assets/default_wallpaper.png)
     local REPO_DEFAULT_WALL="$REPO_DIR/assets/default_wallpaper.png"
+    local INIT_WALL="$USER_WALL_DIR/default_initial_wallpaper.png"
     
     if [ -f "$REPO_DEFAULT_WALL" ]; then
-        local wall_name="default_initial_wallpaper.png"
-        local target_wall="$USER_WALL_DIR/$wall_name"
+        echo -e "${BLUE}>> 正在部署初始壁纸资产...${NC}"
+        cp "$REPO_DEFAULT_WALL" "$INIT_WALL"
         
-        # 复制到用户目录
-        cp "$REPO_DEFAULT_WALL" "$target_wall"
-        
-        echo -e "${BLUE}>> 正在执行初始色彩提取 (Hellwal)...${NC}"
+        # 主动触发一次 Hellwal 色彩生成
         if command -v hellwal &> /dev/null; then
-            # 仅触发生成脚本，不涉及仓库提交
-            hellwal -i "$target_wall" > /dev/null 2>&1
-            
-            # 记录当前壁纸状态供分发脚本使用
-            echo "$target_wall" > "$HOME/.cache/current_wallpaper"
-            echo -e "${GREEN}✅ 本地颜色配置文件已生成至 ~/.cache/hellwal/${NC}"
-        else
-            echo -e "${RED}❌ 错误: 未找到 hellwal 命令，请确保在基础环境阶段已安装。${NC}"
+            echo -e "${BLUE}>> 正在生成初始 Hellwal 色彩配置...${NC}"
+            hellwal -i "$INIT_WALL" > /dev/null 2>&1
+            # 缓存当前壁纸路径供 Niri 启动脚本使用
+            echo "$INIT_WALL" > "$HOME/.cache/current_wallpaper"
+            echo -e "${GREEN}✅ 初始色彩生成完成。${NC}"
         fi
     else
-        echo -e "${YELLOW}>> [警告] 仓库内未找到 assets/default_wallpaper.png，跳过色彩生成。${NC}"
+        echo -e "${RED}⚠️ 仓库 assets/ 下未找到默认壁纸，跳过色彩初始化。${NC}"
     fi
 
-    # --- 2. 应用 Dotfiles 链接 ---
-    echo -e "${BLUE}>> 正在部署 Niri, Waybar, Rofi 相关配置...${NC}"
+    # --- 2. 部署 Dotfiles 链接 ---
+    echo -e "${BLUE}>> 正在链接应用配置 (Niri, Waybar, Rofi)...${NC}"
     cd "$DOTFILES_DIR"
     
-    # 按照你的要求，这里只链接应用配置，不涉及 colors 仓库模块
+    # 遍历仓库模块进行链接，注意 colors 模块已从仓库中移除，由 hellwal 动态生成
     for mod in niri waybar rofi mako kitty; do
         if [ -d "$mod" ]; then
             stow -t ~ "$mod" 2>/dev/null

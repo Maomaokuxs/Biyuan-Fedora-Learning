@@ -7,7 +7,7 @@ setup_snapper() {
     
     local BACKUP_ROOT="$HOME/.dotfiles_backup"
     
-    # --- 1. Snapper 快照模块 (保持稳定) ---
+    # --- 1. Snapper 快照模块 ---
     if ! command -v snapper &> /dev/null || [ ! "$(ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
         echo -e "${YELLOW}>> 准备初始化 Snapper...${NC}"
         if ! command -v snapper &> /dev/null; then sudo dnf install -y snapper &> /dev/null; fi
@@ -39,48 +39,44 @@ setup_snapper() {
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 2. 自动化全量备份模块 (针对仓库涉及的所有应用) ---
+    # --- 2. 自动化模块备份模块 (不污染仓库) ---
     mkdir -p "$BACKUP_ROOT"
-    read -p "📦 是否自动备份本地所有受影响的应用配置？[y/N]: " auto_backup
+    read -p "📦 是否自动备份本地所有涉及到的应用配置？[y/N]: " auto_backup
     if [[ $auto_backup == [yY] ]]; then
         local date_tag=$(date +%Y%m%d_%H%M)
         echo -e "${BLUE}>> 正在根据仓库模块扫描并备份本地配置...${NC}"
         
-        # 遍历 dotfiles 目录下的所有模块名
         for module in $(ls "$DOTFILES_DIR"); do
             local dest_dir="$BACKUP_ROOT/${module}_${date_tag}"
             
-            # 备份逻辑：保持目录结构以便后续 Stow 识别
-            if [ -d "$HOME/.config/$module" ]; then
-                mkdir -p "$dest_dir/.config/$module"
-                cp -r "$HOME/.config/$module/." "$dest_dir/.config/$module/"
-                echo -e "${GREEN}  [OK] 备份: .config/$module${NC}"
-            fi
-            
-            # 特殊处理颜色缓存备份
+            # 备份逻辑：特殊处理颜色缓存
             if [ "$module" == "colors" ] || [ "$module" == "hellwal" ]; then
                 if [ -d "$HOME/.cache/hellwal" ]; then
                     mkdir -p "$dest_dir/.cache/hellwal"
                     cp -r "$HOME/.cache/hellwal/." "$dest_dir/.cache/hellwal/"
-                    echo -e "${GREEN}  [OK] 备份: .cache/hellwal${NC}"
+                    echo -e "${GREEN}  [OK] 备份颜色缓存${NC}"
                 fi
+            elif [ -d "$HOME/.config/$module" ]; then
+                mkdir -p "$dest_dir/.config/$module"
+                cp -r "$HOME/.config/$module/." "$dest_dir/.config/$module/"
+                echo -e "${GREEN}  [OK] 备份本地配置: $module${NC}"
             fi
         done
-        echo -e "${YELLOW}>> 备份任务完成。${NC}"
+        echo -e "${YELLOW}>> 备份已存放至: $BACKUP_ROOT${NC}"
     fi
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
     # --- 3. 双源链接切换与物理恢复模块 ---
     echo -e "${YELLOW}当前配置源管理 (Stow 链接切换):${NC}"
-    echo "  1) ☁️  使用仓库最新配置 (链接至 Git)"
-    echo "  2) 🕰️  使用历史备份配置 (链接至本地备份库)"
+    echo "  1) ☁️  使用主仓库最新配置 (链接至 Git)"
+    echo "  2) 🕰️  使用历史备份配置 (链接至备份库)"
     echo "  3) 📁  物理恢复并解除链接 (断开链接，原位复制)"
     echo "  0) ⏭️  跳过此步骤"
     read -p "请选择操作模式 [0-3]: " source_mode
 
     if [[ "$source_mode" =~ ^[1-3]$ ]]; then
-        read -p "请输入要操作的模块名 (如 niri, waybar): " module_name
+        read -p "请输入要操作的模块名: " module_name
         [ -z "$module_name" ] && return
 
         local target_dir="$HOME/.config/$module_name"
@@ -94,13 +90,13 @@ setup_snapper() {
                 if [ -d "$DOTFILES_DIR/$module_name" ]; then
                     cd "$DOTFILES_DIR"
                     stow -t ~ "$module_name" 2>/dev/null
-                    echo -e "${GREEN}✅ 已链接至 Git 主仓库版本。${NC}"
+                    echo -e "${GREEN}✅ 已链接至 Git 仓库版本。${NC}"
                 fi ;;
             2)
                 mapfile -t backups < <(ls -d "$BACKUP_ROOT/${module_name}_"* 2>/dev/null)
                 if [ ${#backups[@]} -gt 0 ]; then
                     for i in "${!backups[@]}"; do echo "  $((i+1))) $(basename "${backups[i]}")"; done
-                    read -p "选择回滚版本编号: " b_idx
+                    read -p "选择回滚版本: " b_idx
                     if [[ "$b_idx" -gt 0 ]] && [[ "$b_idx" -le "${#backups[@]}" ]]; then
                         selected_pkg=$(basename "${backups[$((b_idx-1))]}")
                         cd "$BACKUP_ROOT"
@@ -112,7 +108,7 @@ setup_snapper() {
                 mapfile -t backups < <(ls -d "$BACKUP_ROOT/${module_name}_"* 2>/dev/null)
                 if [ ${#backups[@]} -gt 0 ]; then
                     for i in "${!backups[@]}"; do echo "  $((i+1))) $(basename "${backups[i]}")"; done
-                    read -p "选择物理恢复的版本: " b_idx
+                    read -p "选择恢复版本: " b_idx
                     if [[ "$b_idx" -gt 0 ]] && [[ "$b_idx" -le "${#backups[@]}" ]]; then
                         selected_path="${backups[$((b_idx-1))]}"
                         mkdir -p "$target_dir"
@@ -121,7 +117,7 @@ setup_snapper() {
                         else
                             cp -rf "$selected_path/.config/$module_name/." "$target_dir/"
                         fi
-                        echo -e "${GREEN}✅ 物理文件已恢复，当前独立运行。${NC}"
+                        echo -e "${GREEN}✅ 物理文件已恢复（独立运行）。${NC}"
                     fi
                 fi ;;
         esac
