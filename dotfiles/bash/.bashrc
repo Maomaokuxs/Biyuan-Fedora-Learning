@@ -35,41 +35,5 @@ eval "$(starship init bash)"
 # Stow 版 dpush 别名
 alias dpush='cd ~/Documents/github/Biyuan-Fedora-Learning && git add . && git commit -m "Update" && git push origin main'
 
-# Biyuan Manager Path
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
-# Biyuan CLI Tools
-export PATH="$HOME/.local/bin:$PATH"
-
 # Biyuan CLI Tools
 export PATH="$HOME/.local/bin:$PATH"
