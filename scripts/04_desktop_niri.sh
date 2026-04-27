@@ -41,21 +41,16 @@ install_desktop_niri() {
     # --- 4. 安装 Niri 及桌面/视觉生态组件 ---
     echo -e "${YELLOW}>> 正在安装 Niri 窗口管理器及全套周边生态...${NC}"
     
-    # 核心组件 + 终端 + 视觉引擎 + 工具
-    # 将 waypaper 添加到安装列表
+    # 核心组件 + 终端 + 视觉引擎 + 工具 + 锁屏闲置管理
     local niri_pkgs=(
         niri waybar rofi-wayland fcitx5 fcitx5-chinese-addons
         stow unzip kitty fastfetch jq ImageMagick 
         swww hellwal waypaper polkit-kde
+        hyprlock hypridle # 新增锁屏与休眠组件
     )
 
-    echo -e "${YELLOW}>> 正在安装 Niri 核心组件及 KDE 提权工具...${NC}"
+    echo -e "${YELLOW}>> 正在安装 Niri 核心组件及锁屏休眠工具...${NC}"
     sudo dnf install -y "${niri_pkgs[@]}"
-
-    # 验证关键取色引擎
-    if command -v hellwal &> /dev/null; then
-        echo -e "${GREEN}✅ 视觉引擎 Hellwal 已就绪。${NC}"
-    fi
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
