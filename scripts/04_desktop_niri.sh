@@ -45,6 +45,7 @@ install_desktop_niri() {
     local niri_pkgs=(
         niri waybar rofi-wayland fcitx5 fcitx5-chinese-addons
         stow unzip kitty fastfetch jq ImageMagick swww hellwal
+        starship 
     )
 
     if sudo dnf install -y "${niri_pkgs[@]}"; then
