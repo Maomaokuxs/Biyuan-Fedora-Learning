@@ -5,23 +5,24 @@
 CYAN='\033[0;36m'; BLUE='\033[0;34m'; GREEN='\033[0;32m'; PURPLE='\033[0;35m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'; BOLD='\033[1m'
 
 # --- 0. 自动更新模块 ---
-update_self() {
-    if [ -d ".git" ] && command -v git &> /dev/null; then
-        echo -e "${BLUE}>> 正在检查远程仓库更新...${NC}"
-        git fetch --quiet
-        LOCAL=$(git rev-parse @)
-        REMOTE=$(git rev-parse @{u})
 
-        if [ "$LOCAL" != "$REMOTE" ]; then
-            if git pull; then
-                echo -e "${GREEN}✅ 仓库代码已更新。${NC}"
-                sync && sleep 0.5 
-                exec bash "$0" --no-update "$@"
-                exit 0
-            fi
-        fi
-    fi
-}
+# update_self() {
+#    if [ -d ".git" ] && command -v git &> /dev/null; then
+#        echo -e "${BLUE}>> 正在检查远程仓库更新...${NC}"
+#        git fetch --quiet
+#        LOCAL=$(git rev-parse @)
+#        REMOTE=$(git rev-parse @{u})
+#
+#        if [ "$LOCAL" != "$REMOTE" ]; then
+#            if git pull; then
+#                echo -e "${GREEN}✅ 仓库代码已更新。${NC}"
+#                sync && sleep 0.5 
+#                exec bash "$0" --no-update "$@"
+#                exit 0
+#            fi
+#        fi
+#    fi
+#}
 
 # --- 主程序入口 ---
 main() {

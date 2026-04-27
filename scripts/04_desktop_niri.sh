@@ -42,17 +42,15 @@ install_desktop_niri() {
     echo -e "${YELLOW}>> 正在安装 Niri 窗口管理器及全套周边生态...${NC}"
     
     # 核心组件 + 终端 + 视觉引擎 + 工具
+    # 将 waypaper 添加到安装列表
     local niri_pkgs=(
         niri waybar rofi-wayland fcitx5 fcitx5-chinese-addons
-        stow unzip kitty fastfetch jq ImageMagick swww hellwal
-        starship 
+        stow unzip kitty fastfetch jq ImageMagick 
+        swww hellwal waypaper polkit-kde
     )
 
-    if sudo dnf install -y "${niri_pkgs[@]}"; then
-        echo -e "${GREEN}✅ 桌面核心及视觉生态组件安装完毕。${NC}"
-    else
-        echo -e "${RED}❌ 桌面组件安装遇到问题，请检查 dnf 状态。${NC}"
-    fi
+    echo -e "${YELLOW}>> 正在安装 Niri 核心组件及 KDE 提权工具...${NC}"
+    sudo dnf install -y "${niri_pkgs[@]}"
 
     # 验证关键取色引擎
     if command -v hellwal &> /dev/null; then
