@@ -3,18 +3,21 @@
 
 setup_snapper_and_backup() {
     echo -e "${BLUE}=====================================================${NC}"
-    echo -e "${GREEN}  [系统阶段 1] 磁盘防护初始化与时间轴备份${NC}"
+    echo -e "${GREEN}  [Phase 1] Disk Protection & Config Backup${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
-    sudo -v || { echo -e "${RED}❌ 无法获取管理员权限，脚本退出。${NC}"; exit 1; }
+    sudo -v || { echo -e "${RED}Failed to obtain sudo privileges. Exiting...${NC}"; exit 1; }
 
     # --- 1. 环境预检 ---
+
+    # 检测是否有配置snpper，如果配置了就会提示用户进行快照，并且弹出能够进行快照的挂载点
+    
     if ! command -v snapper &> /dev/null; then
-        echo -e "${YELLOW}>> 未检测到 snapper，正在为您安装基础防护组件...${NC}"
+        echo -e "${YELLOW}>> Snapper not found. Installing protection components...${NC}"
         sudo dnf install -y snapper
     fi
 
-    echo -e "${BLUE}>> 正在分析磁盘 Btrfs 拓扑与快照配置...${NC}"
+    echo -e "${BLUE}>> Analyzing Btrfs topology & snapshot status...${NC}"
     
     mapfile -t all_mounts_raw < <(findmnt -t btrfs -n -o TARGET)
     
@@ -33,28 +36,30 @@ setup_snapper_and_backup() {
         clean_paths+=("$clean")
         
         if [ -n "$conf" ]; then
-            status_tags+=("${GREEN}[已配置]${NC}")
+            status_tags+=("${GREEN}[active]${NC}")
             config_names+=("$conf")
         else
-            status_tags+=("${YELLOW}[未初始化]${NC}")
+            status_tags+=("${YELLOW}[inactive]${NC}")
             config_names+=("")
         fi
     done
 
     # --- 2. 统一交互菜单 ---
-    echo -e "\n${YELLOW}>> 发现以下可快照子卷，请选择要备份/初始化的编号：${NC}"
+
+    echo -e "\n${YELLOW}>> Found subvolumes. Select IDs to initialize/backup:${NC}"
     for i in "${!display_names[@]}"; do
         echo -e "  $((i+1))) ${status_tags[i]} ${display_names[i]}"
     done
-    echo "  a) 全部执行 (一键配置并快照)"
-    echo "  0) ⏭️ 跳过"
+    echo "  a) All (Batch setup & snapshot)"
+    echo "  0) Skip"
     
-    read -p "选择编号 [支持多选, 如 1 2 或 a]: " choices
+    read -p "Selection [Supports multiple, e.g., 1 2 or a]: " choices
     
     if [[ "$choices" != "0" && -n "$choices" ]]; then
         [[ "$choices" == "a" ]] && choices=$(seq 1 ${#display_names[@]})
 
-        # --- 3. 结果导向的执行循环 ---
+    # --- 3. 结果导向的执行循环 ---
+
         for idx in $choices; do
             if [[ "$idx" -gt 0 ]] && [[ "$idx" -le "${#display_names[@]}" ]]; then
                 i=$((idx-1))
@@ -66,28 +71,32 @@ setup_snapper_and_backup() {
                 [ "$path_n" != "/" ] && target_conf=$(echo "$path_n" | sed 's|^/||' | sed 's|/|-|g')
 
                 if [ -n "$conf_n" ]; then
-                    echo -e "${CYAN}>> 正在为 [$raw_n] 创建安全快照...${NC}"
+                    echo -e "${CYAN}>> Creating security snapshot for [$raw_n]...${NC}"
                     if sudo snapper -c "$conf_n" create --description "Manual_Pre_Deployment"; then
-                        echo -e "${GREEN}✅ [$raw_n] 快照完成。${NC}"
+                        echo -e "${GREEN}✅ [$raw_n] Snapshot completed.${NC}"
                     else
-                        echo -e "${RED}❌ [$raw_n] 快照创建失败！${NC}"
+                        echo -e "${RED}❌ [$raw_n] Snapshot failed!${NC}"
                     fi
                 else
-                    echo -e "${YELLOW}>> 正在尝试初始化子卷 [$raw_n] ...${NC}"
+                    echo -e "${YELLOW}>> Initializing subvolume [$raw_n]...${NC}"
                     output=$(sudo snapper -c "$target_conf" create-config "$path_n" 2>&1)
                     
                     if [ $? -eq 0 ]; then
+                        # Granting user permissions and taking first snapshot
                         sudo sed -i "s/ALLOW_USERS=\"\"/ALLOW_USERS=\"$(whoami)\"/" "/etc/snapper/configs/$target_conf"
                         sudo snapper -c "$target_conf" create --description "Initial_Snapshot"
-                        echo -e "${GREEN}✅ [$raw_n] 初始化并快照成功。${NC}"
+                        echo -e "${GREEN}✅ [$raw_n] Initialization & Initial Snapshot successful.${NC}"
                     else
+                        # Handling specific Snapper error codes/messages
                         if echo "$output" | grep -q "subvolume already covered"; then
-                            echo -e "${BLUE}ℹ️  [$raw_n] 已被父级包含覆盖，该区域已安全，无需独立快照。${NC}"
+                            echo -e "${BLUE}ℹ️  [$raw_n] Already covered by parent subvolume; area secure. Skipping...${NC}"
                         elif echo "$output" | grep -q "already exists"; then
-                            echo -e "${YELLOW}⚠️  配置文件已存在但未被系统缓存，尝试直接打快照...${NC}"
-                            sudo snapper -c "$target_conf" create --description "Forced_Snapshot" && echo -e "${GREEN}✅ [$raw_n] 强制快照成功！${NC}" || echo -e "${RED}❌ 快照失败！${NC}"
+                            echo -e "${YELLOW}⚠️  Config exists but not cached. Attempting forced snapshot...${NC}"
+                            sudo snapper -c "$target_conf" create --description "Forced_Snapshot" && \
+                            echo -e "${GREEN}✅ [$raw_n] Forced snapshot successful!${NC}" || \
+                            echo -e "${RED}❌ Forced snapshot failed!${NC}"
                         else
-                            echo -e "${RED}❌ 无法处理 [$raw_n]: $output${NC}"
+                            echo -e "${RED}❌ Failed to process [$raw_n]: $output${NC}"
                         fi
                     fi
                 fi
@@ -98,11 +107,12 @@ setup_snapper_and_backup() {
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
     # --- 4. 时间轴全量静默备份 (核心修复) ---
+
     local BACKUP_ROOT="$HOME/.dotfiles_backup"
     local date_tag=$(date +%Y%m%d_%H%M%S)
     local current_backup_dir="$BACKUP_ROOT/$date_tag"
     
-    echo -e "${BLUE}>> 正在静默执行本地配置物理备份 (解引用软链接)...${NC}"
+    echo -e "${BLUE}>> Performing silent physical backup of local configs (Dereferencing symlinks)...${NC}"
     if [ -d "$DOTFILES_DIR" ]; then
         local backed_any=false
         mkdir -p "$current_backup_dir"
@@ -111,23 +121,23 @@ setup_snapper_and_backup() {
             local src="$HOME/.config/$module"
             [[ "$module" == "colors" ]] && src="$HOME/.cache/hellwal"
             
-            # 使用 -e 检查文件或目录是否存在（即使是软链接也能正确判断）
+            # Use -e to check existence (correctly identifies files, directories, or symlinks)
             if [ -e "$src" ]; then
                 local dest="$current_backup_dir/$module"
                 local rel=$(dirname "$src" | sed "s|$HOME||")
                 mkdir -p "$dest$rel"
                 
-                # 【关键修复】：加入了 -L 参数，强制解析软链接，提取真实物理文件
+                # [CRITICAL FIX]: -L flag used to resolve symlinks and extract real physical files
                 cp -rLf "$src" "$dest$rel/"
                 backed_any=true
             fi
         done
         
         if [ "$backed_any" = true ]; then
-             echo -e "${GREEN}✅ 真实物理文件已安全抽离并备份至: $current_backup_dir${NC}"
+             echo -e "${GREEN}✅ Physical files extracted and backed up to: $current_backup_dir${NC}"
         else
              rm -rf "$current_backup_dir"
-             echo -e "${YELLOW}>> 未检测到需要备份的本地配置。${NC}"
+             echo -e "${YELLOW}>> No local configurations detected for backup.${NC}"
         fi
     fi
 }

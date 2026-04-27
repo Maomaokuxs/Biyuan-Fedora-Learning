@@ -5,38 +5,39 @@ print_header() {
     figlet -f block "BIYUAN"
     figlet -f block "FEDORA"
     echo -e "${NC}-----------------------------------------------------"
-    echo -e "       模块化环境向导程序 | 智能引擎版 | 2026.04"
+    # 【修复点】：这里末尾漏掉了一个双引号 "
+    echo -e "                Modular Environment Wizard"
     echo -e "-----------------------------------------------------\n"
 }
 
 # --- 预检与云端同步 ---
 sync_and_snapshot() {
     echo -e "${BLUE}=====================================================${NC}"
-    echo -e "${GREEN}  [系统预检] 云端同步与安全快照检查${NC}"
+    echo -e "${GREEN}  [System Check] Cloud Sync & Security Snapshot${NC}"
     echo -e "${BLUE}=====================================================${NC}"
 
     cd "$REPO_DIR" || return
     if [ -d ".git" ]; then
-        echo "正在检查仓库更新..."
+        echo "Checking for repository updates..."
         git fetch origin main -q 2>/dev/null
         if [ "$(git rev-parse HEAD)" != "$(git rev-parse @{u} 2>/dev/null)" ]; then
-            read -p "检测到云端有更新，是否拉取？[y/N]: " pull_confirm
+            read -p "Cloud updates detected. Pull latest changes? [y/N]: " pull_confirm
             if [[ $pull_confirm == [yY] ]]; then
-                git pull origin main && echo -e "${GREEN}更新成功，重启脚本...${NC}" && sleep 1 && exec bash "$REPO_DIR/install.sh" "$@"
+                git pull origin main && echo -e "${GREEN}Update successful. Restarting script...${NC}" && sleep 1 && exec bash "$REPO_DIR/install.sh" "$@"
             fi
         fi
     fi
 
     # 自动快照检测与带时间戳的执行
     if command -v snapper &> /dev/null && [ "$(ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
-        echo -e "${YELLOW}检测到系统已配置 Snapper 快照保护。${NC}"
-        read -p "是否在部署前创建安全快照？[y/N]: " snap_pre
+        echo -e "${YELLOW}System is protected by Snapper snapshots.${NC}"
+        read -p "Create a security snapshot before deployment? [y/N]: " snap_pre
         if [[ $snap_pre == [yY] ]]; then
             local ts=$(date "+%Y-%m-%d %H:%M:%S")
-            local desc="Biyuan-Fedora-Install 开始于 $ts"
-            echo "正在生成快照: [$desc]..."
+            local desc="Biyuan-Fedora-Install started at $ts"
+            echo "Generating snapshot: [$desc]..."
             sudo snapper create --description "$desc"
-            echo -e "${GREEN}✅ 预执行快照已创建。${NC}"
+            echo -e "${GREEN}✅ Pre-deployment snapshot created.${NC}"
         fi
     fi
     echo ""
@@ -65,18 +66,18 @@ safe_install() {
     to_install=$(echo "$to_install" | xargs)
     already_installed=$(echo "$already_installed" | xargs)
 
-    # 打印已存在的包 (透明反馈，化解误解)
+    # 打印已存在的包 (透明反馈)
     if [ -n "$already_installed" ]; then
-        echo -e "${GREEN}>> [检测] 以下依赖已存在，跳过安装: ${NC}$already_installed"
+        echo -e "${GREEN}>> [Check] The following dependencies are present, skipping: ${NC}$already_installed"
     fi
 
     # 安装缺失的包
     if [ -n "$to_install" ]; then
-        echo -e "${YELLOW}>> [执行] 正在补充安装缺失包: ${NC}$to_install"
+        echo -e "${YELLOW}>> [Execute] Installing missing packages: ${NC}$to_install"
         sudo dnf install -y --setopt=strict=0 $to_install || true
-        echo -e "${GREEN}>> [完成] 软件包补充环节结束。${NC}"
+        echo -e "${GREEN}>> [Done] Package installation phase complete.${NC}"
     else
-        echo -e "${GREEN}>> [跳过] 所有底层依赖均已满足，直接进入环境配置。${NC}"
+        echo -e "${GREEN}>> [Skip] All base dependencies met. Proceeding to configuration.${NC}"
     fi
 }
 
@@ -84,21 +85,28 @@ safe_install() {
 deploy_module() {
     local module_name=$1
     local timestamp=$(date +%Y%m%d_%H%M%S)
+    # 如果没有定义 BACKUP_ROOT，给一个默认值
+    : "${BACKUP_ROOT:=$HOME/.dotfiles_backup}"
     local bdir="$BACKUP_ROOT/${timestamp}_$module_name"
     local check_path=""
     
     # 修正 bashrc 的判断路径
-    [ "$module_name" == "bash" ] && check_path="$HOME/.bashrc" || check_path="$HOME/.config/$module_name"
+    if [ "$module_name" == "bash" ]; then
+        check_path="$HOME/.bashrc"
+    else
+        check_path="$HOME/.config/$module_name"
+    fi
 
     # 如果有旧配置，执行备份
     if [ -e "$check_path" ] && [ ! -L "$check_path" ]; then
-        echo -e "${YELLOW}>> [备份] 发现旧配置，正在备份: $module_name${NC}"
+        echo -e "${YELLOW}>> [Backup] Legacy config found. Backing up: $module_name${NC}"
         mkdir -p "$bdir"
         cp -rf "$check_path" "$bdir/"
         rm -rf "$check_path" # 移除物理文件以便 stow 可以创建软链接
     fi
 
     cd "$DOTFILES_DIR"
-    stow -v -t ~ "$module_name" 2>/dev/null
-    echo -e "${BLUE}>> [配置] $module_name 模块映射已应用。${NC}"
+    # 使用 -R 替代 -v -t ~ 往往更简洁
+    stow -R -t ~ "$module_name" 2>/dev/null
+    echo -e "${BLUE}>> [Config] Module mapping applied: $module_name${NC}"
 }
