@@ -18,7 +18,6 @@ setup_snapper_and_backup() {
     
     mapfile -t all_mounts_raw < <(findmnt -t btrfs -n -o TARGET)
     
-    # 【核心修复】无视中间的制表符，直接抓取第一列($1)和最后一列($NF)
     configured_data=$(sudo snapper list-configs 2>/dev/null | awk 'NR>2 {print $1, $NF}')
 
     display_names=()   
@@ -63,7 +62,6 @@ setup_snapper_and_backup() {
                 local path_n="${clean_paths[i]}"
                 local conf_n="${config_names[i]}"
 
-                # 智能生成配置名 (用于未配置或强制恢复的情况)
                 local target_conf="root"
                 [ "$path_n" != "/" ] && target_conf=$(echo "$path_n" | sed 's|^/||' | sed 's|/|-|g')
 
@@ -83,7 +81,6 @@ setup_snapper_and_backup() {
                         sudo snapper -c "$target_conf" create --description "Initial_Snapshot"
                         echo -e "${GREEN}✅ [$raw_n] 初始化并快照成功。${NC}"
                     else
-                        # 结果导向：如果是被父级覆盖，提示并跳过；如果是已存在，直接强制打快照
                         if echo "$output" | grep -q "subvolume already covered"; then
                             echo -e "${BLUE}ℹ️  [$raw_n] 已被父级包含覆盖，该区域已安全，无需独立快照。${NC}"
                         elif echo "$output" | grep -q "already exists"; then
@@ -100,12 +97,12 @@ setup_snapper_and_backup() {
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 4. 时间轴全量静默备份 ---
+    # --- 4. 时间轴全量静默备份 (核心修复) ---
     local BACKUP_ROOT="$HOME/.dotfiles_backup"
     local date_tag=$(date +%Y%m%d_%H%M%S)
     local current_backup_dir="$BACKUP_ROOT/$date_tag"
     
-    echo -e "${BLUE}>> 正在静默执行本地配置现状备份...${NC}"
+    echo -e "${BLUE}>> 正在静默执行本地配置物理备份 (解引用软链接)...${NC}"
     if [ -d "$DOTFILES_DIR" ]; then
         local backed_any=false
         mkdir -p "$current_backup_dir"
@@ -113,19 +110,24 @@ setup_snapper_and_backup() {
         for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             local src="$HOME/.config/$module"
             [[ "$module" == "colors" ]] && src="$HOME/.cache/hellwal"
-            if [ -d "$src" ]; then
+            
+            # 使用 -e 检查文件或目录是否存在（即使是软链接也能正确判断）
+            if [ -e "$src" ]; then
                 local dest="$current_backup_dir/$module"
                 local rel=$(dirname "$src" | sed "s|$HOME||")
                 mkdir -p "$dest$rel"
-                cp -rf "$src" "$dest$rel/"
+                
+                # 【关键修复】：加入了 -L 参数，强制解析软链接，提取真实物理文件
+                cp -rLf "$src" "$dest$rel/"
                 backed_any=true
             fi
         done
         
         if [ "$backed_any" = true ]; then
-             echo -e "${GREEN}✅ 配置文件已存至: $current_backup_dir${NC}"
+             echo -e "${GREEN}✅ 真实物理文件已安全抽离并备份至: $current_backup_dir${NC}"
         else
              rm -rf "$current_backup_dir"
+             echo -e "${YELLOW}>> 未检测到需要备份的本地配置。${NC}"
         fi
     fi
 }

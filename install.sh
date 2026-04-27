@@ -63,16 +63,57 @@ main() {
     fi
 
     # --- 执行流程 ---
+    
     # 1. 磁盘防护与备份
     if command -v setup_snapper_and_backup &> /dev/null; then
         setup_snapper_and_backup
     fi
 
-    # 2. 桌面环境部署 (接力执行)
-    if command -v install_desktop_niri &> /dev/null; then
-        echo -e "${BLUE}>> Snapper 配置阶段结束，准备进入桌面部署...${NC}"
-        install_desktop_niri
-    fi
+    echo -e "\n${BLUE}>> Snapper 配置阶段结束，准备进入桌面部署...${NC}"
+
+    # 2. 桌面环境部署选择菜单
+    echo -e "\n${BLUE}=====================================================${NC}"
+    echo -e "${GREEN}  [系统阶段 2] 桌面环境 (Desktop Environment) 选择${NC}"
+    echo -e "${BLUE}=====================================================${NC}"
+    echo "  1) 🟢 GNOME 桌面环境 (官方标准)"
+    echo "  2) 🔵 KDE Plasma 桌面环境 (高度定制)"
+    echo "  3) 🟣 Niri 窗口管理器 (极简平铺)"
+    echo "  0) ⏭️  跳过桌面部署 (仅保留基础环境)"
+    read -p "请选择要部署的桌面环境 [0-3]: " desktop_opt
+
+    case "$desktop_opt" in
+        1)
+            # 假设 06_desktop_gnome.sh 中的主函数名为 install_desktop_gnome
+            if command -v install_desktop_gnome &> /dev/null; then
+                install_desktop_gnome
+            else
+                echo -e "${RED}❌ 错误: 未找到 GNOME 部署模块或函数名不匹配。${NC}"
+            fi
+            ;;
+        2)
+            # 假设 05_desktop_kde.sh 中的主函数名为 install_desktop_kde
+            if command -v install_desktop_kde &> /dev/null; then
+                install_desktop_kde
+            else
+                echo -e "${RED}❌ 错误: 未找到 KDE 部署模块或函数名不匹配。${NC}"
+            fi
+            ;;
+        3)
+            if command -v install_desktop_niri &> /dev/null; then
+                install_desktop_niri
+            else
+                echo -e "${RED}❌ 错误: 未找到 Niri 部署模块或函数名不匹配。${NC}"
+            fi
+            ;;
+        0)
+            echo -e "${YELLOW}>> 用户选择跳过桌面环境安装。${NC}"
+            ;;
+        *)
+            echo -e "${RED}>> 无效输入，已跳过桌面环境安装。${NC}"
+            ;;
+    esac
+    
+    echo -e "\n${GREEN}✨ 系统部署流程全部结束！${NC}"
 }
 
 main "$@"

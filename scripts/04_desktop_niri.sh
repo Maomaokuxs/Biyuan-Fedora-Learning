@@ -6,7 +6,7 @@ install_desktop_niri() {
     echo -e "${GREEN}  [系统阶段 3] Niri 桌面环境自动化部署${NC}"
     echo -e "${BLUE}=====================================================${NC}"
 
-    # --- 1. 【新增】调用基础环境脚本 ---
+    # --- 1. 调用基础环境脚本 ---
     local BASE_SCRIPT="$REPO_DIR/scripts/02_base_env.sh"
     if [ -f "$BASE_SCRIPT" ]; then
         echo -e "${YELLOW}>> 正在检查并部署基础运行环境...${NC}"
@@ -30,15 +30,37 @@ install_desktop_niri() {
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 3. 安装 Niri 及核心周边组件 ---
-    echo -e "${YELLOW}>> 正在安装 Niri 窗口管理器及周边生态环境...${NC}"
-    # 移除已在 base_env 中安装过的包，保持精简
-    sudo dnf install -y niri waybar rofi-wayland fcitx5 fcitx5-chinese-addons
-    echo -e "${GREEN}✅ 桌面核心组件安装完毕。${NC}"
+    # --- 3. 配置三方仓库 (由基础环境迁移至此) ---
+    echo -e "${BLUE}>> 正在启用视觉引擎与桌面组件的专属仓库...${NC}"
+    if sudo dnf copr enable -y hermitfeather/hyprland; then
+        echo -e "${GREEN}✅ 仓库 [hermitfeather/hyprland] 已启用。${NC}"
+    else
+        echo -e "${YELLOW}⚠️ 无法启用 Copr 仓库，部分视觉包可能安装失败。${NC}"
+    fi
+
+    # --- 4. 安装 Niri 及桌面/视觉生态组件 ---
+    echo -e "${YELLOW}>> 正在安装 Niri 窗口管理器及全套周边生态...${NC}"
+    
+    # 核心组件 + 终端 + 视觉引擎 + 工具
+    local niri_pkgs=(
+        niri waybar rofi-wayland fcitx5 fcitx5-chinese-addons
+        stow unzip kitty fastfetch jq ImageMagick swww hellwal
+    )
+
+    if sudo dnf install -y "${niri_pkgs[@]}"; then
+        echo -e "${GREEN}✅ 桌面核心及视觉生态组件安装完毕。${NC}"
+    else
+        echo -e "${RED}❌ 桌面组件安装遇到问题，请检查 dnf 状态。${NC}"
+    fi
+
+    # 验证关键取色引擎
+    if command -v hellwal &> /dev/null; then
+        echo -e "${GREEN}✅ 视觉引擎 Hellwal 已就绪。${NC}"
+    fi
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 4. 配置部署模式 (Stow 逻辑) ---
+    # --- 5. 配置部署模式 (Stow 逻辑) ---
     echo -e "${YELLOW}==== 初始配置部署模式 ====${NC}"
     echo "  1) ☁️  同步仓库最新配置 (Git -> Local) [使用 Stow]"
     echo "  2) 📁  物理脱离 (还原物理文件)"
@@ -63,7 +85,7 @@ install_desktop_niri() {
         done
         echo -e "${GREEN}✅ 配置文件部署完毕！${NC}"
 
-        # --- 5. 自动化色彩与壁纸初始化 ---
+        # --- 6. 自动化色彩与壁纸初始化 ---
         local INIT_SCRIPT="$HOME/.config/niri/scripts/init-wallpaper.sh"
         if [ -f "$INIT_SCRIPT" ]; then
             echo -e "${BLUE}>> 正在激活视觉引擎...${NC}"
@@ -80,7 +102,7 @@ install_desktop_niri() {
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 6. 注册全局维护命令 by-mgr ---
+    # --- 7. 注册全局维护命令 by-mgr ---
     echo -e "${BLUE}>> 正在注册全局系统维护命令: by-mgr${NC}"
     local BIN_DIR="$HOME/.local/bin"
     mkdir -p "$BIN_DIR"

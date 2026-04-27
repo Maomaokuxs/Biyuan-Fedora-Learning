@@ -37,7 +37,13 @@ else
     if [ -f "$ALT_SYNC" ]; then
         bash "$ALT_SYNC" "$FINAL_WALLPAPER"
     else
-        swww img "$FINAL_WALLPAPER"
+        # 【核心修复】：增加 Wayland 环境感知，防止在安装阶段 (TTY) 强行启动 swww 导致卡死
+        if [ -n "$WAYLAND_DISPLAY" ]; then
+            swww query &>/dev/null || swww init &>/dev/null
+            swww img "$FINAL_WALLPAPER"
+        else
+            echo -e "\033[0;33mℹ️  当前非 Wayland 环境，仅部署文件，跳过壁纸渲染守护进程。\033[0m"
+        fi
     fi
 fi
 
