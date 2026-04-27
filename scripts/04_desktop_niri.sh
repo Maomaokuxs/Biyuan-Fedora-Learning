@@ -3,13 +3,13 @@
 
 install_desktop_niri() {
     echo -e "${BLUE}=====================================================${NC}"
-    echo -e "${GREEN}  [系统阶段 3] Niri 桌面环境自动化部署${NC}"
+    echo -e "${GREEN}  [Phase 3] Niri Desktop Environment Deployment${NC}"
     echo -e "${BLUE}=====================================================${NC}"
 
     # --- 1. 调用基础环境脚本 ---
     local BASE_SCRIPT="$REPO_DIR/scripts/02_base_env.sh"
     if [ -f "$BASE_SCRIPT" ]; then
-        echo -e "${YELLOW}>> 正在检查并部署基础运行环境...${NC}"
+        echo -e "${YELLOW}>> Checking and deploying base runtime environment...${NC}"
         chmod +x "$BASE_SCRIPT"
         source "$BASE_SCRIPT"
         if command -v setup_base &> /dev/null; then
@@ -20,7 +20,7 @@ install_desktop_niri() {
     # --- 2. 调用独立显卡驱动脚本 ---
     local GPU_SCRIPT="$REPO_DIR/scripts/03_gpu_drivers.sh"
     if [ -f "$GPU_SCRIPT" ]; then
-        echo -e "${YELLOW}>> 正在加载外部显卡驱动配置模块...${NC}"
+        echo -e "${YELLOW}>> Loading external GPU driver configuration module...${NC}"
         chmod +x "$GPU_SCRIPT"
         source "$GPU_SCRIPT"
         if command -v setup_gpu &> /dev/null; then
@@ -31,15 +31,15 @@ install_desktop_niri() {
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
     # --- 3. 配置三方仓库 (由基础环境迁移至此) ---
-    echo -e "${BLUE}>> 正在启用视觉引擎与桌面组件的专属仓库...${NC}"
+    echo -e "${BLUE}>> Enabling visual engine and desktop component repository...${NC}"
     if sudo dnf copr enable -y hermitfeather/hyprland; then
-        echo -e "${GREEN}✅ 仓库 [hermitfeather/hyprland] 已启用。${NC}"
+        echo -e "${GREEN}✅ Repository [hermitfeather/hyprland] enabled.${NC}"
     else
-        echo -e "${YELLOW}⚠️ 无法启用 Copr 仓库，部分视觉包可能安装失败。${NC}"
+        echo -e "${YELLOW}⚠️ Failed to enable Copr repository. Some visual packages may fail to install.${NC}"
     fi
 
     # --- 4. 安装 Niri 及桌面/视觉生态组件 ---
-    echo -e "${YELLOW}>> 正在安装 Niri 窗口管理器及全套周边生态...${NC}"
+    echo -e "${YELLOW}>> Installing Niri window manager and ecosystem components...${NC}"
     
     # 核心组件 + 终端 + 视觉引擎 + 工具 + 锁屏闲置管理
     local niri_pkgs=(
@@ -49,20 +49,20 @@ install_desktop_niri() {
         hyprlock hypridle # 新增锁屏与休眠组件
     )
 
-    echo -e "${YELLOW}>> 正在安装 Niri 核心组件及锁屏休眠工具...${NC}"
+    echo -e "${YELLOW}>> Deploying Niri core and security tools...${NC}"
     sudo dnf install -y "${niri_pkgs[@]}"
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
     # --- 5. 配置部署模式 (Stow 逻辑) ---
-    echo -e "${YELLOW}==== 初始配置部署模式 ====${NC}"
-    echo "  1) ☁️  同步仓库最新配置 (Git -> Local) [使用 Stow]"
-    echo "  2) 📁  物理脱离 (还原物理文件)"
-    echo "  0) ⏭️  跳过"
-    read -p "选择模式 [0-2]: " deploy_mode
+    echo -e "${YELLOW}==== Configuration Deployment Mode ====${NC}"
+    echo "  1) ☁️  Sync Latest (Git -> Local) [Use Stow]"
+    echo "  2) 📁  Physical Detachment (Restore physical files)"
+    echo "  0) ⏭️  Skip"
+    read -p "Select Mode [0-2]: " deploy_mode
 
     if [[ "$deploy_mode" =~ ^[1-2]$ ]]; then
-        echo -e "${YELLOW}>> 正在执行配置部署...${NC}"
+        echo -e "${YELLOW}>> Executing configuration deployment...${NC}"
         for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             local target_dir="$HOME/.config/$module"
             [[ "$module" == "colors" ]] && target_dir="$HOME/.cache/hellwal"
@@ -70,19 +70,19 @@ install_desktop_niri() {
 
             if [ "$deploy_mode" == "1" ]; then
                 cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
-                echo -e "  [🔗 链接] $module"
+                echo -e "  [🔗 Linked] $module"
             elif [ "$deploy_mode" == "2" ]; then
                 mkdir -p "$target_dir"
                 cp -rf "$DOTFILES_DIR/$module/." "$target_dir/"
-                echo -e "  [📁 物理] $module"
+                echo -e "  [📁 Physical] $module"
             fi
         done
-        echo -e "${GREEN}✅ 配置文件部署完毕！${NC}"
+        echo -e "${GREEN}✅ Configuration deployment complete!${NC}"
 
         # --- 6. 自动化色彩与壁纸初始化 ---
         local INIT_SCRIPT="$HOME/.config/niri/scripts/init-wallpaper.sh"
         if [ -f "$INIT_SCRIPT" ]; then
-            echo -e "${BLUE}>> 正在激活视觉引擎...${NC}"
+            echo -e "${BLUE}>> Activating visual engine...${NC}"
             chmod +x "$INIT_SCRIPT"
             bash "$INIT_SCRIPT"
         else
@@ -97,7 +97,7 @@ install_desktop_niri() {
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
     # --- 7. 注册全局维护命令 by-mgr ---
-    echo -e "${BLUE}>> 正在注册全局系统维护命令: by-mgr${NC}"
+    echo -e "${BLUE}>> Registering global maintenance command: by-mgr${NC}"
     local BIN_DIR="$HOME/.local/bin"
     mkdir -p "$BIN_DIR"
     
@@ -115,6 +115,14 @@ install_desktop_niri() {
                 echo "$PATH_LINE" >> "$SHELL_RC"
             fi
         fi
-        echo -e "${GREEN}✅ 命令部署成功。${NC}"
+        echo -e "${GREEN}✅ Command deployed successfully.${NC}"
     fi
 }
+
+# --- 8. 登录管理器部署 ---
+    local GREETD_SCRIPT="$REPO_DIR/scripts/05_greetd_setup.sh"
+    if [ -f "$GREETD_SCRIPT" ]; then
+        echo -e "${YELLOW}>> Configuring display manager (greetd/tuigreet)...${NC}"
+        source "$GREETD_SCRIPT"
+        setup_greetd_niri
+    fi

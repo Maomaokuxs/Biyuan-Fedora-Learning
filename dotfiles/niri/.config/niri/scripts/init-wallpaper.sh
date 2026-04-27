@@ -1,59 +1,76 @@
 #!/bin/bash
 # 文件位置: dotfiles/niri/.config/niri/scripts/init-wallpaper.sh
 
-# 1. 动态获取仓库根目录
-SCRIPT_PATH=$(readlink -f "$0")
-search_dir=$(dirname "$SCRIPT_PATH")
+# --- 1. 智能查找真正的仓库根目录 (Feature-Based Search) ---
+REAL_PATH=$(readlink -f "$0")
+CURRENT_LOOKUP=$(dirname "$REAL_PATH")
 REPO_ROOT=""
-while [[ "$search_dir" != "/" ]]; do
-    if [[ -d "$search_dir/assets" ]] || [[ -d "$search_dir/.git" ]]; then
-        REPO_ROOT="$search_dir"
+
+# 向上递归查找包含 'install.sh' 的目录，确保定位到仓库根
+while [[ "$CURRENT_LOOKUP" != "/" ]]; do
+    if [[ -f "$CURRENT_LOOKUP/install.sh" ]]; then
+        REPO_ROOT="$CURRENT_LOOKUP"
         break
     fi
-    search_dir=$(dirname "$search_dir")
+    CURRENT_LOOKUP=$(dirname "$CURRENT_LOOKUP")
 done
 
-# 2. 路径定义 (修复了大小写，统一使用小写 wallpapers)
+# 兜底指定
+: "${REPO_ROOT:=$HOME/Documents/github/Biyuan-Fedora-Learning}"
+
+# --- 2. 核心路径定义 (关键修正区) ---
+# 壁纸资产在仓库根目录
 DEFAULT_WALL_SRC="$REPO_ROOT/assets/default_wallpaper.png"
-THEME_SYNC_SCRIPT="$REPO_ROOT/scripts/theme-sync.sh"
+
+# 【核心修复】：根据你之前 find 的结果，脚本实际在 dotfiles 深度目录下
+THEME_SYNC_SCRIPT="$REPO_ROOT/dotfiles/niri/.config/niri/scripts/theme-sync.sh"
+
+# 如果 dotfiles 里找不到，尝试去仓库根目录 scripts 找 (增加兼容性)
+[ -f "$THEME_SYNC_SCRIPT" ] || THEME_SYNC_SCRIPT="$REPO_ROOT/scripts/theme-sync.sh"
+
 WALL_DEST_DIR="$HOME/Pictures/wallpapers"
 mkdir -p "$WALL_DEST_DIR"
-
-# 3. 部署默认壁纸
 FINAL_WALLPAPER="$WALL_DEST_DIR/default_wallpaper.png"
 
-echo ">> 正在检查默认壁纸资产..."
+# --- 3. 调试输出 ---
+echo ">> Debug Info:"
+echo "   Real REPO_ROOT: $REPO_ROOT"
+echo "   Target Engine: $THEME_SYNC_SCRIPT"
+
+# --- 4. 部署默认壁纸 ---
+echo ">> Checking default wallpaper asset..."
 if [ -f "$DEFAULT_WALL_SRC" ]; then
-    cp -n "$DEFAULT_WALL_SRC" "$FINAL_WALLPAPER"
-    echo -e "\033[0;32m✅ 默认壁纸已就绪: $FINAL_WALLPAPER\033[0m"
+    cp -n "$DEFAULT_WALL_SRC" "$FINAL_WALLPAPER" 2>/dev/null
+    echo -e "\033[0;32m✅ Wallpaper ready: $FINAL_WALLPAPER\033[0m"
 else
-    echo -e "\033[0;33m⚠️ 警告: 仓库中未找到初始壁纸 ($DEFAULT_WALL_SRC)。\033[0m"
+    echo -e "\033[0;33m⚠️  Warning: Asset not found at $DEFAULT_WALL_SRC\033[0m"
+    # 如果目标不存在，尝试找一张现成的
+    [ -f "$FINAL_WALLPAPER" ] || FINAL_WALLPAPER=$(ls "$WALL_DEST_DIR"/*.{png,jpg,jpeg} 2>/dev/null | head -n 1)
 fi
 
-# 4. 激活视觉引擎
-# 【核心修复】：必须确保 FINAL_WALLPAPER 真实存在，才能呼叫取色脚本！
+# --- 5. 激活视觉引擎 ---
 if [ -f "$FINAL_WALLPAPER" ]; then
     if [ -f "$THEME_SYNC_SCRIPT" ]; then
-        echo ">> 发现取色引擎: $THEME_SYNC_SCRIPT"
+        echo ">> Found visual engine: $THEME_SYNC_SCRIPT"
         chmod +x "$THEME_SYNC_SCRIPT"
+        # 使用 bash 调用确保稳定性
         bash "$THEME_SYNC_SCRIPT" "$FINAL_WALLPAPER"
     else
-        echo -e "\033[0;31m⚠️ 错误: 找不到 $THEME_SYNC_SCRIPT，尝试备选路径...\033[0m"
+        echo -e "\033[0;31m⚠️  Error: Cannot locate engine at $THEME_SYNC_SCRIPT\033[0m"
+        
+        # 最后的保命逻辑：尝试从当前已安装的配置目录查找
         ALT_SYNC="$HOME/.config/niri/scripts/theme-sync.sh"
         if [ -f "$ALT_SYNC" ]; then
             bash "$ALT_SYNC" "$FINAL_WALLPAPER"
         else
             if [ -n "$WAYLAND_DISPLAY" ]; then
                 swww query &>/dev/null || swww init &>/dev/null
-                swww img "$FINAL_WALLPAPER"
-            else
-                echo -e "\033[0;33mℹ️  当前非 Wayland 环境，跳过壁纸渲染守护进程。\033[0m"
+                swww img "$FINAL_WALLPAPER" --transition-type center
             fi
         fi
     fi
 else
-    # 如果连壁纸文件都没有，果断阻断流程，防止产生僵尸配置
-    echo -e "\033[0;31m❌ 致命错误: 目标壁纸文件不存在，已放弃呼叫取色引擎！请手动放置一张壁纸并运行 theme-sync.sh。\033[0m"
+    echo -e "\033[0;31m❌ Fatal: No wallpaper file available.\033[0m"
 fi
 
-echo "✨ 视觉系统初始化结束。"
+echo "✨ Visualization system initialization finished."
