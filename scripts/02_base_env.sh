@@ -18,26 +18,42 @@ setup_base() {
     echo -e "${YELLOW}>> 正在安装基础工具与官方仓库字体...${NC}"
     sudo dnf install -y "${pkgs[@]}"
 
-# 2. Iosevka Nerd Font 本地部署 (从仓库资产安装)
- 
-    # 优先检查系统中是否已经识别该字体
-    if fc-list | grep -qi "Iosevka"; then
-        echo -e "${GREEN}✅ Iosevka 字体已在系统中注册，跳过安装。${NC}"
+# --- 2. Iosevka Nerd Font 本地部署 ---
+    # 【修复重点】：不依赖外部 REPO_DIR，改为根据脚本位置自动推导
+    local CURRENT_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+    local REPO_ROOT=$(dirname "$CURRENT_SCRIPT_DIR")
+    local REPO_FONT_SOURCE="$REPO_ROOT/assets/fonts/IosevkaNerdFont-Regular.ttf"
+    
+    local FONT_DIR="$HOME/.local/share/fonts"
+    
+    # 确保目标目录物理存在
+    mkdir -p "$FONT_DIR"
+
+    echo -e "${BLUE}>> 正在检查 Iosevka 字体状态...${NC}"
+    
+    if fc-list | grep -qi "Iosevka" || [ -f "$FONT_DIR/IosevkaNerdFont-Regular.ttf" ]; then
+        echo -e "${GREEN}✅ Iosevka 字体已在系统中注册或文件已存在，跳过安装。${NC}"
     else
-        # 严格检查仓库资产目录中是否存在字体文件
+        # 增加调试信息：打印出脚本尝试查找的真实路径
+        echo -e "${CYAN}>> 检索路径: $REPO_FONT_SOURCE${NC}"
+
         if [ -f "$REPO_FONT_SOURCE" ]; then
             echo -e "${YELLOW}>> 正在从仓库资产拷贝字体文件...${NC}"
-            cp "$REPO_FONT_SOURCE" "$FONT_DIR/"
+            # 使用 -p 保留权限，使用 -f 强制覆盖
+            cp -pf "$REPO_FONT_SOURCE" "$FONT_DIR/"
             
             echo -e "${CYAN}>> 正在刷新系统字体缓存...${NC}"
-            fc-cache -f > /dev/null
+            fc-cache -f "$FONT_DIR" > /dev/null
             echo -e "${GREEN}✅ Iosevka 字体本地部署完成。${NC}"
         else
-            echo -e "${RED}❌ 错误: 在仓库中未找到字体资产！${NC}"
-            echo -e "${RED}   路径应为: $REPO_FONT_SOURCE${NC}"
-            echo -e "${YELLOW}>> 请手动将字体文件放入该路径后重新运行。${NC}"
+            echo -e "${RED}❌ 错误: 物理路径下未找到字体资产！${NC}"
+            echo -e "${RED}   请确认文件是否存在于: ${BOLD}$REPO_FONT_SOURCE${NC}"
+            
+            # 自动列出 assets 目录内容帮助排查
+            echo -e "${YELLOW}>> 当前 assets/fonts 目录内容如下:${NC}"
+            ls -R "$REPO_ROOT/assets" 2>/dev/null || echo "   (目录完全不存在)"
         fi
-    f
+    fi
 
     echo -e "${GREEN}✅ 基础环境与字体配置成功。${NC}"
 }
