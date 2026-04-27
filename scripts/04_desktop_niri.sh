@@ -30,23 +30,30 @@ install_desktop_niri() {
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 3. 配置三方仓库 (由基础环境迁移至此) ---
+    # --- 3. 配置三方仓库 (新增 Starship 仓库) ---
     echo -e "${BLUE}>> Enabling visual engine and desktop component repository...${NC}"
-    if sudo dnf copr enable -y hermitfeather/hyprland; then
-        echo -e "${GREEN}✅ Repository [hermitfeather/hyprland] enabled.${NC}"
+    
+    # 启用 Hyprland 兼容生态仓库
+    sudo dnf copr enable -y hermitfeather/hyprland
+    
+    # 新增: 启用 Starship 官方 Copr 仓库
+    echo -e "${YELLOW}>> Enabling Starship shell prompt repository...${NC}"
+    if sudo dnf copr enable -y atim/starship; then
+        echo -e "${GREEN}✅ Repository [atim/starship] enabled.${NC}"
     else
-        echo -e "${YELLOW}⚠️ Failed to enable Copr repository. Some visual packages may fail to install.${NC}"
+        echo -e "${RED}❌ Failed to enable Starship repository.${NC}"
     fi
 
     # --- 4. 安装 Niri 及桌面/视觉生态组件 ---
     echo -e "${YELLOW}>> Installing Niri window manager and ecosystem components...${NC}"
     
     # 核心组件 + 终端 + 视觉引擎 + 工具 + 锁屏闲置管理
+    # 新增: starship 已经加入列表
     local niri_pkgs=(
         niri waybar rofi-wayland fcitx5 fcitx5-chinese-addons
         stow unzip kitty fastfetch jq ImageMagick 
         swww hellwal waypaper polkit-kde
-        hyprlock hypridle # 新增锁屏与休眠组件
+        hyprlock hypridle starship
     )
 
     echo -e "${YELLOW}>> Deploying Niri core and security tools...${NC}"
@@ -117,12 +124,12 @@ install_desktop_niri() {
         fi
         echo -e "${GREEN}✅ Command deployed successfully.${NC}"
     fi
-}
 
-# --- 8. 登录管理器部署 ---
+    # --- 8. 登录管理器部署 (修正: 移入函数体内) ---
     local GREETD_SCRIPT="$REPO_DIR/scripts/05_greetd_setup.sh"
     if [ -f "$GREETD_SCRIPT" ]; then
         echo -e "${YELLOW}>> Configuring display manager (greetd/tuigreet)...${NC}"
         source "$GREETD_SCRIPT"
         setup_greetd_niri
     fi
+}
