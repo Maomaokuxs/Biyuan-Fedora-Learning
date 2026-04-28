@@ -124,9 +124,10 @@
     "format": "{}",
     "exec": "~/.config/waybar/scripts/check-updates.sh",
     "return-type": "json",
-    "on-click": "kitty --hold sudo dnf upgrade", // 点击直接开终端更新
-    "interval": 3600, // 每小时检查一次
-    "signal": 8       // 允许通过 pkill -RTMIN+8 waybar 手动刷新
+    "on-click": "kitty --hold sudo dnf upgrade", 
+    "on-click-right": "pkill -RTMIN+8 waybar", // 右键点击重新检查
+    "interval": 3600, 
+    "signal": 8       
     },
 
     "custom/weather": {
