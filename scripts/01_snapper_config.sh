@@ -118,12 +118,29 @@ setup_snapper_and_backup() {
         mkdir -p "$current_backup_dir"
         
         for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
-            # 1. 动态确定目标路径 (适配非 .config 目录)
+            # 1. 默认探测路径（目录优先）
             local src="$HOME/.config/$module"
+            
+            # 2. 特殊路径映射
             [[ "$module" == "colors" ]] && src="$HOME/.cache/hellwal"
             [[ "$module" == "bash" ]] && src="$HOME/.bashrc"
             
-            if [ -e "$src" ]; then
+            # 3. 智能探测：如果默认目录不存在，尝试探测同名文件
+            # 这样不仅解决了 starship.toml，以后如果你有 nvim.lua 或 gitconfig 也能自动识别
+            if [ ! -e "$src" ] && [ ! -L "$src" ]; then
+                # 尝试寻找 .config/ 下的同名 .toml, .conf 或无后缀文件
+                if [ -f "$HOME/.config/${module}.toml" ]; then
+                    src="$HOME/.config/${module}.toml"
+                elif [ -f "$HOME/.config/${module}.conf" ]; then
+                    src="$HOME/.config/${module}.conf"
+                fi
+            fi
+
+            # 4. 终极判断：只要是 存在(e) 或者是 链接(L) 就执行备份
+            # [ -L ] 即使链接断了也能抓到它，配合 cp -aL 会很有用
+            if [ -e "$src" ] || [ -L "$src" ]; then
+                # ... 拦截空目录逻辑 ...
+                # ... 执行备份逻辑 ...
                 # 【核心修复 1】：拦截空文件夹！如果是个空壳目录，直接跳过，不制造垃圾备份
                 if [ -d "$src" ] && [ -z "$(ls -A "$src" 2>/dev/null)" ]; then
                     continue

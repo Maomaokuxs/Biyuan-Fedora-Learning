@@ -1,229 +1,221 @@
 #!/bin/bash
-# Biyuan 配置管理引擎 (by-mgr) - 双擎驱动版 (备份恢复 + 部署同步)
+# Biyuan 配置管理引擎 (by-mgr) - 智能信息提示版
 
 REPO_DIR="$HOME/Documents/github/Biyuan-Fedora-Learning"
 DOTFILES_DIR="$REPO_DIR/dotfiles"
 BACKUP_ROOT="$HOME/.dotfiles_backup"
+SELF_PATH=$(realpath "$0")
 
-BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; NC='\033[0m'
+BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; PURPLE='\033[0;35m'; NC='\033[0m'
 
-if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
-    echo -e "${BLUE}Biyuan 系统维护引擎 (by-mgr)${NC}"
-    echo "用法: by-mgr    (启动配置调度菜单)"
-    exit 0
-fi
-
-# ==========================================
-# 辅助函数：获取模块对应的系统真实路径
-# ==========================================
+# --- 辅助函数 ---
 get_target_path() {
     local mod="$1"
+    local base_path="$HOME/.config/$mod"
+    
+    # 特殊路径优先级最高
     if [[ "$mod" == "colors" ]]; then echo "$HOME/.cache/hellwal"
     elif [[ "$mod" == "bash" ]]; then echo "$HOME/.bashrc"
-    else echo "$HOME/.config/$mod"; fi
+    # 智能探测：处理单文件配置 (如 starship.toml)
+    elif [ ! -d "$base_path" ] && [ -f "${base_path}.toml" ]; then echo "${base_path}.toml"
+    elif [ ! -d "$base_path" ] && [ -f "${base_path}.conf" ]; then echo "${base_path}.conf"
+    else echo "$base_path"; fi
 }
 
-# 辅助函数：安全销毁目标路径 (清理旧链接或旧文件夹)
 clean_target() {
     local target="$1"
     [ -L "$target" ] && rm -f "$target"
-    [ -d "$target" ] && rm -rf "$target"
-    [ -f "$target" ] && rm -f "$target"
+    [ -d "$target" ] && [ ! -L "$target" ] && rm -rf "$target"
+    [ -f "$target" ] && [ ! -L "$target" ] && rm -f "$target"
 }
 
-# ==========================================
-# 1. 预检测历史时间节点
-# ==========================================
-HAS_HISTORY=false
-mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort -r)
-[ ${#time_list[@]} -gt 0 ] && HAS_HISTORY=true
+# --- 模块：备份与恢复管理 ---
+menu_backup_restore() {
+    mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort)
+    local count=${#time_list[@]}
 
-# ==========================================
-# 2. 渲染主菜单
-# ==========================================
-clear
-echo -e "${CYAN}================================================${NC}"
-echo -e "${BOLD}       Biyuan 配置管理引擎 (by-mgr)${NC}"
-echo -e "${CYAN}================================================${NC}"
+    echo -e "\n${YELLOW}>>>> 备份与恢复管理 (Backup & Restore) <<<<${NC}"
+    echo "  1) 💾 创建当前系统配置的物理快照"
+    echo "  2) 🕰️ 从历史时间点还原配置 (物理/Stow)"
+    echo "  3) 🔄 逆向同步：历史备份覆盖回仓库"
+    echo "  4) 🧹 清理旧快照 (智能清理)"
+    echo "  0) 🔙 返回主菜单"
+    read -p "请选择操作: " sub_mode
 
-echo -e "${YELLOW}【第一部分：备份与恢复 (Backup & Restore)】${NC}"
-echo "  1) 💾 创建系统当前配置的物理备份 (智能穿透 Stow 链接)"
-if [ "$HAS_HISTORY" = true ]; then
-    echo "  2) 🕰️ 从历史备份还原 (支持选择还原为 物理文件 或 Stow链接)"
-    echo "  3) 🔄 逆向同步：将历史备份覆盖回 GitHub 主仓库"
-else
-    echo -e "  ${RED}(暂无历史备份，还原功能不可用)${NC}"
-fi
-
-echo -e "\n${YELLOW}【第二部分：更新与部署 (Sync & Deploy)】${NC}"
-echo "  4) ☁️ 部署最新仓库配置 -> [全局 Stow 软链接模式]"
-echo "  5) 📁 部署最新仓库配置 -> [全局 物理文件模式]"
-
-echo -e "\n  0) 退出"
-echo -e "${CYAN}------------------------------------------------${NC}"
-
-read -p "选择操作模式 [0-5]: " mode
-[[ "$mode" == "0" || -z "$mode" ]] && exit 0
-
-trigger_visual_engine=false
-
-# ==========================================
-# 3. 核心逻辑执行分支
-# ==========================================
-
-case "$mode" in
-    1)
-        # --- 模式 1: 创建全新物理备份 ---
-        echo -e "\n${YELLOW}>> 正在提取系统当前配置并创建物理备份...${NC}"
-        date_tag=$(date +%Y%m%d_%H%M%S)
-        current_backup_dir="$BACKUP_ROOT/$date_tag"
-        backed_up_any=false
-
-        mkdir -p "$current_backup_dir"
-        for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
-            src=$(get_target_path "$module")
-            if [ -e "$src" ]; then
-                # 过滤空文件夹
-                if [ -d "$src" ] && [ -z "$(ls -A "$src" 2>/dev/null)" ]; then continue; fi
-                
-                rel_path="${src#$HOME/}"
-                dest="$current_backup_dir/$rel_path"
-                mkdir -p "$(dirname "$dest")"
-                
-                # 【核心】：-L 参数强制穿透软链接，抓取真实的物理文件
-                cp -aL "$src" "$dest"
-                backed_up_any=true
-            fi
-        done
-        
-        if [ "$backed_up_any" = true ]; then
-            echo -e "${GREEN}✅ 备份完成！(所有配置已被提纯为物理文件)${NC}"
-            echo -e "   备份路径: $current_backup_dir"
-        else
-            rm -rf "$current_backup_dir"
-            echo -e "${RED}❌ 未找到任何需要备份的配置。${NC}"
-        fi
-        ;;
-
-    2)
-        # --- 模式 2: 从历史备份还原 ---
-        if [ "$HAS_HISTORY" = false ]; then exit 1; fi
-
-        # 选择时间点
-        echo -e "\n${YELLOW}>> [步骤 1/3] 请选择历史备份点:${NC}"
-        for i in "${!time_list[@]}"; do echo "  $((i+1))) $(basename "${time_list[i]}")"; done
-        read -p "选择时间编号: " t_idx
-        selected_time="${time_list[$((t_idx-1))]}"
-
-        # 分析可用模块
-        declare -a mod_list
-        for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
-            check_path="${selected_time}/${$(get_target_path "$mod")#$HOME/}"
-            [ -e "$check_path" ] && mod_list+=("$mod")
-        done
-        if [ ${#mod_list[@]} -eq 0 ]; then echo -e "${RED}该备份点下无可用配置！${NC}"; exit 1; fi
-        
-        # 选择模块
-        echo -e "\n${YELLOW}>> [步骤 2/3] 请选择要恢复的模块:${NC}"
-        for i in "${!mod_list[@]}"; do echo "  $((i+1))) ${mod_list[i]}"; done
-        read -p "选择模块编号: " m_idx
-        mod="${mod_list[$((m_idx-1))]}"
-
-        target=$(get_target_path "$mod")
-        backup_src="${selected_time}/${target#$HOME/}"
-
-        # 核心：询问恢复模式
-        echo -e "\n${YELLOW}>> [步骤 3/3] 请选择如何恢复 [ $mod ] 到系统中？${NC}"
-        echo "  1) 📁 作为纯物理文件恢复 (直接复制到 $target)"
-        echo "  2) ☁️  作为 Stow 软链接恢复 (先覆盖 Git 仓库，再进行链接)"
-        read -p "选择恢复模式 [1/2]: " r_mode
-
-        # 执行恢复前清理目标路径
-        cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
-        clean_target "$target"
-
-        if [ "$r_mode" == "1" ]; then
-            echo -e "${BLUE}>> 正在执行物理恢复...${NC}"
-            if [ -d "$backup_src" ]; then
-                mkdir -p "$target" && cp -a "$backup_src/." "$target/"
+    case "$sub_mode" in
+        1)
+            echo -e "${YELLOW}>> 正在创建物理快照...${NC}"
+            date_tag=$(date +%Y%m%d_%H%M%S)
+            current_backup_dir="$BACKUP_ROOT/$date_tag"
+            mkdir -p "$current_backup_dir"
+            local backed_any=false
+            for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                src=$(get_target_path "$module")
+                if [ -e "$src" ] || [ -L "$src" ]; then
+                    [ -d "$src" ] && [ ! -L "$src" ] && [ -z "$(ls -A "$src" 2>/dev/null)" ] && continue
+                    rel_path="${src#$HOME/}"
+                    dest="$current_backup_dir/$rel_path"
+                    mkdir -p "$(dirname "$dest")"
+                    cp -aL "$src" "$dest" 2>/dev/null && backed_any=true
+                fi
+            done
+            if [ "$backed_any" = true ]; then
+                echo -e "${GREEN}✅ 快照已保存: $date_tag${NC}"
             else
-                mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+                rm -rf "$current_backup_dir"
+                echo -e "${YELLOW}>> 无需备份。${NC}"
             fi
-            echo -e "${GREEN}✅ $mod 已通过物理文件恢复。${NC}"
-        elif [ "$r_mode" == "2" ]; then
-            echo -e "${BLUE}>> 正在同步至仓库并建立 Stow 链接...${NC}"
-            # 将备份文件放入 dotfiles 仓库
-            repo_target="$DOTFILES_DIR/$mod"
-            rm -rf "$repo_target" && mkdir -p "$repo_target"
-            
-            # 因为 colors 和 bash 路径特殊，需要还原 repo 里的层级结构
-            if [[ "$mod" == "colors" ]]; then repo_target="$DOTFILES_DIR/$mod/.cache/hellwal"; mkdir -p "$repo_target"; fi
-            if [[ "$mod" == "bash" ]]; then repo_target="$DOTFILES_DIR/$mod/.bashrc"; fi
+            sleep 1.2
+            ;;
+        2)
+            [ "$count" -eq 0 ] && echo -e "${RED}❌ 无历史备份！${NC}" && sleep 1 && return
+            mapfile -t display_list < <(printf '%s\n' "${time_list[@]}" | sort -r)
+            echo -e "\n${CYAN}>> 请选择历史备份点:${NC}"
+            for i in "${!display_list[@]}"; do echo "  $((i+1))) $(basename "${display_list[i]}")"; done
+            read -p "编号 (0返回): " t_idx
+            [[ "$t_idx" == "0" || -z "$t_idx" ]] && return
+            selected_time="${display_list[$((t_idx-1))]}"
 
-            if [ -d "$backup_src" ]; then
-                cp -a "$backup_src/." "$repo_target/"
-            else
-                cp -a "$backup_src" "$repo_target"
-            fi
-            
-            # 建立链接
-            cd "$DOTFILES_DIR" && stow -t ~ "$mod"
-            echo -e "${GREEN}✅ $mod 已恢复至仓库，并重新建立 Stow 软链接。${NC}"
-        fi
-        trigger_visual_engine=true
-        ;;
+            declare -a mod_list
+            for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                mod_target=$(get_target_path "$mod")
+                [ -e "${selected_time}/${mod_target#$HOME/}" ] && mod_list+=("$mod")
+            done
 
-    3)
-        # --- 模式 3: 逆向同步至主仓库 ---
-        # ... (简化代码，调用模式 2 里的 r_mode 2 逻辑类似，如果需要可以后续补全，目前保留结构)
-        echo -e "${YELLOW}提示: 在模式 2 中选择 '作为 Stow 软链接恢复' 即可同时完成逆向同步。${NC}"
-        ;;
+            echo -e "\n${CYAN}>> 请选择模块:${NC}"
+            for i in "${!mod_list[@]}"; do echo "  $((i+1))) ${mod_list[i]}"; done
+            read -p "编号: " m_idx
+            mod="${mod_list[$((m_idx-1))]}"
+            target=$(get_target_path "$mod")
+            backup_src="${selected_time}/${target#$HOME/}"
 
-    4|5)
-        # --- 模式 4/5: 全局部署最新仓库配置 ---
-        if [ "$mode" == "4" ]; then
-            echo -e "\n${YELLOW}>> 正在执行 Stow 全局软链接部署 (开发模式)...${NC}"
-        else
-            echo -e "\n${YELLOW}>> 正在执行物理脱离部署 (稳定模式)...${NC}"
-        fi
-
-        for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
-            [[ "$module" == "bash" ]] && continue # 保护原生 .bashrc
+            echo -e "\n${YELLOW}>> 还原模式: 1) 物理还原  2) Stow链接还原${NC}"
+            read -p "选择 [1/2]: " r_type
             
-            target=$(get_target_path "$module")
-            
-            # 通用清理步骤
-            cd "$DOTFILES_DIR" && stow -D -t ~ "$module" 2>/dev/null
+            # 还原前必须卸载旧链接并清理目标
+            cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
             clean_target "$target"
 
-            if [ "$mode" == "4" ]; then
-                # Stow 部署
-                cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
-                echo -e "  [🔗 Linked] $module"
+            if [ "$r_type" == "1" ]; then
+                if [ -d "$backup_src" ]; then
+                    mkdir -p "$target" && cp -a "$backup_src/." "$target/"
+                else
+                    mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+                fi
             else
-                # 物理部署
-                cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null
-                echo -e "  [📁 Physical] $module"
+                repo_target="$DOTFILES_DIR/$mod"
+                [[ "$mod" == "colors" ]] && repo_target="$DOTFILES_DIR/$mod/.cache/hellwal"
+                [[ "$mod" == "bash" ]] && repo_target="$DOTFILES_DIR/$mod/.bashrc"
+                rm -rf "$repo_target" && mkdir -p "$(dirname "$repo_target")"
+                [ -d "$backup_src" ] && cp -a "$backup_src/." "$repo_target/" || cp -a "$backup_src" "$repo_target"
+                cd "$DOTFILES_DIR" && stow -t ~ "$mod"
             fi
-        done
-        echo -e "${GREEN}✅ 全局部署完成！${NC}"
-        trigger_visual_engine=true
-        ;;
-esac
+            echo -e "${GREEN}✅ 还原操作完成。${NC}"
+            sleep 1.2
+            ;;
+        4)
+            echo -e "\n${CYAN}>> 当前共有 [ $count ] 个快照。${NC}"
+            [ "$count" -eq 0 ] && sleep 1 && return
+            local first_snap=$(basename "${time_list[0]}" | cut -d'_' -f1)
+            local last_snap=$(basename "${time_list[-1]}" | cut -d'_' -f1)
+            echo -e "${PURPLE}>> 快照日期范围: [ ${first_snap:0:4}-${first_snap:4:2}-${first_snap:6:2} ] 至 [ ${last_snap:0:4}-${last_snap:4:2}-${last_snap:6:2} ]${NC}"
 
-# ==========================================
-# 4. 自动化色彩与壁纸初始化
-# ==========================================
-if [ "$trigger_visual_engine" = true ]; then
-    echo -e "\n${BLUE}-----------------------------------------------------${NC}"
-    echo -e "${BLUE}>> Activating visual engine...${NC}"
-    INIT_SCRIPT="$HOME/.config/niri/scripts/init-wallpaper.sh"
-    ALT_INIT="$DOTFILES_DIR/niri/.config/niri/scripts/init-wallpaper.sh"
-    
-    if [ -f "$INIT_SCRIPT" ]; then
-        chmod +x "$INIT_SCRIPT" && bash "$INIT_SCRIPT"
-    elif [ -f "$ALT_INIT" ]; then
-        chmod +x "$ALT_INIT" && bash "$ALT_INIT"
-    fi
-    echo -e "${GREEN}✨ by-mgr 任务流执行完毕！${NC}"
-fi
+            echo "清理模式选择: 1) 按数量  2) 按日期"
+            read -p "请选择: " clean_type
+            if [ "$clean_type" == "1" ]; then
+                read -p "保留最近数量: " keep_count
+                if [ "$keep_count" -lt "$count" ]; then
+                    local remove_count=$((count - keep_count))
+                    for ((i=0; i<remove_count; i++)); do rm -rf "${time_list[i]}"; done
+                    echo -e "${GREEN}✅ 已清理 $remove_count 个旧快照。${NC}"
+                fi
+            elif [ "$clean_type" == "2" ]; then
+                read -p "删除多少天之前的？: " days
+                local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
+                local del_count=0
+                for s in "${time_list[@]}"; do
+                    local stime=$(echo "$(basename "$s")" | tr -d '_')
+                    if [ "$stime" -lt "$threshold" ]; then rm -rf "$s" && ((del_count++)); fi
+                done
+                echo -e "${GREEN}✅ 已清理 $del_count 个快照。${NC}"
+            fi
+            sleep 1.2
+            ;;
+        0) return ;;
+    esac
+}
+
+# --- 模块：更新与部署管理 ---
+menu_sync_deploy() {
+    echo -e "\n${YELLOW}>>>> 更新与部署管理 (Sync & Deploy) <<<<${NC}"
+    echo "  1) ☁️  全局 Stow 模式 (Git -> Local)"
+    echo "  2) 📁  全局 物理模式 (Git -> Local)"
+    echo "  3) ♻️  更新 by-mgr 脚本自身 (覆盖并重启)"
+    echo "  0) 🔙 返回主菜单"
+    read -p "请选择: " sub_mode
+
+    case "$sub_mode" in
+        1|2)
+            for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                [[ "$module" == "bash" ]] && continue
+                local target=$(get_target_path "$module")
+                
+                # 1. 尝试卸载旧链接
+                cd "$DOTFILES_DIR" && stow -D -t ~ "$module" 2>/dev/null
+                # 2. 清理目标路径
+                clean_target "$target"
+
+                if [ "$sub_mode" == "1" ]; then
+                    # Stow 模式：直接链接
+                    cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
+                    echo -e "  [🔗 Linked] $module"
+                else
+                    # 物理模式：从仓库拷贝到系统 (保持层级)
+                    # 物理拷贝需要根据模块内容决定拷贝方式
+                    if [ -d "$DOTFILES_DIR/$module/.config" ]; then
+                        cp -a "$DOTFILES_DIR/$module/.config/." "$HOME/.config/" 2>/dev/null
+                    elif [ -f "$DOTFILES_DIR/$module/.config/$module.toml" ]; then
+                        cp -a "$DOTFILES_DIR/$module/.config/$module.toml" "$HOME/.config/" 2>/dev/null
+                    else
+                        # 兜底：直接把模块下的内容往 HOME 扔
+                        cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null
+                    fi
+                    echo -e "  [📁 Physical] $module"
+                fi
+            done
+            echo -e "${GREEN}✅ 部署完成！${NC}"
+            sleep 1.2
+            ;;
+        3)
+            local repo_script="$REPO_DIR/scripts/by-mgr"
+            read -p "确认从仓库更新并重启脚本？(y/n): " confirm
+            if [[ "$confirm" == "y" ]]; then
+                cp "$repo_script" "$SELF_PATH" && chmod +x "$SELF_PATH"
+                echo -e "${GREEN}✨ 更新成功！重启中...${NC}"
+                sleep 1
+                exec "$SELF_PATH"
+            fi
+            ;;
+        0) return ;;
+    esac
+}
+
+# --- 主循环 ---
+while true; do
+    clear
+    echo -e "${CYAN}================================================${NC}"
+    echo -e "${BOLD}       Biyuan 配置管理引擎 (by-mgr)${NC}"
+    echo -e "${CYAN}================================================${NC}"
+    echo "  1) 🛠️  备份与恢复管理 (快照/还原/清理)"
+    echo "  2) 🚀 更新与部署管理 (Stow/物理模式/自更新)"
+    echo "  0) 🚪 退出维护"
+    echo -e "${CYAN}------------------------------------------------${NC}"
+    read -p "请选择主功能: " main_opt
+
+    case "$main_opt" in
+        1) menu_backup_restore ;;
+        2) menu_sync_deploy ;;
+        0) echo -e "${GREEN}再见, Biyuan!${NC}"; exit 0 ;;
+        *) echo -e "${RED}无效选项${NC}" && sleep 1 ;;
+    esac
+done
