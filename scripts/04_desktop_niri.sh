@@ -75,6 +75,7 @@ install_desktop_niri() {
         dolphin fcitx5 fcitx5-chinese-addons 
         xdg-desktop-portal-gnome xdg-desktop-portal-wlr
         libva-nvidia-driver libva-utils libva-nvidia-driver
+        polkit-kde
     )
 
     echo -e "${YELLOW}>> Deploying Niri ecosystem components...${NC}"
