@@ -116,6 +116,7 @@ install_desktop_niri() {
             2)
                 echo -e "${YELLOW}>> Executing Physical configuration deployment (Copy)...${NC}"
                 for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+
                     # 【核心修复】：彻底销毁旧的软链接
                     # 1. 尝试让 stow 回收旧链接
                     cd "$DOTFILES_DIR" && stow -D -t ~ "$module" 2>/dev/null
@@ -164,26 +165,60 @@ install_desktop_niri() {
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 7. 注册全局维护命令 by-mgr ---
-    echo -e "${BLUE}>> Registering global maintenance command: by-mgr${NC}"
+    # --- 7. 注册全局维护命令 by-mgr 与 Shell 环境初始化 ---
+    echo -e "${BLUE}>> Registering global commands and initializing shell...${NC}"
     local BIN_DIR="$HOME/.local/bin"
     mkdir -p "$BIN_DIR"
     
     if [ -f "$REPO_DIR/scripts/by-mgr" ]; then
+        # 1. 部署 by-mgr 工具
         cp "$REPO_DIR/scripts/by-mgr" "$BIN_DIR/by-mgr"
         chmod +x "$BIN_DIR/by-mgr"
         
-        local SHELL_RC="$HOME/.bashrc"
-        [[ "$SHELL" == *"zsh"* ]] && SHELL_RC="$HOME/.zshrc"
+        # 定义配置文件路径
+        local BASH_RC="$HOME/.bashrc"
+        local ZSH_RC="$HOME/.zshrc"
+        local BASH_PROFILE="$HOME/.bash_profile"
         
-        local PATH_LINE="export PATH=\"\$HOME/.local/bin:\$PATH\""
-        if [ -f "$SHELL_RC" ]; then
-            if ! grep -Fq "$PATH_LINE" "$SHELL_RC"; then
-                echo -e "\n# Biyuan CLI Tools" >> "$SHELL_RC"
-                echo "$PATH_LINE" >> "$SHELL_RC"
+        # --- A. 注入 PATH 与 Starship (针对交互式 Shell) ---
+        for rc in "$BASH_RC" "$ZSH_RC"; do
+            if [ -f "$rc" ]; then
+                local PATH_LINE="export PATH=\"\$HOME/.local/bin:\$PATH\""
+                local STARSHIP_CMD='eval "$(starship init '$(basename "$rc" | sed 's/rc//;s/\.//')')"'
+                
+                # 注入 PATH
+                if ! grep -Fq "$PATH_LINE" "$rc"; then
+                    echo -e "\n# Biyuan CLI Tools & Environment" >> "$rc"
+                    echo "$PATH_LINE" >> "$rc"
+                fi
+                
+                # 注入 Starship
+                if ! grep -Fq "starship init" "$rc"; then
+                    echo -e "\n# Starship Prompt Initialization" >> "$rc"
+                    echo "$STARSHIP_CMD" >> "$rc"
+                fi
+            fi
+        done
+
+        # --- B. 注入 Fcitx5 环境变量 (针对登录 Shell: .bash_profile) ---
+        if [ -f "$BASH_PROFILE" ]; then
+            if ! grep -q "XMODIFIERS=@im=fcitx" "$BASH_PROFILE"; then
+                echo -e "\n# fcitx5 Environment Variables" >> "$BASH_PROFILE"
+                cat >> "$BASH_PROFILE" <<EOF
+export XMODIFIERS=@im=fcitx
+export GTK_IM_MODULE=fcitx
+export QT_IM_MODULE=fcitx
+export SDL_IM_MODULE=fcitx
+# 关键：告诉程序优先使用 Wayland 协议
+export CLUTTER_IM_MODULE=fcitx
+EOF
+                echo -e "${CYAN}  [Env] Fcitx5 variables injected into .bash_profile.${NC}"
             fi
         fi
-        echo -e "${GREEN}✅ Command deployed successfully.${NC}"
+
+        echo -e "${GREEN}✅ Command and Shell environment deployed successfully.${NC}"
+    else
+        echo -e "${RED}❌ Error: by-mgr script not found at $REPO_DIR/scripts/by-mgr${NC}"
     fi
 
     # --- 8. 登录管理器部署 (修正: 移入函数体内) ---
