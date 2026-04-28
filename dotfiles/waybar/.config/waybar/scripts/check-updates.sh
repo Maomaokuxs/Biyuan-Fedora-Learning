@@ -23,7 +23,7 @@ if [ "$COUNT" -gt 0 ]; then
     fi
 else
     # 系统已是最新
-    TEXT="󰏗0" 
+    TEXT="󰏗 0" 
     ALT="uptodate"
     TOOLTIP="系统已是最新状态"
 fi
