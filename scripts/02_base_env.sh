@@ -6,6 +6,11 @@ setup_base() {
     echo -e "${GREEN}          Base Environment & Core Fonts${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
+    # --- 0. 系统更新 (确保安装前系统版本最新) ---
+    echo -e "${YELLOW}>> Refreshing package cache and upgrading system...${NC}"
+    # 使用 --refresh 强制刷新元数据，确保获取到最新的补丁
+    sudo dnf upgrade -y --refresh
+
     # --- 0. 初始化家目录结构 ---
     echo -e "${YELLOW}>> Initializing standard user directories...${NC}"
     sudo dnf install -y xdg-user-dirs

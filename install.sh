@@ -61,7 +61,7 @@ main() {
     echo "/_____/_/\__, /\__,_/\__,_/_/ /_/       "
     echo "        /____/  Fedora Install Engine"
     echo -e "${CYAN}------------------------------------------------------${NC}"
-    echo -e "  ⚡ Fast Deployment | Auto-Sync Remote | 📅 2026"
+    echo -e "  ⚡ Fast Deployment | Auto-Sync Remote |"
     echo -e "${CYAN}------------------------------------------------------${NC}\n"
 
     # --- 1. 【核心修复】：加载所有模块 ---
