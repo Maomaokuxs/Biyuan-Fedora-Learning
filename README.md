@@ -22,4 +22,4 @@
 
 - niri
 
-[[/images/desktop-screenshot-niri.png]]
+[[images/desktop-screenshot-niri.png]]
