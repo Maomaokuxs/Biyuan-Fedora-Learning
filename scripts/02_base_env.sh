@@ -6,6 +6,23 @@ setup_base() {
     echo -e "${GREEN}          Base Environment & Core Fonts${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
+    # --- 0. 软件镜像源优化 (针对国内网络) ---
+    echo -e "${YELLOW}>> Network optimization check...${NC}"
+    read -p "Switch to Tsinghua TUNA mirror? (y/N): " confirm_mirror
+    
+    # 默认为 N (不切换)
+    if [[ "$confirm_mirror" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}>> Replacing Fedora mirrors with Tsinghua TUNA...${NC}"
+        sudo sed -e 's|^metalink=|#metalink=|g' \
+            -e 's|^#baseurl=http://download.example/pub/fedora/linux|baseurl=https://mirrors.tuna.tsinghua.edu.cn/fedora|g' \
+            -i.bak \
+            /etc/yum.repos.d/fedora.repo \
+            /etc/yum.repos.d/fedora-updates.repo
+        echo -e "${GREEN}✅ Mirrors replaced (Old files backed up as .bak).${NC}"
+    else
+        echo -e "${CYAN}>> Skipping mirror replacement, using system defaults.${NC}"
+    fi
+
     # --- 0. 系统更新 (确保安装前系统版本最新) ---
     echo -e "${YELLOW}>> Refreshing package cache and upgrading system...${NC}"
     # 使用 --refresh 强制刷新元数据，确保获取到最新的补丁
