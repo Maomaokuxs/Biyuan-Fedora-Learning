@@ -149,7 +149,7 @@ window#waybar {
 
 /* 🚀 内核更新：使用强调色，加粗，并执行闪烁动画 */
 #custom-updates.kernel {
-    color: @accent;        /* 使用你的强调色变量 */
+    color: @fg;        /* 使用你的强调色变量 */
     font-weight: bold;
     padding: 0 5px;
     animation: blinker 2s linear infinite;
