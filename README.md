@@ -22,4 +22,4 @@
 
 - niri
 
-[[images/desktop-screenshot-niri.png]]
+![niri](images/desktop-screenshot-niri.png)
