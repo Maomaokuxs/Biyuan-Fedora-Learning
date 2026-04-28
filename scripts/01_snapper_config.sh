@@ -106,29 +106,38 @@ setup_snapper_and_backup() {
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 4. 时间轴全量静默备份 (核心修复) ---
+# --- 4. 时间轴全量静默备份 (优化与修复版) ---
 
     local BACKUP_ROOT="$HOME/.dotfiles_backup"
     local date_tag=$(date +%Y%m%d_%H%M%S)
     local current_backup_dir="$BACKUP_ROOT/$date_tag"
     
-    echo -e "${BLUE}>> Performing silent physical backup of local configs (Dereferencing symlinks)...${NC}"
+    echo -e "${BLUE}>> Performing silent physical backup of local configs...${NC}"
     if [ -d "$DOTFILES_DIR" ]; then
         local backed_any=false
         mkdir -p "$current_backup_dir"
         
         for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            # 1. 动态确定目标路径 (适配非 .config 目录)
             local src="$HOME/.config/$module"
             [[ "$module" == "colors" ]] && src="$HOME/.cache/hellwal"
+            [[ "$module" == "bash" ]] && src="$HOME/.bashrc"
             
-            # Use -e to check existence (correctly identifies files, directories, or symlinks)
             if [ -e "$src" ]; then
-                local dest="$current_backup_dir/$module"
-                local rel=$(dirname "$src" | sed "s|$HOME||")
-                mkdir -p "$dest$rel"
+                # 【核心修复 1】：拦截空文件夹！如果是个空壳目录，直接跳过，不制造垃圾备份
+                if [ -d "$src" ] && [ -z "$(ls -A "$src" 2>/dev/null)" ]; then
+                    continue
+                fi
                 
-                # [CRITICAL FIX]: -L flag used to resolve symlinks and extract real physical files
-                cp -rLf "$src" "$dest$rel/"
+                # 2. 还原相对于 HOME 的真实目录结构 (例如: .config/hypr 或 .bashrc)
+                local rel_path="${src#$HOME/}"
+                local dest="$current_backup_dir/$rel_path"
+                
+                # 【核心修复 2】：优雅创建父级目录，避免错误的嵌套
+                mkdir -p "$(dirname "$dest")"
+                
+                # 【核心修复 3】：使用 -aL (归档模式 + 物理化软链接) 替代 -rLf，更安全地保留权限
+                cp -aL "$src" "$dest"
                 backed_any=true
             fi
         done
@@ -136,8 +145,9 @@ setup_snapper_and_backup() {
         if [ "$backed_any" = true ]; then
              echo -e "${GREEN}✅ Physical files extracted and backed up to: $current_backup_dir${NC}"
         else
+             # 如果全是空文件夹或都不存在，销毁这次的备份日期目录
              rm -rf "$current_backup_dir"
-             echo -e "${YELLOW}>> No local configurations detected for backup.${NC}"
+             echo -e "${YELLOW}>> No local configurations needed backup.${NC}"
         fi
     fi
 }

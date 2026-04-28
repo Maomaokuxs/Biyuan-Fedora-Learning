@@ -4,42 +4,12 @@
 # 色彩定义
 CYAN='\033[0;36m'; BLUE='\033[0;34m'; GREEN='\033[0;32m'; PURPLE='\033[0;35m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'; BOLD='\033[1m'
 
-# --- 0. 自动更新模块 ---
-update_self() {
-    # 设置超时时间（例如 5 秒）
-    local TIMEOUT_SEC=5
-
-    if [ -d ".git" ] && command -v git &> /dev/null; then
-        echo -e "${BLUE}>> Checking for remote updates (Timeout: ${TIMEOUT_SEC}s)...${NC}"
-        
-        # 使用 timeout 命令限制 git fetch 的执行时间
-        if ! timeout "${TIMEOUT_SEC}" git fetch --quiet 2>/dev/null; then
-            echo -e "${YELLOW}⚠️  Update check timed out or network failed. Skipping...${NC}"
-            return 0
-        fi
-
-        LOCAL=$(git rev-parse @)
-        REMOTE=$(git rev-parse @{u} 2>/dev/null)
-
-        if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
-            echo -e "${CYAN}>> New version detected, pulling changes...${NC}"
-            if timeout "${TIMEOUT_SEC}" git pull --quiet; then
-                echo -e "${GREEN}✅ Repository code updated.${NC}"
-                sync && sleep 0.5 
-                exec bash "$0" --no-update "$@"
-                exit 0
-            else
-                echo -e "${RED}❌ Pull failed. Continuing with local version.${NC}"
-            fi
-        fi
-    fi
-}
-
 # --- 主程序入口 ---
 main() {
-    if [[ "$1" != "--no-update" ]]; then
-        update_self "$@"
-    else
+    # 状态标记：检查是否是更新后重新拉起的脚本
+    local is_resumed=false
+    if [[ "$1" == "--resumed" ]]; then
+        is_resumed=true
         shift
     fi
 
@@ -52,17 +22,20 @@ main() {
     # 预热 sudo 权限
     sudo -v || exit 1
 
-    clear
-    echo -e "${CYAN}${BOLD}"
-    echo "    ____  _                             "
-    echo "   / __ )(_)__  __ __  ______ _____     "
-    echo "  / __  / / / / / / / / / __ \`/ __ \    "
-    echo " / /_/ / / /_/ / /_/ / / /_/ / / / /    "
-    echo "/_____/_/\__, /\__,_/\__,_/_/ /_/       "
-    echo "        /____/  Fedora Install Engine"
-    echo -e "${CYAN}------------------------------------------------------${NC}"
-    echo -e "  ⚡ Fast Deployment | Auto-Sync Remote |"
-    echo -e "${CYAN}------------------------------------------------------${NC}\n"
+    # 如果是首次启动（非更新后重启），则显示欢迎画面
+    if [ "$is_resumed" = false ]; then
+        clear
+        echo -e "${CYAN}${BOLD}"
+        echo "    ____  _                             "
+        echo "   / __ )(_)__  __ __  ______ _____     "
+        echo "  / __  / / / / / / / / / __ \`/ __ \    "
+        echo " / /_/ / / /_/ / /_/ / / /_/ / / / /    "
+        echo "/_____/_/\__, /\__,_/\__,_/_/ /_/       "
+        echo "        /____/  Fedora Install Engine"
+        echo -e "${CYAN}------------------------------------------------------${NC}"
+        echo -e "  ⚡ Fast Deployment | Auto-Sync Remote |"
+        echo -e "${CYAN}------------------------------------------------------${NC}\n"
+    fi
 
     # --- 1. 【核心修复】：加载所有模块 ---
     if [ -d "$SCRIPTS_DIR" ]; then
@@ -82,14 +55,59 @@ main() {
 
     # --- 执行流程 ---
     
-    # Phase 1: 磁盘防护与备份
-    if command -v setup_snapper_and_backup &> /dev/null; then
-        setup_snapper_and_backup
-    else
-        echo -e "${RED}>> Error: setup_snapper_and_backup function not loaded!${NC}"
-    fi
+    # 仅在非恢复状态下执行备份和更新询问
+    if [ "$is_resumed" = false ]; then
+        # Phase 1: 磁盘防护与备份
+        if command -v setup_snapper_and_backup &> /dev/null; then
+            setup_snapper_and_backup
+        else
+            echo -e "${RED}>> Error: setup_snapper_and_backup function not loaded!${NC}"
+        fi
 
-    echo -e "\n${BLUE}>> Snapper configuration finished. Entering desktop deployment...${NC}"
+        echo -e "\n${BLUE}>> Snapper configuration finished. Entering desktop deployment...${NC}"
+
+        # ========================================================
+        # 【新增逻辑】：在备份完成后，询问是否拉取更新
+        # ========================================================
+        if [ -d ".git" ] && command -v git &> /dev/null; then
+            echo -e "\n${BLUE}=====================================================${NC}"
+            echo -e "${GREEN}  Repository Update Check${NC}"
+            echo -e "${BLUE}=====================================================${NC}"
+            
+            read -p "Check and pull the latest remote code? (y/N): " confirm_update
+            
+            if [[ "$confirm_update" =~ ^[Yy]$ ]]; then
+                local TIMEOUT_SEC=5
+                echo -e "${YELLOW}>> Checking for remote updates (Timeout: ${TIMEOUT_SEC}s)...${NC}"
+                
+                # 使用 timeout 命令限制 git fetch 的执行时间
+                if ! timeout "${TIMEOUT_SEC}" git fetch --quiet 2>/dev/null; then
+                    echo -e "${YELLOW}⚠️  Update check timed out or network failed. Skipping...${NC}"
+                else
+                    LOCAL=$(git rev-parse @)
+                    REMOTE=$(git rev-parse @{u} 2>/dev/null)
+
+                    if [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
+                        echo -e "${CYAN}>> New version detected, pulling changes...${NC}"
+                        if timeout "${TIMEOUT_SEC}" git pull --quiet; then
+                            echo -e "${GREEN}✅ Repository code updated.${NC}"
+                            echo -e "${YELLOW}>> Restarting script to apply new changes...${NC}"
+                            sync && sleep 0.5 
+                            # 拉取成功后重启脚本，附带 --resumed 参数跳过 Phase 1
+                            exec bash "$0" --resumed "$@"
+                            exit 0
+                        else
+                            echo -e "${RED}❌ Pull failed. Continuing with local version.${NC}"
+                        fi
+                    else
+                        echo -e "${GREEN}✅ Repository is already up to date.${NC}"
+                    fi
+                fi
+            else
+                echo -e "${CYAN}>> Skipped repository update.${NC}"
+            fi
+        fi
+    fi
 
     # Phase 2: 桌面环境部署选择菜单
     echo -e "\n${BLUE}=====================================================${NC}"
