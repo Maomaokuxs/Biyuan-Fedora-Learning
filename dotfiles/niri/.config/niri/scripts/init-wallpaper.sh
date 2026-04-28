@@ -20,7 +20,7 @@ done
 
 # --- 2. 核心路径定义 (关键修正区) ---
 # 壁纸资产在仓库根目录
-DEFAULT_WALL_SRC="$REPO_ROOT/assets/default_wallpaper.png"
+DEFAULT_WALL_SRC="$REPO_ROOT/assets/default_wallpaper.jpg"
 
 # 【核心修复】：根据你之前 find 的结果，脚本实际在 dotfiles 深度目录下
 THEME_SYNC_SCRIPT="$REPO_ROOT/dotfiles/niri/.config/niri/scripts/theme-sync.sh"
@@ -30,22 +30,27 @@ THEME_SYNC_SCRIPT="$REPO_ROOT/dotfiles/niri/.config/niri/scripts/theme-sync.sh"
 
 WALL_DEST_DIR="$HOME/Pictures/wallpapers"
 mkdir -p "$WALL_DEST_DIR"
-FINAL_WALLPAPER="$WALL_DEST_DIR/default_wallpaper.png"
+FINAL_WALLPAPER="$WALL_DEST_DIR/default_wallpaper.jpg"
 
 # --- 3. 调试输出 ---
 echo ">> Debug Info:"
 echo "   Real REPO_ROOT: $REPO_ROOT"
 echo "   Target Engine: $THEME_SYNC_SCRIPT"
 
-# --- 4. 部署默认壁纸 ---
+# --- 4. 部署默认壁纸 (优化逻辑) ---
 echo ">> Checking default wallpaper asset..."
 if [ -f "$DEFAULT_WALL_SRC" ]; then
-    cp -n "$DEFAULT_WALL_SRC" "$FINAL_WALLPAPER" 2>/dev/null
-    echo -e "\033[0;32m✅ Wallpaper ready: $FINAL_WALLPAPER\033[0m"
+    # 【修复点】：使用软链接代替复制，防止目录充满重复物理文件
+    # -s: 软链接, -f: 强制覆盖旧链接（确保仓库图片更新时能同步）
+    ln -sf "$DEFAULT_WALL_SRC" "$FINAL_WALLPAPER"
+    echo -e "\033[0;32m✅ Wallpaper linked: $FINAL_WALLPAPER -> $DEFAULT_WALL_SRC\033[0m"
 else
     echo -e "\033[0;33m⚠️  Warning: Asset not found at $DEFAULT_WALL_SRC\033[0m"
-    # 如果目标不存在，尝试找一张现成的
-    [ -f "$FINAL_WALLPAPER" ] || FINAL_WALLPAPER=$(ls "$WALL_DEST_DIR"/*.{png,jpg,jpeg} 2>/dev/null | head -n 1)
+    
+    # 只有当链接失效且目标文件不存在时，才尝试寻找备份
+    if [ ! -f "$FINAL_WALLPAPER" ]; then
+        FINAL_WALLPAPER=$(ls "$WALL_DEST_DIR"/*.{png,jpg,jpeg} 2>/dev/null | grep -v "default_wallpaper.jpg" | head -n 1)
+    fi
 fi
 
 # --- 5. 激活视觉引擎 ---

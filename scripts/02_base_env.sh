@@ -3,9 +3,20 @@
 
 setup_base() {
     echo -e "${BLUE}=====================================================${NC}"
-    echo -e "${GREEN}  [Phase 2] Base Environment & Core Fonts${NC}"
+    echo -e "${GREEN}          Base Environment & Core Fonts${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
+    # --- 0. 初始化家目录结构 ---
+    echo -e "${YELLOW}>> Initializing standard user directories...${NC}"
+    sudo dnf install -y xdg-user-dirs
+
+    # 生成 Documents, Pictures, Downloads 等文件夹
+    xdg-user-dirs-update --force
+
+    # 验证路径（确保脚本后续引用的变量正确）
+    mkdir -p "$HOME/Documents/github"
+    mkdir -p "$HOME/Pictures/wallpapers"
+
     # 1. 基础系统工具与 Fedora 仓库字体包
     # 包含了你指定的 JetBrains Mono, Noto Emoji, Noto CJK
     local pkgs=(
