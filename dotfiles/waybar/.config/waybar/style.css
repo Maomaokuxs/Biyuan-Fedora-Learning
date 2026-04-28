@@ -5,7 +5,7 @@
 
 /* --- 1. 引入 Hellwal 生成的颜色变量 --- */
 /* 需要使用绝对路径确保 Waybar 在启动时能准确加载 */
-@import url("/home/biyuan/.cache/hellwal/colors-waybar.css");
+@import url("../../.cache/hellwal/colors-waybar.css");
 
 /* --- 2. 全局基础设置 --- */
 * {
@@ -90,7 +90,7 @@ window#waybar {
 
 /* 鼠标悬停预览 */
 #workspaces button:hover {
-    background-color: rgba(255, 255, 255, 0.5);
+    background-color: @bg;
     min-width: 25px;
 }
 
@@ -136,21 +136,28 @@ window#waybar {
     color: @fg;
 }
 
-/* 更新提醒模块 */
+/* 默认状态：系统最新 */
 #custom-updates.uptodate {
     color: @fg;
+    padding: 0 5px;
 }
 
-/* 🔴 内核更新提醒：变红并闪烁 */
+/* 有普通更新 */
+#custom-updates.normal {
+    color: @accent; /* 普通更新也可以用强调色，或者你喜欢的其他颜色 */
+}
+
+/* 🚀 内核更新：使用强调色，加粗，并执行闪烁动画 */
 #custom-updates.kernel {
-    background-color: #f38ba8; 
-    color: #11111b;
+    color: @accent;        /* 使用你的强调色变量 */
     font-weight: bold;
+    padding: 0 5px;
     animation: blinker 2s linear infinite;
 }
 
+/* 闪烁动画保持不变 */
 @keyframes blinker {
-    50% { opacity: 0.7; }
+    50% { opacity: 0.3; }
 }
 
 /* --- Fcitx5 输入法状态胶囊 --- */

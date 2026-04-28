@@ -1,21 +1,21 @@
 format = """$os$username$directory$git_branch$git_status$time$line_break$character"""
 [os]
 disabled = false
-format = "[](#4a5755)[ ](bg:#4a5755 fg:#010101)"
+format = "[](#7b7b7b)[ ](bg:#7b7b7b fg:#050505)"
 [username]
 show_always = true
-format = "[ $user ](bg:#4a5755 fg:#010101)[](fg:#4a5755 bg:#060607)"
+format = "[ $user ](bg:#7b7b7b fg:#050505)[](fg:#7b7b7b bg:#161615)"
 [directory]
-format = "[ $path ](bg:#060607 fg:#ccb891)"
+format = "[ $path ](bg:#161615 fg:#ffffff)"
 truncation_length = 3
 [git_branch]
 symbol = ""
-format = "[ $symbol $branch ](fg:#4a5755 bg:#060607)"
+format = "[ $symbol $branch ](fg:#7b7b7b bg:#161615)"
 [git_status]
-format = "[$all_status$ahead_behind](fg:#4a5755 bg:#060607)"
+format = "[$all_status$ahead_behind](fg:#7b7b7b bg:#161615)"
 [time]
 disabled = false
-format = "[  $time ](bg:#060607 fg:#ccb891)[ ](fg:#060607)"
+format = "[  $time ](bg:#161615 fg:#ffffff)[ ](fg:#161615)"
 [character]
-success_symbol = '[❯](bold fg:#4a5755)'
+success_symbol = '[❯](bold fg:#7b7b7b)'
 error_symbol = '[❯](bold fg:red)'
