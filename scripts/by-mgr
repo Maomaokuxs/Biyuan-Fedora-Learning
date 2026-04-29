@@ -6,6 +6,11 @@ DOTFILES_DIR="$REPO_DIR/dotfiles"
 BACKUP_ROOT="$HOME/.dotfiles_backup"
 SELF_PATH=$(realpath "$0")
 
+# [新增] 定义本地标准配置路径，实现与 Git 仓库解耦
+USER_CONFIG_DIR="$HOME/.config/by-mgr"
+LOCAL_REPO_LIST="$USER_CONFIG_DIR/repos.list"
+PROJECT_REPO_LIST="$REPO_DIR/config/repos.list"
+
 BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; PURPLE='\033[0;35m'; NC='\033[0m'; BOLD='\033[1m'
 
 # --- 辅助函数 ---
@@ -27,6 +32,25 @@ clean_target() {
     [ -L "$target" ] && rm -f "$target"
     [ -d "$target" ] && [ ! -L "$target" ] && rm -rf "$target"
     [ -f "$target" ] && [ ! -L "$target" ] && rm -f "$target"
+}
+
+# ==========================================
+# [新增辅助函数] DNF5/DNF4 仓库开关兼容
+# ==========================================
+enable_repo_compat() {
+    if command -v dnf5 &>/dev/null || dnf --version | grep -q "dnf5"; then
+        sudo dnf config-manager setopt "$1.enabled=1" 2>/dev/null
+    else
+        sudo dnf config-manager --set-enabled "$1" 2>/dev/null
+    fi
+}
+
+disable_repo_compat() {
+    if command -v dnf5 &>/dev/null || dnf --version | grep -q "dnf5"; then
+        sudo dnf config-manager setopt "$1.enabled=0" 2>/dev/null
+    else
+        sudo dnf config-manager --set-disabled "$1" 2>/dev/null
+    fi
 }
 
 # --- 模块：备份与恢复管理 ---
@@ -261,6 +285,185 @@ EOF
     [[ "$reboot_now" =~ ^[Yy]$ ]] && sudo reboot
 }
 
+# ==========================================
+# 软件仓库智能管理器 (Repo Manager)
+# ==========================================
+menu_repo_manager() {
+    # 初始化配置目录
+    mkdir -p "$USER_CONFIG_DIR"
+    mkdir -p "$(dirname "$PROJECT_REPO_LIST")"
+
+    while true; do
+        clear
+        echo -e "\n${YELLOW}>>>> 📦 软件仓库智能管理器 (Repo Manager) <<<<${NC}"
+        # 智能显示：优先显示本地配置是否存在
+        if [ -f "$LOCAL_REPO_LIST" ]; then
+            echo -e "${CYAN}当前生效清单 (本地): ${LOCAL_REPO_LIST}${NC}"
+        elif [ -f "$PROJECT_REPO_LIST" ]; then
+            echo -e "${CYAN}当前生效清单 (仓库): ${PROJECT_REPO_LIST}${NC}"
+        else
+            echo -e "${RED}未检测到任何仓库清单文件${NC}"
+        fi
+
+        echo "  1) 💾 导出清单：备份当前启用的仓库"
+        echo "  2) 🧹 强力清理：扫描并禁用 404/失效的现有仓库"
+        echo "  3) ➕ 增量补齐：根据清单添加缺失仓库"
+        echo "  4) 📝 手动编辑清单文件"
+        echo "  0) 🔙 返回上一级"
+        read -p "请选择操作: " repo_opt
+
+        case "$repo_opt" in
+            1)
+                echo -e "\n${BLUE}>> 请选择导出位置:${NC}"
+                echo "  1) 系统本地配置 (~/.config/by-mgr/) [隐私/推荐]"
+                echo "  2) Git 仓库项目目录 (Documents/github/...) [同步/分享]"
+                read -p "选择 [1/2]: " export_dest
+                
+                local target_file=""
+                if [ "$export_dest" == "2" ]; then target_file="$PROJECT_REPO_LIST"; else target_file="$LOCAL_REPO_LIST"; fi
+                
+                echo -e "${YELLOW}>> 正在备份仓库到: $target_file ...${NC}"
+                echo "# Biyuan 自动生成的仓库备份清单" > "$target_file"
+                for repo in $(dnf repolist --enabled | tail -n +2 | awk '{print $1}'); do
+                    if [[ "$repo" == copr:copr.fedorainfracloud.org:* ]]; then
+                        local author=$(echo "$repo" | cut -d':' -f3)
+                        local project=$(echo "$repo" | cut -d':' -f4 | sed 's/-x86_64//g')
+                        echo "copr $author/$project" >> "$target_file"
+                    else
+                        echo "repo $repo" >> "$target_file"
+                    fi
+                done
+                echo -e "${GREEN}✅ 导出成功！${NC}"
+                sleep 1.2
+                ;;
+            2)
+                echo -e "${YELLOW}>> 正在逐个验证已启用的仓库 (严格探测模式)...${NC}"
+                ask_snapper_snapshot
+                for repo in $(dnf repolist --enabled | tail -n +2 | awk '{print $1}'); do
+                    echo -n -e "  🔍 探测: ${PURPLE}$repo${NC} ... "
+                    local check_out
+                    check_out=$(sudo dnf makecache --repo="$repo" --refresh --setopt="${repo}.skip_if_unavailable=False" 2>&1)
+                    if [ $? -ne 0 ] || echo "$check_out" | grep -qiE "status code: 404|failed to download|error:|no valid source"; then
+                        echo -e "${RED}[失效 - 正在隔离]${NC}"
+                        disable_repo_compat "$repo"
+                    else
+                        echo -e "${GREEN}[正常]${NC}"
+                    fi
+                done
+                echo -e "${GREEN}✅ 清理完成！${NC}"
+                read -p "按回车键返回..."
+                ;;
+            3)
+                # 智能寻找清单：优先本地，其次项目
+                local list_to_use=""
+                if [ -f "$LOCAL_REPO_LIST" ]; then list_to_use="$LOCAL_REPO_LIST"
+                elif [ -f "$PROJECT_REPO_LIST" ]; then list_to_use="$PROJECT_REPO_LIST"
+                fi
+
+                if [ -z "$list_to_use" ]; then
+                    echo -e "${RED}>> 找不到任何清单文件，请先执行导出！${NC}"
+                    sleep 1; continue
+                fi
+                
+                echo -e "${BLUE}>> 正在根据 [$list_to_use] 补齐缺失仓库...${NC}"
+                local added_count=0
+                while read -r line || [[ -n "$line" ]]; do
+                    [[ -z "$line" || "$line" == \#* ]] && continue
+                    local r_type=$(echo "$line" | awk '{print $1}')
+                    local r_val=$(echo "$line" | awk '{print $2}')
+                    
+                    if [ "$r_type" == "copr" ]; then
+                        local author=$(echo "$r_val" | cut -d'/' -f1)
+                        local project=$(echo "$r_val" | cut -d'/' -f2)
+                        local search_id="copr:copr.fedorainfracloud.org:${author}:${project}"
+                        if ! dnf repolist --enabled | grep -q "$search_id"; then
+                            echo -e "  ${YELLOW}>> 添加 Copr: $r_val${NC}"
+                            sudo dnf copr enable -y "$r_val" && ((added_count++))
+                        fi
+                    elif [ "$r_type" == "repo" ]; then
+                        if ! dnf repolist --enabled | grep -q "^${r_val}"; then
+                            echo -e "  ${YELLOW}>> 启用仓库: $r_val${NC}"
+                            enable_repo_compat "$r_val" && ((added_count++))
+                        fi
+                    fi
+                done < "$list_to_use"
+                echo -e "${GREEN}✅ 补齐完成！共计添加 $added_count 个仓库。${NC}"
+                sleep 2
+                ;;
+            4)
+                # 智能编辑：优先打开本地文件，若无则尝试打开项目文件
+                local file_to_edit="$LOCAL_REPO_LIST"
+                [ ! -f "$LOCAL_REPO_LIST" ] && [ -f "$PROJECT_REPO_LIST" ] && file_to_edit="$PROJECT_REPO_LIST"
+                
+                local sys_fallback="vi"
+                command -v editor &>/dev/null && sys_fallback="editor"
+                ${EDITOR:-$sys_fallback} "$file_to_edit"
+                ;;
+            0) return ;;
+        esac
+    done
+}
+
+# ==========================================
+# [新增模块] 系统默认文本编辑器设置
+# ==========================================
+menu_default_editor() {
+    while true; do
+        clear
+        echo -e "\n${YELLOW}>>>> 📝 系统默认文本编辑器设置 <<<<${NC}"
+        
+        # 探测当前状态
+        local current_editor=${EDITOR:-"未设置"}
+        local sys_editor=$(readlink -f /usr/bin/editor 2>/dev/null || echo "未配置")
+        
+        echo -e "${CYAN}当前终端 (\$EDITOR): ${PURPLE}${current_editor}${NC}"
+        echo -e "${CYAN}系统全局 (alternatives): ${PURPLE}${sys_editor}${NC}"
+        echo -e "${CYAN}------------------------------------------------${NC}"
+        echo "  1) 🟢 Neovim (nvim) - 推荐"
+        echo "  2) 🔵 Vim (vim)"
+        echo "  3) 🟡 Nano (nano)"
+        echo "  4) 🟣 Helix (hx)"
+        echo "  0) 🔙 返回上一级"
+        read -p "请选择你的首选编辑器: " editor_opt
+
+        local target_cmd=""
+        case "$editor_opt" in
+            1) target_cmd="nvim" ;;
+            2) target_cmd="vim" ;;
+            3) target_cmd="nano" ;;
+            4) target_cmd="hx" ;;
+            0) return ;;
+            *) echo -e "${RED}无效选项${NC}"; sleep 1; continue ;;
+        esac
+
+        # 1. 检查并安装
+        if ! command -v "$target_cmd" &> /dev/null; then
+            echo -e "${YELLOW}>> 未检测到 $target_cmd，正在自动安装...${NC}"
+            sudo dnf install -y "$target_cmd"
+        fi
+
+        # 2. 配置用户环境变量 (~/.bashrc)
+        echo -e "${BLUE}>> 正在配置用户环境变量 (~/.bashrc)...${NC}"
+        sed -i '/export EDITOR=/d' ~/.bashrc
+        sed -i '/export VISUAL=/d' ~/.bashrc
+        echo "export EDITOR=\"$target_cmd\"" >> ~/.bashrc
+        echo "export VISUAL=\"$target_cmd\"" >> ~/.bashrc
+        
+        # 3. 配置系统级 alternatives
+        echo -e "${BLUE}>> 正在配置系统级映射 (update-alternatives)...${NC}"
+        local editor_path=$(which "$target_cmd" 2>/dev/null)
+        if command -v update-alternatives &> /dev/null && [ -n "$editor_path" ]; then
+            # 尝试注册并设置为默认
+            sudo update-alternatives --install /usr/bin/editor editor "$editor_path" 100 2>/dev/null
+            sudo update-alternatives --set editor "$editor_path" 2>/dev/null
+        fi
+
+        echo -e "${GREEN}✅ 默认编辑器已成功切换为: $target_cmd${NC}"
+        echo -e "${CYAN}提示: 当前会话需要执行 'source ~/.bashrc' 或重新打开终端才能完全生效。${NC}"
+        read -p "按回车键返回..."
+    done
+}
+
 # --- 模块：系统配置菜单 ---
 menu_system_config() {
     while true; do
@@ -268,6 +471,8 @@ menu_system_config() {
         echo -e "\n${YELLOW}>>>> 系统配置菜单 (System Maintenance) <<<<${NC}"
         echo "  1) 🛠️  修复 NVIDIA 睡眠/休眠异常 (内核参数/服务)"
         echo "  2) 🖥️  切换登录管理器 (DM Switcher)"
+        echo "  3) 📦 软件仓库智能管理器 (Repo Manager)"
+        echo "  4) 📝 设置默认文本编辑器 (Default Editor)"
         echo "  0) 🔙 返回主菜单"
         read -p "请选择: " sys_opt
 
@@ -281,6 +486,8 @@ menu_system_config() {
                 echo -e "${GREEN}✅ 修复完毕，建议重启生效。${NC}"
                 read -p "按回车返回..." ;;
             2) menu_dm_switcher ;;
+            3) menu_repo_manager ;;
+            4) menu_default_editor ;;
             0) return ;;
         esac
     done
