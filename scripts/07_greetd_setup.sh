@@ -45,7 +45,7 @@ setup_greetd_niri() {
     echo -e "${YELLOW}>> Writing /etc/greetd/config.toml...${NC}"
     sudo tee /etc/greetd/config.toml > /dev/null <<EOF
 [default_session]
-command = "tuigreet --time --cmd /usr/bin/niri"
+command = "tuigreet --time --cmd niri-session"
 user = "greetd"
 
 [terminal]
