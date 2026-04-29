@@ -23,3 +23,74 @@
 - niri
 
 ![niri](images/desktop-screenshot-niri.png)
+
+## 安装
+
+- 克隆当前仓库
+
+```bash
+git clone https://github.com/Maomaokuxs/Biyuan-Fedora-Learning.git
+```
+
+- 授予执行权限
+
+```bash
+cd ~/Biyuan-Fedora-Learning
+chmod +x ./install.sh
+```
+
+- 启动脚本
+
+按照引导安装
+
+```bash
+./install.sh
+```
+
+## 当前文件配置
+
+```text
+Biyuan-Fedora-Learning/
+├── 📜 README.md                 # 安装指引
+├── ⚙️ config/                   # 纯数据清单
+│   └── repos.list               # 软件仓库清单，用 by-mgr 生成的增量补齐列表
+│
+├── 🛠️ scripts/                  # 【逻辑层】执行脚本
+│   ├── by-mgr                   # 核心引擎：所有的备份、部署、系统维护逻辑
+│   ├── 01_snapper_config.sh     # 基础环境与依赖包安装脚本
+|   ├── 02_base_env.sh           # 配置基础环境
+|   ├── 03_gpu_driver.sh         # 配置显卡驱动
+|   ├── 04_desktop_niri.sh       # 配置 niri 桌面环境
+│   ├── 05_desktop_kde.sh        # 配置 KDE 桌面环境
+|   ├── 06_desktop_gnome.sh      # 配置 Gnome 桌面环境
+|   └── 07_greetd_setup.sh       # 配置 Greetd/Tuigreet 作为窗口管理器
+│
+│
+├── 📦 dotfiles/                 # 【资产层】各个软件的配置文件 (通过 Stow 或 Physical 部署)
+|    ├── bash/
+│    │   └── .bashrc             # 终端环境变量
+│    ├── colors/
+│    │   └── .cache/hellwal/     # Hellwal 色彩调度中心的全局配色缓存
+│    ├── niri/
+│    │   └── .config/niri/
+│    │       └── config.kdl      # Niri 核心配置文件 (平铺逻辑、快捷键、启动项)
+│    ├── waybar/
+│    │   └── .config/waybar/     # 顶部/底部状态栏配置及 CSS 样式
+│    ├── rofi/
+│    │   └── .config/rofi/       # 启动器与应用抽屉样式
+│    ├── mako/
+│    │   └── .config/mako/       # 桌面通知守护进程配置
+│    ├── nvim/
+│    │   └── .config/nvim/       # Neovim 编辑器配置
+│    ├── starship/
+│    │   └── .config/
+│    │       └── starship.toml   # 终端提示符的高级美化
+│    └── cava/
+|        └── .config/cava/config # 终端音频频谱跳动特效配置
+|
+|       
+├── 🛠️ by-mgr                    # 备份与恢复及更新配置文件
+│
+│
+└── 🛠️ install.sh                # 安装脚本
+```

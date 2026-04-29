@@ -4,6 +4,7 @@ copr atim/starship
 copr hermitfeather/hyprland
 copr kylegospo/grub-btrfs
 copr tjuhasz/node-mass-preb
+copr xmp360/spark-store
 repo fedora
 repo fedora-cisco-openh264
 repo gitlab.com_paulcarroty_vscodium_repo
