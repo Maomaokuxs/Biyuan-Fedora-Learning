@@ -1,0 +1,14 @@
+# Biyuan 自动生成的仓库备份清单
+copr ackerman/nexus
+copr atim/starship
+copr hermitfeather/hyprland
+copr kylegospo/grub-btrfs
+copr tjuhasz/node-mass-preb
+repo fedora
+repo fedora-cisco-openh264
+repo gitlab.com_paulcarroty_vscodium_repo
+repo rpmfusion-free
+repo rpmfusion-free-updates
+repo rpmfusion-nonfree
+repo rpmfusion-nonfree-updates
+repo updates
