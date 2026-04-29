@@ -1,12 +1,37 @@
 #!/bin/bash
-# Biyuan 配置管理引擎 (by-mgr) - 智能信息提示版
+# Biyuan 配置管理引擎 (by-mgr) - 路径无关版
 
-REPO_DIR="$HOME/Documents/github/Biyuan-Fedora-Learning"
+# 1. 核心路径定义 (动态获取)
+SCRIPT_PATH=$(readlink -f "$0")
+REPO_DIR=$(dirname "$(dirname "$SCRIPT_PATH")")
+
+# [升级版逻辑] 如果推算路径不对，直接全家目录搜寻仓库特征
+if [ ! -d "$REPO_DIR/dotfiles" ]; then
+    echo -e "${YELLOW}>> 正在全家目录扫描仓库位置 (请稍候...)${NC}"
+    
+    # 搜索家目录下包含 dotfiles 文件夹且深度合理的目录
+    # -maxdepth 5 防止扫描太深（提高速度）
+    # 2>/dev/null 屏蔽掉权限拒绝的错误
+    FOUND_PATH=$(find "$HOME" -maxdepth 5 -type d -name "Biyuan-Fedora-Learning" -exec test -d "{}/dotfiles" \; -print -quit 2>/dev/null)
+
+    if [ -n "$FOUND_PATH" ]; then
+        REPO_DIR="$FOUND_PATH"
+        echo -e "${GREEN}>> 发现仓库: $REPO_DIR${NC}"
+    fi
+fi
+
 DOTFILES_DIR="$REPO_DIR/dotfiles"
 BACKUP_ROOT="$HOME/.dotfiles_backup"
 SELF_PATH=$(realpath "$0")
 
-# [新增] 定义本地标准配置路径，实现与 Git 仓库解耦
+# 2. 安全校验：确保能找到仓库目录
+if [ ! -d "$DOTFILES_DIR" ]; then
+    echo -e "\033[0;31m错误: 无法根据脚本位置定位到 dotfiles 目录！\033[0m"
+    echo "当前推算的仓库根目录为: $REPO_DIR"
+    exit 1
+fi
+
+# 3. 其他路径定义
 USER_CONFIG_DIR="$HOME/.config/by-mgr"
 LOCAL_REPO_LIST="$USER_CONFIG_DIR/repos.list"
 PROJECT_REPO_LIST="$REPO_DIR/config/repos.list"
