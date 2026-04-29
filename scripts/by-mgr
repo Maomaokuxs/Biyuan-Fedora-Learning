@@ -6,7 +6,7 @@ DOTFILES_DIR="$REPO_DIR/dotfiles"
 BACKUP_ROOT="$HOME/.dotfiles_backup"
 SELF_PATH=$(realpath "$0")
 
-BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; PURPLE='\033[0;35m'; NC='\033[0m'
+BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; PURPLE='\033[0;35m'; NC='\033[0m'; BOLD='\033[1m'
 
 # --- 辅助函数 ---
 get_target_path() {
@@ -92,7 +92,6 @@ menu_backup_restore() {
             echo -e "\n${YELLOW}>> 还原模式: 1) 物理还原  2) Stow链接还原${NC}"
             read -p "选择 [1/2]: " r_type
             
-            # 还原前必须卸载旧链接并清理目标
             cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
             clean_target "$target"
 
@@ -118,8 +117,6 @@ menu_backup_restore() {
             [ "$count" -eq 0 ] && sleep 1 && return
             local first_snap=$(basename "${time_list[0]}" | cut -d'_' -f1)
             local last_snap=$(basename "${time_list[-1]}" | cut -d'_' -f1)
-            echo -e "${PURPLE}>> 快照日期范围: [ ${first_snap:0:4}-${first_snap:4:2}-${first_snap:6:2} ] 至 [ ${last_snap:0:4}-${last_snap:4:2}-${last_snap:6:2} ]${NC}"
-
             echo "清理模式选择: 1) 按数量  2) 按日期"
             read -p "请选择: " clean_type
             if [ "$clean_type" == "1" ]; then
@@ -159,25 +156,17 @@ menu_sync_deploy() {
             for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
                 [[ "$module" == "bash" ]] && continue
                 local target=$(get_target_path "$module")
-                
-                # 1. 尝试卸载旧链接
                 cd "$DOTFILES_DIR" && stow -D -t ~ "$module" 2>/dev/null
-                # 2. 清理目标路径
                 clean_target "$target"
-
                 if [ "$sub_mode" == "1" ]; then
-                    # Stow 模式：直接链接
                     cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
                     echo -e "  [🔗 Linked] $module"
                 else
-                    # 物理模式：从仓库拷贝到系统 (保持层级)
-                    # 物理拷贝需要根据模块内容决定拷贝方式
                     if [ -d "$DOTFILES_DIR/$module/.config" ]; then
                         cp -a "$DOTFILES_DIR/$module/.config/." "$HOME/.config/" 2>/dev/null
                     elif [ -f "$DOTFILES_DIR/$module/.config/$module.toml" ]; then
                         cp -a "$DOTFILES_DIR/$module/.config/$module.toml" "$HOME/.config/" 2>/dev/null
                     else
-                        # 兜底：直接把模块下的内容往 HOME 扔
                         cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null
                     fi
                     echo -e "  [📁 Physical] $module"
@@ -188,70 +177,110 @@ menu_sync_deploy() {
             ;;
         3)
             local repo_script="$REPO_DIR/scripts/by-mgr"
-            read -p "确认从仓库更新并重启脚本？(y/n): " confirm
-            if [[ "$confirm" == "y" ]]; then
+            if [ -f "$repo_script" ]; then
                 cp "$repo_script" "$SELF_PATH" && chmod +x "$SELF_PATH"
                 echo -e "${GREEN}✨ 更新成功！重启中...${NC}"
-                sleep 1
-                exec "$SELF_PATH"
+                sleep 1 && exec "$SELF_PATH"
             fi
             ;;
         0) return ;;
     esac
 }
 
-# ==========================================
-# [新增模块] 触发快照与系统配置菜单
-# ==========================================
+# --- 辅助模块：Snapper 快照 ---
 ask_snapper_snapshot() {
     echo -e "\n${YELLOW}>> 正在检测系统环境与 Snapper 快照支持...${NC}"
-    # 检查 snapper 是否安装，并且 /etc/snapper/configs 下是否有配置文件
     if command -v snapper &> /dev/null && [ "$(sudo ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
         echo -e "${CYAN}检测到 Snapper 已就绪。${NC}"
         read -p "即将执行系统级配置，是否在操作前创建系统快照？(y/N): " snap_confirm
         if [[ "$snap_confirm" =~ ^[Yy]$ ]]; then
             local ts=$(date "+%Y-%m-%d %H:%M:%S")
-            local desc="by-mgr system config pre-snapshot at $ts"
-            echo -e "${BLUE}>> 正在生成快照...${NC}"
-            sudo snapper create --description "$desc"
+            sudo snapper create --description "by-mgr system config pre-snapshot at $ts"
             echo -e "${GREEN}✅ 系统级安全快照已成功创建。${NC}"
-        else
-            echo -e "${YELLOW}>> 已跳过快照保护。${NC}"
         fi
     else
-        echo -e "${RED}>> 未检测到有效的 Snapper 配置，无法创建系统快照，请谨慎操作。${NC}"
+        echo -e "${RED}>> 未检测到有效的 Snapper 配置，无法创建系统快照。${NC}"
     fi
-    sleep 1.5
+    sleep 1.2
 }
 
-menu_system_config() {
-    # 进入前置触发快照询问
+# --- 模块：显示管理器 (DM) 切换工具 ---
+menu_dm_switcher() {
+    echo -e "\n${YELLOW}>>>> 显示管理器 (DM) 切换工具 <<<<${NC}"
+    local current_dm=$(systemctl status display-manager.service 2>/dev/null | grep -Po '(?<=/)\w+(?=\.service)' | head -1)
+    echo -e "${CYAN}当前生效的管理器: ${PURPLE}${current_dm:-"未知"}${NC}"
+    
+    echo "  1) 📟 Greetd + Tuigreet (极简 - 5MB)"
+    echo "  2) ❄️  GDM (全功能适配 - 295MB)"
+    echo "  3) 🌌 SDDM (Wayland 友好 - 21MB)"
+    echo "  0) 🔙 返回上一级"
+    read -p "请选择: " dm_opt
+
+    case "$dm_opt" in
+        1) target_dm="greetd"; extra_pkg="tuigreet" ;;
+        2) target_dm="gdm"; extra_pkg="" ;;
+        3) target_dm="sddm"; extra_pkg="" ;;
+        0) return ;;
+        *) return ;;
+    esac
+
     ask_snapper_snapshot
 
+    echo -e "${YELLOW}>> 正在安装组件...${NC}"
+    for pkg in $target_dm $extra_pkg; do
+        if [ -n "$pkg" ] && ! rpm -q "$pkg" &>/dev/null; then
+            sudo dnf install -y "$pkg"
+        fi
+    done
+
+    # 补全 niri.desktop 入口，确保 DM 能看到 Niri
+    if [ ! -f /usr/share/wayland-sessions/niri.desktop ]; then
+        echo -e "${BLUE}>> 正在补齐 Wayland 会话描述文件...${NC}"
+        sudo mkdir -p /usr/share/wayland-sessions/
+        sudo tee /usr/share/wayland-sessions/niri.desktop > /dev/null <<EOF
+[Desktop Entry]
+Name=Niri
+Comment=A scrollable-tiling Wayland compositor
+Exec=niri-session
+Type=Application
+DesktopNames=niri
+EOF
+    fi
+
+    if [[ "$target_dm" == "greetd" && ! -f /etc/greetd/config.toml ]]; then
+        [ -f "$REPO_DIR/scripts/05_greetd_setup.sh" ] && source "$REPO_DIR/scripts/05_greetd_setup.sh" && setup_greetd_niri
+    fi
+
+    echo -e "${YELLOW}>> 切换服务链路...${NC}"
+    sudo systemctl disable gdm sddm greetd 2>/dev/null
+    sudo systemctl enable "$target_dm"
+    sudo systemctl set-default graphical.target
+
+    echo -e "${GREEN}✅ 切换完成！${NC}"
+    read -p "是否现在重启系统？(y/N): " reboot_now
+    [[ "$reboot_now" =~ ^[Yy]$ ]] && sudo reboot
+}
+
+# --- 模块：系统配置菜单 ---
+menu_system_config() {
     while true; do
         clear
-        echo -e "\n${YELLOW}>>>> 系统配置与高级修复菜单 (System Config) <<<<${NC}"
-        echo "  1) 🛠️  修复 NVIDIA 睡眠/休眠异常 (黑屏死机修复脚本)"
+        echo -e "\n${YELLOW}>>>> 系统配置菜单 (System Maintenance) <<<<${NC}"
+        echo "  1) 🛠️  修复 NVIDIA 睡眠/休眠异常 (内核参数/服务)"
+        echo "  2) 🖥️  切换登录管理器 (DM Switcher)"
         echo "  0) 🔙 返回主菜单"
-        read -p "请选择操作: " sub_mode
+        read -p "请选择: " sys_opt
 
-        case "$sub_mode" in
+        case "$sys_opt" in
             1)
-                echo -e "\n${BLUE}>> 正在执行 NVIDIA 电源管理异常修复流程...${NC}"
-                
-                echo -e "${YELLOW}步骤 1: 启用 NVIDIA 系统级睡眠协助服务...${NC}"
+                ask_snapper_snapshot
+                echo -e "${BLUE}>> 正在修复 NVIDIA 电源管理...${NC}"
                 sudo systemctl enable nvidia-suspend.service nvidia-hibernate.service nvidia-resume.service
-                
-                echo -e "${YELLOW}步骤 2: 注入内核参数 (NVreg_PreserveVideoMemoryAllocations=1)...${NC}"
                 sudo grubby --update-kernel=ALL --args="nvidia.NVreg_PreserveVideoMemoryAllocations=1"
-                
-                echo -e "${YELLOW}步骤 3: 重新生成 initramfs (过程可能需要 1-2 分钟，请耐心等待)...${NC}"
                 sudo dracut -f
-                
-                echo -e "${GREEN}✅ NVIDIA 睡眠异常修复完毕！${NC}"
-                echo -e "${CYAN}提示: 为了使所有内核参数完全生效，建议您稍后重启系统。${NC}"
-                read -p "按回车键返回上一级..."
-                ;;
+                echo -e "${GREEN}✅ 修复完毕，建议重启生效。${NC}"
+                read -p "按回车返回..." ;;
+            2) menu_dm_switcher ;;
             0) return ;;
         esac
     done
@@ -265,7 +294,7 @@ while true; do
     echo -e "${CYAN}================================================${NC}"
     echo "  1) 🛠️  备份与恢复管理 (快照/还原/清理)"
     echo "  2) 🚀 更新与部署管理 (Stow/物理模式/自更新)"
-    echo "  3) ⚙️  系统配置菜单 (系统级快照/NVIDIA睡眠修复)"
+    echo "  3) ⚙️  系统配置菜单 (NVIDIA/DM切换/安全保护)"
     echo "  0) 🚪 退出维护"
     echo -e "${CYAN}------------------------------------------------${NC}"
     read -p "请选择主功能: " main_opt
@@ -275,6 +304,6 @@ while true; do
         2) menu_sync_deploy ;;
         3) menu_system_config ;;
         0) echo -e "${GREEN}再见, Biyuan!${NC}"; exit 0 ;;
-        *) echo -e "${RED}无效选项${NC}" && sleep 1 ;;
+        *) sleep 1 ;;
     esac
 done
