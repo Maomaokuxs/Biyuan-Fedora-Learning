@@ -308,7 +308,7 @@ menu_sync_deploy() {
                 
                 # 【修改预警】：请将下面这行链接替换为你自己真实的 GitHub Raw 链接！
                 # 默认格式: https://raw.githubusercontent.com/<你的用户名>/<仓库名>/<分支名>/scripts/by-mgr
-                local RAW_URL="https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/blob/main/scripts/by-mgr"
+                local RAW_URL="https://raw.githubusercontent.com/Maomaokuxs/Biyuan-Fedora-Learning/main/scripts/by-mgr"
                 local TMP_FILE="/tmp/by-mgr-latest.sh"
 
                 # 使用 curl 静默下载 (-sLf 参数：静默执行，跟随重定向，遇到 404 直接报错而不是下载报错网页)
