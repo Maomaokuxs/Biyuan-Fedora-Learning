@@ -1,5 +1,8 @@
 #!/bin/bash
-# Biyuan 配置管理引擎 (by-mgr) - 路径无关版
+# Biyuan 配置管理引擎 (by-mgr) - 路径无关与多仓库选择版
+
+# 提前定义颜色变量，确保在头部报错和交互时色彩正常渲染
+BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; PURPLE='\033[0;35m'; NC='\033[0m'; BOLD='\033[1m'
 
 # 1. 核心路径定义 (动态获取)
 SCRIPT_PATH=$(readlink -f "$0")
@@ -10,13 +13,39 @@ if [ ! -d "$REPO_DIR/dotfiles" ]; then
     echo -e "${YELLOW}>> 正在全家目录扫描仓库位置 (请稍候...)${NC}"
     
     # 搜索家目录下包含 dotfiles 文件夹且深度合理的目录
-    # -maxdepth 5 防止扫描太深（提高速度）
-    # 2>/dev/null 屏蔽掉权限拒绝的错误
-    FOUND_PATH=$(find "$HOME" -maxdepth 5 -type d -name "Biyuan-Fedora-Learning" -exec test -d "{}/dotfiles" \; -print -quit 2>/dev/null)
+    # 去掉 -quit，找出所有匹配项，并使用 mapfile 存入 found_repos 数组
+    mapfile -t found_repos < <(find "$HOME" -maxdepth 5 -type d -name "Biyuan-Fedora-Learning" -exec test -d "{}/dotfiles" \; -print 2>/dev/null)
 
-    if [ -n "$FOUND_PATH" ]; then
-        REPO_DIR="$FOUND_PATH"
-        echo -e "${GREEN}>> 发现仓库: $REPO_DIR${NC}"
+    # 获取找到的仓库总数
+    repo_count=${#found_repos[@]}
+
+    if [ "$repo_count" -eq 0 ]; then
+        # 找不到仓库：直接报错并退出
+        echo -e "${RED}❌ 错误: 在家目录下未找到包含 dotfiles 的 Biyuan-Fedora-Learning 仓库！${NC}"
+        exit 1
+    elif [ "$repo_count" -eq 1 ]; then
+        # 只找到一个：直接沿用，不打扰用户
+        REPO_DIR="${found_repos[0]}"
+        echo -e "${GREEN}✅ 自动定位到唯一仓库: $REPO_DIR${NC}"
+    else
+        # 找到多个：渲染交互式选择菜单
+        echo -e "\n${CYAN}>> 发现多个有效的仓库副本，请指定你需要操作的那一个：${NC}"
+        for i in "${!found_repos[@]}"; do
+            echo -e "  ${PURPLE}$((i+1)))${NC} ${found_repos[i]}"
+        done
+
+        while true; do
+            read -p "请输入对应的编号 (1-$repo_count): " select_idx
+            # 正则校验：输入必须是纯数字，且在有效范围内
+            if [[ "$select_idx" =~ ^[0-9]+$ ]] && [ "$select_idx" -ge 1 ] && [ "$select_idx" -le "$repo_count" ]; then
+                REPO_DIR="${found_repos[$((select_idx-1))]}"
+                echo -e "${GREEN}✅ 已锁定目标仓库: $REPO_DIR${NC}"
+                sleep 1
+                break
+            else
+                echo -e "${RED}❌ 无效的编号，请重新输入！${NC}"
+            fi
+        done
     fi
 fi
 
@@ -26,7 +55,7 @@ SELF_PATH=$(realpath "$0")
 
 # 2. 安全校验：确保能找到仓库目录
 if [ ! -d "$DOTFILES_DIR" ]; then
-    echo -e "\033[0;31m错误: 无法根据脚本位置定位到 dotfiles 目录！\033[0m"
+    echo -e "${RED}错误: 无法根据脚本位置定位到 dotfiles 目录！${NC}"
     echo "当前推算的仓库根目录为: $REPO_DIR"
     exit 1
 fi
@@ -35,7 +64,6 @@ fi
 USER_CONFIG_DIR="$HOME/.config/by-mgr"
 LOCAL_REPO_LIST="$USER_CONFIG_DIR/repos.list"
 PROJECT_REPO_LIST="$REPO_DIR/config/repos.list"
-
 BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; PURPLE='\033[0;35m'; NC='\033[0m'; BOLD='\033[1m'
 
 # --- 辅助函数 ---
@@ -79,161 +107,233 @@ disable_repo_compat() {
 }
 
 # --- 模块：备份与恢复管理 ---
+# --- 模块：备份与恢复管理 ---
 menu_backup_restore() {
-    mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort)
-    local count=${#time_list[@]}
+    # 增加 while true 循环，让它变成一个独立的常驻子菜单
+    while true; do
+        clear # 每次循环重新清屏渲染菜单
+        mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort)
+        local count=${#time_list[@]}
 
-    echo -e "\n${YELLOW}>>>> 备份与恢复管理 (Backup & Restore) <<<<${NC}"
-    echo "  1) 💾 创建当前系统配置的物理快照"
-    echo "  2) 🕰️ 从历史时间点还原配置 (物理/Stow)"
-    echo "  3) 🔄 逆向同步：历史备份覆盖回仓库"
-    echo "  4) 🧹 清理旧快照 (智能清理)"
-    echo "  0) 🔙 返回主菜单"
-    read -p "请选择操作: " sub_mode
+        echo -e "\n${YELLOW}>>>> 备份与恢复管理 (Backup & Restore) <<<<${NC}"
+        echo "  1) 💾 创建当前系统配置的物理快照"
+        echo "  2) 🕰️ 从历史时间点还原配置 (物理/Stow)"
+        echo "  3) 🔄 逆向同步：历史备份覆盖回仓库"
+        echo "  4) 🧹 清理旧快照 (智能清理)"
+        echo "  0) 🔙 返回上一级菜单"
+        read -p "请选择操作: " sub_mode
 
-    case "$sub_mode" in
-        1)
-            echo -e "${YELLOW}>> 正在创建物理快照...${NC}"
-            date_tag=$(date +%Y%m%d_%H%M%S)
-            current_backup_dir="$BACKUP_ROOT/$date_tag"
-            mkdir -p "$current_backup_dir"
-            local backed_any=false
-            for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
-                src=$(get_target_path "$module")
-                if [ -e "$src" ] || [ -L "$src" ]; then
-                    [ -d "$src" ] && [ ! -L "$src" ] && [ -z "$(ls -A "$src" 2>/dev/null)" ] && continue
-                    rel_path="${src#$HOME/}"
-                    dest="$current_backup_dir/$rel_path"
-                    mkdir -p "$(dirname "$dest")"
-                    cp -aL "$src" "$dest" 2>/dev/null && backed_any=true
-                fi
-            done
-            if [ "$backed_any" = true ]; then
-                echo -e "${GREEN}✅ 快照已保存: $date_tag${NC}"
-            else
-                rm -rf "$current_backup_dir"
-                echo -e "${YELLOW}>> 无需备份。${NC}"
-            fi
-            sleep 1.2
-            ;;
-        2)
-            [ "$count" -eq 0 ] && echo -e "${RED}❌ 无历史备份！${NC}" && sleep 1 && return
-            mapfile -t display_list < <(printf '%s\n' "${time_list[@]}" | sort -r)
-            echo -e "\n${CYAN}>> 请选择历史备份点:${NC}"
-            for i in "${!display_list[@]}"; do echo "  $((i+1))) $(basename "${display_list[i]}")"; done
-            read -p "编号 (0返回): " t_idx
-            [[ "$t_idx" == "0" || -z "$t_idx" ]] && return
-            selected_time="${display_list[$((t_idx-1))]}"
-
-            declare -a mod_list
-            for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
-                mod_target=$(get_target_path "$mod")
-                [ -e "${selected_time}/${mod_target#$HOME/}" ] && mod_list+=("$mod")
-            done
-
-            echo -e "\n${CYAN}>> 请选择模块:${NC}"
-            for i in "${!mod_list[@]}"; do echo "  $((i+1))) ${mod_list[i]}"; done
-            read -p "编号: " m_idx
-            mod="${mod_list[$((m_idx-1))]}"
-            target=$(get_target_path "$mod")
-            backup_src="${selected_time}/${target#$HOME/}"
-
-            echo -e "\n${YELLOW}>> 还原模式: 1) 物理还原  2) Stow链接还原${NC}"
-            read -p "选择 [1/2]: " r_type
-            
-            cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
-            clean_target "$target"
-
-            if [ "$r_type" == "1" ]; then
-                if [ -d "$backup_src" ]; then
-                    mkdir -p "$target" && cp -a "$backup_src/." "$target/"
+        case "$sub_mode" in
+            1)
+                echo -e "${YELLOW}>> 正在创建物理快照...${NC}"
+                date_tag=$(date +%Y%m%d_%H%M%S)
+                current_backup_dir="$BACKUP_ROOT/$date_tag"
+                mkdir -p "$current_backup_dir"
+                local backed_any=false
+                for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                    src=$(get_target_path "$module")
+                    if [ -e "$src" ] || [ -L "$src" ]; then
+                        [ -d "$src" ] && [ ! -L "$src" ] && [ -z "$(ls -A "$src" 2>/dev/null)" ] && continue
+                        rel_path="${src#$HOME/}"
+                        dest="$current_backup_dir/$rel_path"
+                        mkdir -p "$(dirname "$dest")"
+                        cp -aL "$src" "$dest" 2>/dev/null && backed_any=true
+                    fi
+                done
+                
+                echo -e "\n------------------------------------------------"
+                if [ "$backed_any" = true ]; then
+                    echo -e "${GREEN}✅ 快照已保存: $date_tag${NC}"
                 else
-                    mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+                    rm -rf "$current_backup_dir"
+                    echo -e "${YELLOW}>> 无需备份。${NC}"
                 fi
-            else
-                repo_target="$DOTFILES_DIR/$mod"
-                [[ "$mod" == "colors" ]] && repo_target="$DOTFILES_DIR/$mod/.cache/hellwal"
-                [[ "$mod" == "bash" ]] && repo_target="$DOTFILES_DIR/$mod/.bashrc"
-                rm -rf "$repo_target" && mkdir -p "$(dirname "$repo_target")"
-                [ -d "$backup_src" ] && cp -a "$backup_src/." "$repo_target/" || cp -a "$backup_src" "$repo_target"
-                cd "$DOTFILES_DIR" && stow -t ~ "$mod"
-            fi
-            echo -e "${GREEN}✅ 还原操作完成。${NC}"
-            sleep 1.2
-            ;;
-        4)
+                # [修改点] 将 sleep 替换为交互式暂停
+                read -p "按回车键继续..."
+                ;;
+            2)
+                # [修改点] 遇到错误不再 return（这会退出整个模块），而是 continue（重开本菜单循环）
+                if [ "$count" -eq 0 ]; then
+                    echo -e "${RED}❌ 无历史备份！${NC}"
+                    read -p "按回车键继续..."
+                    continue
+                fi
+                
+                mapfile -t display_list < <(printf '%s\n' "${time_list[@]}" | sort -r)
+                echo -e "\n${CYAN}>> 请选择历史备份点:${NC}"
+                for i in "${!display_list[@]}"; do echo "  $((i+1))) $(basename "${display_list[i]}")"; done
+                read -p "编号 (0返回): " t_idx
+                # [修改点] 输入 0 则退出本次还原，回到备份菜单本身
+                [[ "$t_idx" == "0" || -z "$t_idx" ]] && continue
+                selected_time="${display_list[$((t_idx-1))]}"
+
+                declare -a mod_list
+                for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                    mod_target=$(get_target_path "$mod")
+                    [ -e "${selected_time}/${mod_target#$HOME/}" ] && mod_list+=("$mod")
+                done
+
+                echo -e "\n${CYAN}>> 请选择模块:${NC}"
+                for i in "${!mod_list[@]}"; do echo "  $((i+1))) ${mod_list[i]}"; done
+                read -p "编号: " m_idx
+                mod="${mod_list[$((m_idx-1))]}"
+                target=$(get_target_path "$mod")
+                backup_src="${selected_time}/${target#$HOME/}"
+
+                echo -e "\n${YELLOW}>> 还原模式: 1) 物理还原  2) Stow链接还原${NC}"
+                read -p "选择 [1/2]: " r_type
+                
+                cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
+                clean_target "$target"
+
+                if [ "$r_type" == "1" ]; then
+                    if [ -d "$backup_src" ]; then
+                        mkdir -p "$target" && cp -a "$backup_src/." "$target/"
+                    else
+                        mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+                    fi
+                else
+                    repo_target="$DOTFILES_DIR/$mod"
+                    [[ "$mod" == "colors" ]] && repo_target="$DOTFILES_DIR/$mod/.cache/hellwal"
+                    [[ "$mod" == "bash" ]] && repo_target="$DOTFILES_DIR/$mod/.bashrc"
+                    rm -rf "$repo_target" && mkdir -p "$(dirname "$repo_target")"
+                    [ -d "$backup_src" ] && cp -a "$backup_src/." "$repo_target/" || cp -a "$backup_src" "$repo_target"
+                    cd "$DOTFILES_DIR" && stow -t ~ "$mod"
+                fi
+                echo -e "${GREEN}✅ 还原操作完成。${NC}"
+                # [修改点] 将 sleep 替换为交互式暂停
+                read -p "按回车键继续..."
+                ;;
+            4)
             echo -e "\n${CYAN}>> 当前共有 [ $count ] 个快照。${NC}"
-            [ "$count" -eq 0 ] && sleep 1 && return
+            if [ "$count" -eq 0 ]; then
+                read -p "按回车键返回..."
+                return
+            fi
+            
             local first_snap=$(basename "${time_list[0]}" | cut -d'_' -f1)
             local last_snap=$(basename "${time_list[-1]}" | cut -d'_' -f1)
+            
             echo "清理模式选择: 1) 按数量  2) 按日期"
             read -p "请选择: " clean_type
+            
             if [ "$clean_type" == "1" ]; then
                 read -p "保留最近数量: " keep_count
-                if [ "$keep_count" -lt "$count" ]; then
+                if [[ "$keep_count" =~ ^[0-9]+$ ]] && [ "$keep_count" -lt "$count" ]; then
                     local remove_count=$((count - keep_count))
                     for ((i=0; i<remove_count; i++)); do rm -rf "${time_list[i]}"; done
                     echo -e "${GREEN}✅ 已清理 $remove_count 个旧快照。${NC}"
+                else
+                    echo -e "${YELLOW}>> 输入无效或无需清理。${NC}"
                 fi
             elif [ "$clean_type" == "2" ]; then
+                # --- 智能计算距今天数作为提示 ---
+                local now_sec=$(date +%s)
+                local oldest_sec=$(date -d "$first_snap" +%s 2>/dev/null || echo "$now_sec")
+                local newest_sec=$(date -d "$last_snap" +%s 2>/dev/null || echo "$now_sec")
+                local oldest_days=$(( (now_sec - oldest_sec) / 86400 ))
+                local newest_days=$(( (now_sec - newest_sec) / 86400 ))
+                
+                echo -e "  ${PURPLE}💡 提示: 最旧快照距今 ${oldest_days} 天，最新快照距今 ${newest_days} 天。${NC}"
                 read -p "删除多少天之前的？: " days
-                local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
-                local del_count=0
-                for s in "${time_list[@]}"; do
-                    local stime=$(echo "$(basename "$s")" | tr -d '_')
-                    if [ "$stime" -lt "$threshold" ]; then rm -rf "$s" && ((del_count++)); fi
-                done
-                echo -e "${GREEN}✅ 已清理 $del_count 个快照。${NC}"
+                
+                if [[ "$days" =~ ^[0-9]+$ ]]; then
+                    local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
+                    local del_count=0
+                    for s in "${time_list[@]}"; do
+                        local stime=$(echo "$(basename "$s")" | tr -d '_')
+                        if [ "$stime" -lt "$threshold" ]; then rm -rf "$s" && ((del_count++)); fi
+                    done
+                    echo -e "${GREEN}✅ 已清理 $del_count 个快照。${NC}"
+                else
+                    echo -e "${RED}❌ 输入无效，请输入纯数字！${NC}"
+                fi
             fi
-            sleep 1.2
+            
+            # [关键修改] 任务结束后等待用户确认，不再自动返回
+            echo -e "\n${CYAN}------------------------------------------------${NC}"
+            read -p "按回车键继续..."
             ;;
-        0) return ;;
-    esac
+            0) 
+                # 只有选择 0 时，才真正退出当前函数，返回调用它的父级菜单
+                return 
+                ;;
+            *)
+                # 捕捉无效输入
+                continue 
+                ;;
+        esac
+    done
 }
 
 # --- 模块：更新与部署管理 ---
+# --- 模块：更新与部署管理 ---
 menu_sync_deploy() {
-    echo -e "\n${YELLOW}>>>> 更新与部署管理 (Sync & Deploy) <<<<${NC}"
-    echo "  1) ☁️  全局 Stow 模式 (Git -> Local)"
-    echo "  2) 📁  全局 物理模式 (Git -> Local)"
-    echo "  3) ♻️  更新 by-mgr 脚本自身 (覆盖并重启)"
-    echo "  0) 🔙 返回主菜单"
-    read -p "请选择: " sub_mode
+    while true; do
+        clear
+        echo -e "\n${YELLOW}>>>> 更新与部署管理 (Sync & Deploy) <<<<${NC}"
+        echo "  1) ☁️  全局 Stow 模式 (Git -> Local)"
+        echo "  2) 📁  全局 物理模式 (Git -> Local)"
+        echo "  3) 🌐  OTA 更新 by-mgr 脚本 (从远程拉取最新版)"
+        echo "  0) 🔙 返回上一级菜单"
+        read -p "请选择: " sub_mode
 
-    case "$sub_mode" in
-        1|2)
-            for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
-                [[ "$module" == "bash" ]] && continue
-                local target=$(get_target_path "$module")
-                cd "$DOTFILES_DIR" && stow -D -t ~ "$module" 2>/dev/null
-                clean_target "$target"
-                if [ "$sub_mode" == "1" ]; then
-                    cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
-                    echo -e "  [🔗 Linked] $module"
-                else
-                    if [ -d "$DOTFILES_DIR/$module/.config" ]; then
-                        cp -a "$DOTFILES_DIR/$module/.config/." "$HOME/.config/" 2>/dev/null
-                    elif [ -f "$DOTFILES_DIR/$module/.config/$module.toml" ]; then
-                        cp -a "$DOTFILES_DIR/$module/.config/$module.toml" "$HOME/.config/" 2>/dev/null
+        case "$sub_mode" in
+            1|2)
+                echo -e "\n${BLUE}>> 正在部署配置...${NC}"
+                for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                    [[ "$module" == "bash" ]] && continue
+                    local target=$(get_target_path "$module")
+                    cd "$DOTFILES_DIR" && stow -D -t ~ "$module" 2>/dev/null
+                    clean_target "$target"
+                    if [ "$sub_mode" == "1" ]; then
+                        cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
+                        echo -e "  [🔗 Linked] $module"
                     else
-                        cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null
+                        if [ -d "$DOTFILES_DIR/$module/.config" ]; then
+                            cp -a "$DOTFILES_DIR/$module/.config/." "$HOME/.config/" 2>/dev/null
+                        elif [ -f "$DOTFILES_DIR/$module/.config/$module.toml" ]; then
+                            cp -a "$DOTFILES_DIR/$module/.config/$module.toml" "$HOME/.config/" 2>/dev/null
+                        else
+                            cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null
+                        fi
+                        echo -e "  [📁 Physical] $module"
                     fi
-                    echo -e "  [📁 Physical] $module"
+                done
+                echo -e "\n${GREEN}✅ 部署完成！${NC}"
+                read -p "按回车键继续..."
+                ;;
+            3)
+                echo -e "\n${YELLOW}>> 正在连接远程仓库检查 by-mgr 最新版本...${NC}"
+                
+                # 【修改预警】：请将下面这行链接替换为你自己真实的 GitHub Raw 链接！
+                # 默认格式: https://raw.githubusercontent.com/<你的用户名>/<仓库名>/<分支名>/scripts/by-mgr
+                local RAW_URL="https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/blob/main/scripts/by-mgr"
+                local TMP_FILE="/tmp/by-mgr-latest.sh"
+
+                # 使用 curl 静默下载 (-sLf 参数：静默执行，跟随重定向，遇到 404 直接报错而不是下载报错网页)
+                if curl -sLf "$RAW_URL" -o "$TMP_FILE"; then
+                    # 防呆校验：检查下载下来的文件第一行是不是真的含有 #!/bin/bash (防止下载了错误的HTML网页)
+                    if head -n 1 "$TMP_FILE" | grep -q "#!/bin/bash"; then
+                        # 校验通过，执行替换
+                        cp -f "$TMP_FILE" "$SELF_PATH" && chmod +x "$SELF_PATH"
+                        rm -f "$TMP_FILE"
+                        echo -e "${GREEN}✨ OTA 更新成功！新版本引擎即将重启...${NC}"
+                        sleep 1.5
+                        exec "$SELF_PATH"
+                    else
+                        echo -e "${RED}❌ 更新失败：远程文件格式不正确 (请检查脚本中的 RAW_URL 链接是否有效)。${NC}"
+                        rm -f "$TMP_FILE"
+                    fi
+                else
+                    echo -e "${RED}❌ 更新失败：无法连接到远程仓库或文件不存在。${NC}"
                 fi
-            done
-            echo -e "${GREEN}✅ 部署完成！${NC}"
-            sleep 1.2
-            ;;
-        3)
-            local repo_script="$REPO_DIR/scripts/by-mgr"
-            if [ -f "$repo_script" ]; then
-                cp "$repo_script" "$SELF_PATH" && chmod +x "$SELF_PATH"
-                echo -e "${GREEN}✨ 更新成功！重启中...${NC}"
-                sleep 1 && exec "$SELF_PATH"
-            fi
-            ;;
-        0) return ;;
-    esac
+                read -p "按回车键继续..."
+                ;;
+            0) return ;;
+            *) continue ;;
+        esac
+    done
 }
 
 # --- 辅助模块：Snapper 快照 ---
@@ -416,13 +516,52 @@ menu_repo_manager() {
                 sleep 2
                 ;;
             4)
-                # 智能编辑：优先打开本地文件，若无则尝试打开项目文件
-                local file_to_edit="$LOCAL_REPO_LIST"
-                [ ! -f "$LOCAL_REPO_LIST" ] && [ -f "$PROJECT_REPO_LIST" ] && file_to_edit="$PROJECT_REPO_LIST"
+                echo -e "\n${CYAN}>> 当前共有 [ $count ] 个快照。${NC}"
+                if [ "$count" -eq 0 ]; then
+                    read -p "按回车键继续..."
+                    continue
+                fi
                 
-                local sys_fallback="vi"
-                command -v editor &>/dev/null && sys_fallback="editor"
-                ${EDITOR:-$sys_fallback} "$file_to_edit"
+                local first_snap=$(basename "${time_list[0]}" | cut -d'_' -f1)
+                local last_snap=$(basename "${time_list[-1]}" | cut -d'_' -f1)
+                
+                echo "清理模式选择: 1) 按数量  2) 按日期"
+                read -p "请选择: " clean_type
+                
+                if [ "$clean_type" == "1" ]; then
+                    read -p "保留最近数量: " keep_count
+                    if [[ "$keep_count" =~ ^[0-9]+$ ]] && [ "$keep_count" -lt "$count" ]; then
+                        local remove_count=$((count - keep_count))
+                        for ((i=0; i<remove_count; i++)); do rm -rf "${time_list[i]}"; done
+                        echo -e "${GREEN}✅ 已清理 $remove_count 个旧快照。${NC}"
+                    else
+                        echo -e "${YELLOW}>> 输入无效或无需清理。${NC}"
+                    fi
+                elif [ "$clean_type" == "2" ]; then
+                    # --- 智能计算距今天数作为提示 ---
+                    local now_sec=$(date +%s)
+                    local oldest_sec=$(date -d "$first_snap" +%s 2>/dev/null || echo "$now_sec")
+                    local newest_sec=$(date -d "$last_snap" +%s 2>/dev/null || echo "$now_sec")
+                    local oldest_days=$(( (now_sec - oldest_sec) / 86400 ))
+                    local newest_days=$(( (now_sec - newest_sec) / 86400 ))
+                    
+                    echo -e "\n  ${PURPLE}💡 提示: 最旧快照距今 ${oldest_days} 天，最新快照距今 ${newest_days} 天。${NC}"
+                    read -p "删除多少天之前的？(输入天数): " days
+                    
+                    if [[ "$days" =~ ^[0-9]+$ ]]; then
+                        local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
+                        local del_count=0
+                        for s in "${time_list[@]}"; do
+                            local stime=$(echo "$(basename "$s")" | tr -d '_')
+                            if [ "$stime" -lt "$threshold" ]; then rm -rf "$s" && ((del_count++)); fi
+                        done
+                        echo -e "${GREEN}✅ 已清理 $del_count 个快照。${NC}"
+                    else
+                        echo -e "${RED}❌ 输入无效，请输入纯数字！${NC}"
+                    fi
+                fi
+                # [修改点] 将 sleep 替换为交互式暂停
+                read -p "按回车键继续..."
                 ;;
             0) return ;;
         esac
@@ -524,9 +663,9 @@ while true; do
     echo -e "${CYAN}================================================${NC}"
     echo -e "${BOLD}       Biyuan 配置管理引擎 (by-mgr)${NC}"
     echo -e "${CYAN}================================================${NC}"
-    echo "  1) 🛠️  备份与恢复管理 (快照/还原/清理)"
+    echo "  1) 🛠️ 备份与恢复管理 (快照/还原/清理)"
     echo "  2) 🚀 更新与部署管理 (Stow/物理模式/自更新)"
-    echo "  3) ⚙️  系统配置菜单 (NVIDIA/DM切换/安全保护)"
+    echo "  3) ⚙️ 系统配置菜单   (NVIDIA/DM切换/安全保护)"
     echo "  0) 🚪 退出维护"
     echo -e "${CYAN}------------------------------------------------${NC}"
     read -p "请选择主功能: " main_opt
@@ -535,7 +674,7 @@ while true; do
         1) menu_backup_restore ;;
         2) menu_sync_deploy ;;
         3) menu_system_config ;;
-        0) echo -e "${GREEN}再见, Biyuan!${NC}"; exit 0 ;;
+        0) echo -e "\n${GREEN}再见, ${USER}!${NC}\n"; exit 0 ;;
         *) sleep 1 ;;
     esac
 done
