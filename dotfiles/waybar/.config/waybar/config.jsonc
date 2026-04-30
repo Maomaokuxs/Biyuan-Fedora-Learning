@@ -124,7 +124,7 @@
     "format": "{}",
     "exec": "~/.config/waybar/scripts/check-updates.sh",
     "return-type": "json",
-    "on-click": "kitty --hold sudo dnf upgrade", 
+    "on-click": "kitty --hold sh -c 'sudo dnf upgrade && pkill -RTMIN+8 waybar'",
     "on-click-right": "pkill -RTMIN+8 waybar", // 右键点击重新检查
     "interval": 3600, 
     "signal": 8       
