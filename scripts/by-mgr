@@ -107,7 +107,6 @@ disable_repo_compat() {
 }
 
 # --- 模块：备份与恢复管理 ---
-# --- 模块：备份与恢复管理 ---
 menu_backup_restore() {
     # 增加 while true 循环，让它变成一个独立的常驻子菜单
     while true; do
@@ -152,56 +151,101 @@ menu_backup_restore() {
                 read -p "按回车键继续..."
                 ;;
             2)
-                # [修改点] 遇到错误不再 return（这会退出整个模块），而是 continue（重开本菜单循环）
+                # [状态检查] 检查是否有历史备份
                 if [ "$count" -eq 0 ]; then
                     echo -e "${RED}❌ 无历史备份！${NC}"
                     read -p "按回车键继续..."
                     continue
                 fi
                 
+                # 1. 选择时间点
                 mapfile -t display_list < <(printf '%s\n' "${time_list[@]}" | sort -r)
                 echo -e "\n${CYAN}>> 请选择历史备份点:${NC}"
                 for i in "${!display_list[@]}"; do echo "  $((i+1))) $(basename "${display_list[i]}")"; done
                 read -p "编号 (0返回): " t_idx
-                # [修改点] 输入 0 则退出本次还原，回到备份菜单本身
                 [[ "$t_idx" == "0" || -z "$t_idx" ]] && continue
                 selected_time="${display_list[$((t_idx-1))]}"
 
+                # 2. 识别该时间点内包含的可恢复模块
                 declare -a mod_list
                 for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
                     mod_target=$(get_target_path "$mod")
-                    [ -e "${selected_time}/${mod_target#$HOME/}" ] && mod_list+=("$mod")
+                    # 检查备份文件夹中是否存在对应的物理文件/目录
+                    if [ -e "${selected_time}/${mod_target#$HOME/}" ]; then
+                        mod_list+=("$mod")
+                    fi
                 done
 
-                echo -e "\n${CYAN}>> 请选择模块:${NC}"
-                for i in "${!mod_list[@]}"; do echo "  $((i+1))) ${mod_list[i]}"; done
-                read -p "编号: " m_idx
-                mod="${mod_list[$((m_idx-1))]}"
-                target=$(get_target_path "$mod")
-                backup_src="${selected_time}/${target#$HOME/}"
+                # 3. 模块选择界面（支持多选）
+                echo -e "\n${CYAN}>> 请选择要恢复的模块 (支持多选):${NC}"
+                for i in "${!mod_list[@]}"; do 
+                    echo -e "  $((i+1))) ${mod_list[i]}"
+                done
+                echo -e "  a) 🌟 全选所有可恢复模块"
+                echo -e "  0) 🔙 返回"
+                read -p "编号 (如 '1 3' 或 'a'): " m_choices
 
+                [[ "$m_choices" == "0" || -z "$m_choices" ]] && continue
+
+                # 处理全选逻辑
+                if [[ "$m_choices" == "a" ]]; then
+                    selected_indices=($(seq 1 ${#mod_list[@]}))
+                else
+                    selected_indices=($m_choices)
+                fi
+
+                # 4. 选择还原模式（全局统一模式）
                 echo -e "\n${YELLOW}>> 还原模式: 1) 物理还原  2) Stow链接还原${NC}"
                 read -p "选择 [1/2]: " r_type
-                
-                cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
-                clean_target "$target"
+                [[ ! "$r_type" =~ ^[12]$ ]] && continue
 
-                if [ "$r_type" == "1" ]; then
-                    if [ -d "$backup_src" ]; then
-                        mkdir -p "$target" && cp -a "$backup_src/." "$target/"
-                    else
-                        mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+                # 5. 循环执行还原操作
+                echo -e "\n${BLUE}>> 正在开始恢复任务...${NC}"
+                for idx in "${selected_indices[@]}"; do
+                    # 检查索引合法性
+                    if [ "$idx" -lt 1 ] || [ "$idx" -gt "${#mod_list[@]}" ]; then
+                        echo -e "${RED}⚠️  跳过无效编号: $idx${NC}"
+                        continue
                     fi
-                else
-                    repo_target="$DOTFILES_DIR/$mod"
-                    [[ "$mod" == "colors" ]] && repo_target="$DOTFILES_DIR/$mod/.cache/hellwal"
-                    [[ "$mod" == "bash" ]] && repo_target="$DOTFILES_DIR/$mod/.bashrc"
-                    rm -rf "$repo_target" && mkdir -p "$(dirname "$repo_target")"
-                    [ -d "$backup_src" ] && cp -a "$backup_src/." "$repo_target/" || cp -a "$backup_src" "$repo_target"
-                    cd "$DOTFILES_DIR" && stow -t ~ "$mod"
-                fi
-                echo -e "${GREEN}✅ 还原操作完成。${NC}"
-                # [修改点] 将 sleep 替换为交互式暂停
+
+                    mod="${mod_list[$((idx-1))]}"
+                    target=$(get_target_path "$mod")
+                    backup_src="${selected_time}/${target#$HOME/}"
+
+                    echo -e "${CYAN}>> 正在处理模块: $mod...${NC}"
+                    
+                    # 预处理：先移除旧的 Stow 链接并清理目标位置
+                    cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
+                    clean_target "$target"
+
+                    if [ "$r_type" == "1" ]; then
+                        # --- 模式 1：直接物理还原到系统 ---
+                        if [ -d "$backup_src" ]; then
+                            mkdir -p "$target" && cp -a "$backup_src/." "$target/"
+                        else
+                            mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+                        fi
+                        echo -e "   ${GREEN}✓ 物理还原完成${NC}"
+                    else
+                        # --- 模式 2：覆盖仓库并重新 Stow ---
+                        repo_target="$DOTFILES_DIR/$mod"
+                        # 处理特殊映射逻辑（根据你之前的逻辑保留）
+                        [[ "$mod" == "colors" ]] && repo_target="$DOTFILES_DIR/$mod/.cache/hellwal"
+                        [[ "$mod" == "bash" ]] && repo_target="$DOTFILES_DIR/$mod/.bashrc"
+                        
+                        rm -rf "$repo_target" && mkdir -p "$(dirname "$repo_target")"
+                        if [ -d "$backup_src" ]; then
+                            cp -a "$backup_src/." "$repo_target/"
+                        else
+                            cp -a "$backup_src" "$repo_target"
+                        fi
+                        # 重新建立链接
+                        cd "$DOTFILES_DIR" && stow -t ~ "$mod"
+                        echo -e "   ${GREEN}✓ Stow链接重建立完成${NC}"
+                    fi
+                done
+
+                echo -e "\n${GREEN}✅ 所有选定模块的还原任务已结束。${NC}"
                 read -p "按回车键继续..."
                 ;;
             4)
@@ -266,7 +310,6 @@ menu_backup_restore() {
     done
 }
 
-# --- 模块：更新与部署管理 ---
 # --- 模块：更新与部署管理 ---
 menu_sync_deploy() {
     while true; do

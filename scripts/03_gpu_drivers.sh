@@ -4,7 +4,8 @@
 
 CYAN='\033[0;36m'; BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
 
-# --- 1. 仓库检测与自愈机制 ---
+# --- 1. 仓库检测与自愈机制 --- # 
+# 检查并自动添加 RPM Fusion（Free 和 Non-Free）第三方仓库
 ensure_rpmfusion() {
     echo -e "${BLUE}>> Checking required repositories (RPM Fusion)...${NC}"
     local repo_added=false
@@ -26,7 +27,7 @@ ensure_rpmfusion() {
     fi
 }
 
-# --- 2. 核心安装与兜底引擎 ---
+# --- 2. 核心安装与兜底引擎 --- #
 execute_installation() {
     local target_name="$1"
     shift
@@ -51,16 +52,19 @@ execute_installation() {
 }
 
 # --- 3. 驱动包具体定义 ---
+# 安装 mesa-freeworld 系列。这非常重要，因为 Fedora 自带的驱动禁用了专利视频加速（H.264/H.265），这个脚本帮你换成功能完整的版本
 install_amd_drivers() {
     execute_installation "AMD (Freeworld)" mesa-va-drivers-freeworld mesa-vdpau-drivers-freeworld libva-utils
 }
 
+# 安装最新的 intel-media-driver，确保 Intel 核显或独显的视频硬解正常
 install_intel_drivers() {
     execute_installation "Intel" intel-media-driver libva-utils
 }
 
+# 安装最稳健的 akmod-nvidia（会在内核更新时自动重新编译）以及 CUDA 支持
 install_nvidia_drivers() {
-    # 【核心修正】：移除了废弃的 nvidia-vaapi-driver，保留 libva-nvidia-driver 即可
+    # 移除了废弃的 nvidia-vaapi-driver，保留 libva-nvidia-driver 即可
     execute_installation "NVIDIA (Proprietary)" akmod-nvidia xorg-x11-drv-nvidia-cuda libva-nvidia-driver libva-utils
 }
 
@@ -71,6 +75,7 @@ setup_gpu_drivers() {
     echo -e "${BLUE}=====================================================${NC}"
 
     # 硬件扫描
+    # 自动检测出你是 AMD、Intel 还是 NVIDIA（或者两者都有，比如笔记本的核显+独显组合）
     echo -e "${CYAN}>> Scanning PCI buses for graphics hardware...${NC}"
     local gpu_info
     gpu_info=$(lspci | grep -iE 'vga|3d|display')
