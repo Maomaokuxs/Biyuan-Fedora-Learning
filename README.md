@@ -63,8 +63,8 @@ Biyuan-Fedora-Learning/
 |   ├── 04_desktop_niri.sh       # 配置 niri 桌面环境
 │   ├── 05_desktop_kde.sh        # 配置 KDE 桌面环境
 |   ├── 06_desktop_gnome.sh      # 配置 Gnome 桌面环境
-|   └── 07_greetd_setup.sh       # 配置 Greetd/Tuigreet 作为窗口管理器
-│
+|   ├── 07_greetd_setup.sh       # 配置 Greetd/Tuigreet 作为窗口管理器
+|   └── 🛠️ by-mgr                # 备份与恢复及更新配置文件
 │
 ├── 📦 dotfiles/                 # 【资产层】各个软件的配置文件 (通过 Stow 或 Physical 部署)
 |    ├── bash/
@@ -87,10 +87,6 @@ Biyuan-Fedora-Learning/
 │    │       └── starship.toml   # 终端提示符的高级美化
 │    └── cava/
 |        └── .config/cava/config # 终端音频频谱跳动特效配置
-|
-|       
-├── 🛠️ by-mgr                    # 备份与恢复及更新配置文件
-│
-│
+|      
 └── 🛠️ install.sh                # 安装脚本
 ```
