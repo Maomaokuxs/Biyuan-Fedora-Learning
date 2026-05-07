@@ -1,10 +1,10 @@
 # Biyuan 自动生成的仓库备份清单
 copr ackerman/nexus
+copr alternateved/niri
 copr atim/starship
 copr hermitfeather/hyprland
 copr kylegospo/grub-btrfs
 copr tjuhasz/node-mass-preb
-copr xmp360/spark-store
 repo fedora
 repo fedora-cisco-openh264
 repo gitlab.com_paulcarroty_vscodium_repo
