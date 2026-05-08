@@ -713,7 +713,7 @@ binds {
          default-window-height { proportion 0.5; }
  }
 
- window-rule {
+  window-rule {
          // 匹配 blueman 管理器
          match app-id="blueman-manager"
          open-floating true  
@@ -722,5 +722,30 @@ binds {
          default-window-height { fixed 400; }
 
  }
+
+// 背景模糊参数
+blur {
+    // off
+    on
+    passes 3
+    offset 3
+    noise 0.02
+    saturation 1.5
+}
+
+window-rule {
+    // 匹配 Kitty 终端
+    match app-id="kitty"
+    
+    // 开启背景效果
+    background-effect {
+        blur true
+        // 建议 xray 设置为 false，这样在平铺布局下能看到下方窗口的模糊残影
+        xray false
+    }
+    
+    // 如果你在 Kitty 配置文件里没设透明度，也可以在 Niri 这一层强制开启
+    // opacity 0.85
+}
 
 
