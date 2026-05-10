@@ -724,7 +724,7 @@ binds {
  }
 
 // 背景模糊参数
-blur {
+  blur {
     // off
     on
     passes 3
@@ -733,7 +733,7 @@ blur {
     saturation 1.5
 }
 
-window-rule {
+  window-rule {
     // 匹配 Kitty 终端
     match app-id="kitty"
     
@@ -746,6 +746,18 @@ window-rule {
     
     // 如果你在 Kitty 配置文件里没设透明度，也可以在 Niri 这一层强制开启
     // opacity 0.85
+}
+
+  environment {
+    // Fcitx5 环境设置
+    "XMODIFIERS" "@im=fcitx"
+    "GTK_IM_MODULE" "fcitx"
+    "QT_IM_MODULE" "fcitx"
+    "SDL_IM_MODULE" "fcitx"
+    "CLUTTER_IM_MODULE" "fcitx"
+    
+    // 这里的设置会让大多数程序原生使用 Wayland 协议
+    "ELECTRON_OZONE_PLATFORM_HINT" "auto"
 }
 
 

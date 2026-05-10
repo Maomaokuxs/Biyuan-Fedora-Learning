@@ -202,22 +202,6 @@ install_desktop_niri() {
             fi
         done
 
-        # --- B. 注入 Fcitx5 环境变量 (针对登录 Shell: .bash_profile) ---
-        if [ -f "$BASH_PROFILE" ]; then
-            if ! grep -q "XMODIFIERS=@im=fcitx" "$BASH_PROFILE"; then
-                echo -e "\n# fcitx5 Environment Variables" >> "$BASH_PROFILE"
-                cat >> "$BASH_PROFILE" <<EOF
-export XMODIFIERS=@im=fcitx
-export GTK_IM_MODULE=fcitx
-export QT_IM_MODULE=fcitx
-export SDL_IM_MODULE=fcitx
-# 关键：告诉程序优先使用 Wayland 协议
-export CLUTTER_IM_MODULE=fcitx
-EOF
-                echo -e "${CYAN}  [Env] Fcitx5 variables injected into .bash_profile.${NC}"
-            fi
-        fi
-
         echo -e "${GREEN}✅ Command and Shell environment deployed successfully.${NC}"
     else
         echo -e "${RED}❌ Error: by-mgr script not found at $REPO_DIR/scripts/by-mgr${NC}"
