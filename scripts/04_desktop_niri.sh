@@ -68,7 +68,9 @@ install_desktop_niri() {
     # 3. 执行补全安装
     # 核心：niri (窗口管理器), waybar (状态栏), rofi-wayland (启动器)
     # 美化：swww (壁纸后端), hellwal (色彩方案生成), starship (终端美化)，cava（终端可视化音乐实现）
-    # 功能：fcitx5 (输入法), nautilus (文件管理), mako (通知通知), hyprlock/idle (锁屏与休眠)，loupe（图片查看器），blueman（蓝牙管理工具）
+    # 功能：fcitx5 (输入法), nautilus (文件管理), mako (通知通知), hyprlock/idle (锁屏与休眠)，loupe（图片查看器），
+    # blueman（蓝牙管理工具），btop（资源占用查看工具)，gnome-text-editor（文本编辑器）
+    
     local niri_pkgs=(
         niri waybar rofi-wayland stow unzip kitty 
         fastfetch jq ImageMagick swww hellwal 
@@ -77,7 +79,7 @@ install_desktop_niri() {
         dolphin fcitx5 fcitx5-chinese-addons 
         xdg-desktop-portal-gnome xdg-desktop-portal-wlr
         polkit-kde firfox cava nautilus loupe nautilus-python
-        blueman
+        blueman btop gnome-text-editor
     )
 
     echo -e "${YELLOW}>> Deploying Niri ecosystem components...${NC}"
