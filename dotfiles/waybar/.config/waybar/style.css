@@ -140,7 +140,7 @@ window#waybar {
     background-color: rgba(255, 255, 255, 0.1); /* 鼠标悬停时图标微亮 */
     border-radius: 4px;
 }
-z
+
 /* Cava 频谱分析仪 */
 #custom-cava {
     color: @accent;
