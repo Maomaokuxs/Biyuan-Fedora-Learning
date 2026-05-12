@@ -1,0 +1,63 @@
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "builtin",
+        "source": "fedora",
+        "color": { "1": "blue", "2": "white" },
+        "padding": { "top": 2, "right": 4 }
+    },
+    "display": {
+        "separator": " ",
+        "key": { "width": 24 }
+    },
+    "modules": [
+        { 
+            "type": "title", 
+            "color": { "user": "blue", "at": "white", "host": "cyan" } 
+        },
+        "separator",
+
+        // --- Software Stack 区块 ---
+        // 顶部保留左侧引导线，去除右侧长线，形成“标签页”感
+        { "type": "custom", "format": "\u001b[34m┌── \u001b[7m SOFTWARE \u001b[27m\u001b[0m" },
+        { "type": "os", "key": "│  󰘳 OS", "keyColor": "blue", "format": "{2} {8} {10}" },
+        { "type": "kernel", "key": "│   Kernel", "keyColor": "blue" },
+        { "type": "uptime", "key": "│  󱎫 Uptime", "keyColor": "blue" },
+        { "type": "packages", "key": "│  󰏗 Packages", "keyColor": "blue", "format": "{1} (rpm)" },
+        { "type": "shell", "key": "│  󱆃 Shell", "keyColor": "blue" },
+        { "type": "display", "key": "│  󰹑 Display", "keyColor": "blue", "compactType": "original" },
+        { "type": "wm", "key": "│  󱂬 WM", "keyColor": "blue", "format": "{1} {2} ({3})" },
+        // 底部使用直角 └ 确保与顶部的 ┌ 完美对齐且不断线
+        { "type": "custom", "format": "\u001b[34m└──────────────────────────────────────\u001b[0m" },
+        
+        "break",
+
+        // --- Hardware Stack 区块 ---
+        { "type": "custom", "format": "\u001b[33m┌── \u001b[7m HARDWARE \u001b[27m\u001b[0m" },
+        { "type": "cpu", "key": "│  󰻠 CPU", "keyColor": "yellow", "format": "{1} ({4}) @ {7} GHz" },
+        { "type": "gpu", "key": "│  󰢮 GPU", "keyColor": "yellow", "format": "{2} [Discrete]" },
+        { "type": "memory", "key": "│  󰑭 Memory", "keyColor": "yellow" },
+        { "type": "swap", "key": "│  󰓡 Swap", "keyColor": "yellow" },
+        { "type": "disk", "key": "│  󰋊 Disk (/)", "keyColor": "yellow", "folders": "/", "format": "{1} / {2} ({3}) - {9}" },
+        { "type": "custom", "format": "\u001b[33m└──────────────────────────────────────\u001b[0m" },
+        
+        "break",
+
+        // --- Environment 区块 ---
+        { "type": "custom", "format": "\u001b[35m┌── \u001b[7m ENVIRON  \u001b[27m\u001b[0m" },
+        { "type": "terminal", "key": "│  󰆍 Terminal", "keyColor": "magenta" },
+        { "type": "terminalfont", "key": "│  󰙅 Term Font", "keyColor": "magenta" },
+        { "type": "theme", "key": "│  󰉼 Theme", "keyColor": "magenta" },
+        { "type": "icons", "key": "│  󰀻 Icons", "keyColor": "magenta" },
+        { "type": "localip", "key": "│  󰩟 Local IP", "keyColor": "magenta", "showIpv6": false, "format": "{1}" },
+        { "type": "custom", "format": "\u001b[35m└──────────────────────────────────────\u001b[0m" },
+        
+        "break",
+        
+        // --- 底部动态色彩胶囊 ---
+        {
+            "type": "custom",
+            "format": "  \u001b[31m█ \u001b[32m█ \u001b[33m█ \u001b[34m█ \u001b[35m█ \u001b[36m█\u001b[0m"
+        }
+    ]
+}
