@@ -680,6 +680,7 @@ menu_system_config() {
         echo "  2) 🖥️  切换登录管理器 (DM Switcher)"
         echo "  3) 📦 软件仓库智能管理器 (Repo Manager)"
         echo "  4) 📝 设置默认文本编辑器 (Default Editor)"
+        echo "  5) 🎨 配置开机动画 (Plymouth & Boot Splash)"
         echo "  0) 🔙 返回主菜单"
         read -p "请选择: " sys_opt
 
@@ -695,9 +696,41 @@ menu_system_config() {
             2) menu_dm_switcher ;;
             3) menu_repo_manager ;;
             4) menu_default_editor ;;
+            5) task_setup_plymouth ;;
             0) return ;;
         esac
     done
+}
+
+# --- 系统任务：配置开机动画 ---
+task_setup_plymouth() {
+    echo -e "\n${BLUE}>> 正在开启图形化引导配置 (Plymouth + NVIDIA Early Loading)...${NC}"
+
+    # 安装必要的包
+    echo -e "${YELLOW}>> [1/4] 安装 Plymouth 组件及主题...${NC}"
+    sudo dnf install -y plymouth plymouth-scripts fedora-logos plymouth-theme-spinner 
+
+    # 设置主题并强制 NVIDIA 驱动早加载
+    echo -e "${YELLOW}>> [2/4] 设置主题并强制加载显卡驱动驱动...${NC}"
+    sudo plymouth-set-default-theme bgrt -R
+    sudo mkdir -p /etc/dracut.conf.d
+    echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' | sudo tee /etc/dracut.conf.d/nvidia.conf > /dev/null
+
+    # 修改 GRUB 参数
+    echo -e "${YELLOW}>> [3/4] 更新 GRUB 内核参数 (rhgb quiet)...${NC}"
+    # 逻辑：检查 GRUB_CMDLINE_LINUX 是否已有参数，没有则追加
+    if grep -q "GRUB_CMDLINE_LINUX" /etc/default/grub; then
+        [[ ! $(grep "rhgb" /etc/default/grub) ]] && sudo sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="rhgb /' /etc/default/grub
+        [[ ! $(grep "quiet" /etc/default/grub) ]] && sudo sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="quiet /' /etc/default/grub
+    fi
+
+    # 生成最终镜像
+    echo -e "${YELLOW}>> [4/4] 重新生成 initramfs 并刷新 GRUB 配置...${NC}"
+    sudo dracut --force
+    sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+
+    echo -e "\n${GREEN}✅ Plymouth 配置完成！重启后将看到 Fedora Logo 动画。${NC}"
+    read -p "按回车键继续..."
 }
 
 # --- 主循环 ---
