@@ -681,7 +681,8 @@ menu_system_config() {
         echo "  3) 📦 软件仓库智能管理器 (Repo Manager)"
         echo "  4) 📝 设置默认文本编辑器 (Default Editor)"
         echo "  5) 🎨 配置开机动画 (Plymouth & Boot Splash)"
-        echo "  0) 🔙 返回主菜单"
+        echo "  6) 💤 配置 Btrfs 系统休眠 (Hibernate Setup)"
+	echo "  0) 🔙 返回主菜单"
         read -p "请选择: " sys_opt
 
         case "$sys_opt" in
@@ -697,6 +698,7 @@ menu_system_config() {
             3) menu_repo_manager ;;
             4) menu_default_editor ;;
             5) task_setup_plymouth ;;
+	    6) task_setup_hibernate ;;
             0) return ;;
         esac
     done
@@ -733,6 +735,118 @@ task_setup_plymouth() {
     read -p "按回车键继续..."
 }
 
+# --- 系统任务：配置休眠文件 ---
+
+task_setup_hibernate() {
+    clear
+    echo -e "\n${RED}============================================================="
+    echo -e " ⚠️  高风险操作警告 (HIGH RISK WARNING) ⚠️ "
+    echo -e "=============================================================${NC}"
+    echo "此功能将执行以下底层操作："
+    echo "  1. 修改 Btrfs 顶层子卷结构 (@swap)"
+    echo "  2. 覆写 /etc/fstab"
+    echo "  3. 修改 SELinux 安全上下文"
+    echo "  4. 重写内核启动参数 (Grubby) 并重新生成 initramfs (Dracut)"
+    echo -e "\n${YELLOW}极度建议：在没有备份数据时，请立即退出！操作失败可能导致系统 Kernel Panic。${NC}"
+
+    read -p "是否接受上述风险并继续配置？ (输入 'YES' 确认): " CONFIRM
+    if [ "$CONFIRM" != "YES" ]; then
+        echo -e "\n${YELLOW}>> 已取消操作，系统未作任何修改。${NC}"
+        sleep 1
+        return
+    fi
+
+    echo -e "\n${BLUE}>> 正在开启 Btrfs 系统休眠配置...${NC}"
+    sudo -v
+
+    # [1/7] 环境与现有交换检查 (防止破坏)
+    echo -e "${YELLOW}>> [1/7] 正在检测现有交换设备与文件系统...${NC}"
+    
+    # 检测是否已有物理 Swap (排除 zram)
+    EXISTING_SWAP=$(swapon --show --noheadings --bytes | grep -v "zram")
+    if [ -n "$EXISTING_SWAP" ]; then
+        echo -e "${RED}❌ 冲突检测: 系统已存在活跃的物理 Swap 分区或文件！${NC}"
+        echo "当前活跃交换空间信息："
+        swapon --show
+        echo -e "${YELLOW}建议：请先手动清理现有 Swap 布局后再运行此脚本，以防破坏文件系统。${NC}"
+        read -p "按回车返回..." && return
+    fi
+
+    if mokutil --sb-state 2>/dev/null | grep -q "enabled"; then
+        echo -e "${RED}❌ 错误: 检测到安全启动已开启，Fedora 内核不支持休眠。请先在 BIOS 中关闭。${NC}"
+        read -p "按回车返回..." && return
+    fi
+
+    ROOT_FSTYPE=$(findmnt -nvo FSTYPE /)
+    if [ "$ROOT_FSTYPE" != "btrfs" ]; then
+        echo -e "${RED}❌ 错误: 仅支持 Btrfs，当前为 $ROOT_FSTYPE。${NC}"
+        read -p "按回车返回..." && return
+    fi
+
+    # [2/7] 参数配置
+    echo -e "\n${YELLOW}>> [2/7] 配置休眠参数...${NC}"
+    read -p "请输入 Swap 子卷挂载点 [默认: /swap]: " INPUT_SWAP_DIR
+    SWAP_DIR=${INPUT_SWAP_DIR:-/swap}
+
+    read -p "请输入休眠文件大小 [默认: 8G]: " INPUT_SWAP_SIZE
+    SWAP_SIZE=${INPUT_SWAP_SIZE:-8G}
+
+    SWAP_FILE="$SWAP_DIR/swapfile"
+    SUBVOL_NAME=$(basename "$SWAP_DIR")
+    ROOT_DEV=$(findmnt -nvo SOURCE /)
+    ROOT_UUID=$(lsblk -no UUID "$ROOT_DEV" | head -n1)
+
+    # 检查目标文件是否已在磁盘上存在
+    if [ -f "$SWAP_FILE" ] || grep -q "$SWAP_DIR" /etc/fstab; then
+        echo -e "${RED}❌ 错误: 检测到路径 $SWAP_DIR 或配置文件中已存在 Swap 相关条目。${NC}"
+        echo "为了系统安全，脚本拒绝在已有的路径上重复操作。"
+        read -p "按回车返回..." && return
+    fi
+
+    # [3/7] 创建独立子卷
+    echo -e "\n${YELLOW}>> [3/7] 在顶层设备创建独立子卷 @${SUBVOL_NAME}...${NC}"
+    sudo mkdir -p /mnt/tmp_root
+    sudo mount -t btrfs -o subvolid=5 "$ROOT_DEV" /mnt/tmp_root
+    
+    if [ ! -d "/mnt/tmp_root/$SUBVOL_NAME" ]; then
+        sudo btrfs subvolume create "/mnt/tmp_root/$SUBVOL_NAME"
+    fi
+    
+    sudo mkdir -p "$SWAP_DIR"
+    sudo umount /mnt/tmp_root && sudo rmdir /mnt/tmp_root
+
+    # [4/7] 配置 fstab 
+    echo -e "\n${YELLOW}>> [4/7] 写入 /etc/fstab 挂载信息...${NC}"
+    sudo cp /etc/fstab /etc/fstab.bak
+    echo "UUID=$ROOT_UUID  $SWAP_DIR  btrfs  subvol=$SUBVOL_NAME,compress=no,noatime 0 0" | sudo tee -a /etc/fstab > /dev/null
+    echo "$SWAP_FILE none swap defaults,pri=-1 0 0" | sudo tee -a /etc/fstab > /dev/null
+    sudo mount "$SWAP_DIR"
+
+    # [5/7] 创建交换文件
+    echo -e "\n${YELLOW}>> [5/7] 正在创建 Btrfs 专用 Swapfile ($SWAP_SIZE)...${NC}"
+    sudo btrfs filesystem mkswapfile --size "$SWAP_SIZE" "$SWAP_FILE"
+    sudo swapon "$SWAP_FILE"
+
+    # [6/7] SELinux 与权限对齐
+    echo -e "\n${YELLOW}>> [6/7] 修复 SELinux 上下文权限...${NC}"
+    sudo semanage fcontext -a -t mnt_t "$SWAP_DIR" 2>/dev/null
+    sudo semanage fcontext -a -t swapfile_t "$SWAP_FILE" 2>/dev/null
+    sudo restorecon -v "$SWAP_FILE"
+
+    # [7/7] 内核参数注入与 Dracut
+    echo -e "\n${YELLOW}>> [7/7] 计算偏移量并重新生成 initramfs (耗时操作)...${NC}"
+    OFFSET=$(sudo btrfs inspect-internal map-swapfile -r "$SWAP_FILE")
+    sudo grubby --update-kernel=ALL --args="resume=UUID=$ROOT_UUID resume_offset=$OFFSET"
+
+    if [ ! -f /etc/dracut.conf.d/resume.conf ]; then
+        echo 'add_dracutmodules+=" resume "' | sudo tee /etc/dracut.conf.d/resume.conf > /dev/null
+    fi
+    sudo dracut -f
+
+    echo -e "\n${GREEN}✅ 极致休眠配置完成！${NC}"
+    echo "建议先重启电脑，然后执行 'sudo systemctl hibernate' 进行测试。"
+    read -p "按回车返回菜单..."
+}
 # --- 主循环 ---
 while true; do
     clear
