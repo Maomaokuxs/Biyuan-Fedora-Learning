@@ -8,7 +8,7 @@
 
     "modules-left": ["custom/launcher","custom/recorder","custom/music","custom/cava","niri/window"],
     "modules-center": ["niri/workspaces"],
-    "modules-right": ["custom/updates","custom/weather","pulseaudio", "network","bluetooth", "cpu", "memory", "battery", "clock", "tray","custom/fcitx","custom/power"],
+    "modules-right": ["custom/updates","custom/weather","pulseaudio","custom/backlight", "network","bluetooth", "cpu", "memory", "battery", "clock", "tray","custom/fcitx","custom/power"],
 
     "custom/launcher": {
         "format": " 󰣛 ",
@@ -33,22 +33,22 @@
     },
 
     "clock": {
-        "format": "  {:%H:%M}",
+        "format": "   {:%H:%M}",
         "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
     },
 
-    "cpu": { "format": " {usage}%" },
+    "cpu": { "format": "  {usage}%" },
     
     "memory": {
         "interval": 5,
-        "format": " {used:0.1f}G",
+        "format": "  {used:0.1f}G",
         "tooltip-format": "内存已用: {used}GiB / {total}GiB",
         "on-click": "kitty --title 'System Monitor' btop",
         "on-click-right": "pkill btop"
     },
 
    "pulseaudio": {
-        "format": "{icon} {volume}%",
+        "format": "{icon}  {volume}%",
         "format-muted": "󰝟 Muted",
         "format-icons": {
             "headphone": "",
@@ -77,11 +77,17 @@
     
     // 右键点击可以快速切换电源开关（可选）
     "on-click-right": "rfkill toggle bluetooth"
-},
+    },
 
     "network": {
-        "format-wifi": "  {essid}",
-        "format-disconnected": "󰤮 Disconnected"
+    "format-wifi": "",
+    "format-ethernet": "󰈀",
+    "format-disconnected": "󰤮",
+    "tooltip-format": "{ifname} via {gwaddr} 󰊗",
+    "tooltip-format-wifi": "  {essid} ({signalStrength}%)",
+    "tooltip-format-ethernet": "󰈀  {ifname} ",
+    "tooltip-format-disconnected": "Disconnected ⚠",
+    "on-click": "kitty -e nmtui" // 点击直接在终端打开网络管理，符合博主的操作习惯
     },
 
     "battery": {
@@ -161,6 +167,18 @@
     "on-scroll-down": "playerctl -p splayer volume 0.05-",
     "max-length": 30,
     "tooltip": true
-} 
+    },
+
+    "custom/backlight": {
+    "format": "{icon}  {percentage}%",
+    "format-icons": ["󰃞", "󰃟", "󰃠"],
+    "return-type": "json",
+    "exec": "sh -c 'val=$(ddcutil getvcp 10 --brief | awk \"{print \\$4}\"); echo \"{\\\"percentage\\\": $val}\"'",
+    "on-scroll-up": "ddcutil setvcp 10 + 10",
+    "on-scroll-down": "ddcutil setvcp 10 - 10",
+    "on-click": "ddcutil setvcp 10 50", // 点击恢复50%
+    "interval": 30, // 30秒同步一次物理按钮调节的数值
+    "tooltip": false
+    }
 
 }
