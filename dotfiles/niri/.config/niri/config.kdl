@@ -693,7 +693,7 @@ binds {
   spawn-at-startup "sh" "-c" "sleep 5 && pkill -RTMIN+8 waybar"
 
   // 窗口规则
-  window-rule {
+window-rule {
          // 窗口矩形绘制设置为无背景
          draw-border-with-background false
          // 设置背景圆角
@@ -702,7 +702,7 @@ binds {
          clip-to-geometry true
 }  
   // 窗口规则
-  window-rule {
+window-rule {
          match app-id="waypaper"
     
          // 开启悬浮模式
@@ -711,9 +711,9 @@ binds {
          // 修正：Niri 的规则中设置初始大小的正确简写语法
          default-column-width { proportion 0.5; } 
          default-window-height { proportion 0.5; }
- }
+}
 
-  window-rule {
+window-rule {
          // 匹配 blueman 管理器
          match app-id="blueman-manager"
          open-floating true  
@@ -721,19 +721,9 @@ binds {
          default-column-width { fixed 600; }
          default-window-height { fixed 400; }
 
- }
-
-// 背景模糊参数
-  blur {
-    // off
-    on
-    passes 3
-    offset 3
-    noise 0.02
-    saturation 1.5
 }
 
-  window-rule {
+window-rule {
     // 匹配 Kitty 终端
     match app-id="kitty"
     
@@ -748,7 +738,19 @@ binds {
     // opacity 0.85
 }
 
-  environment {
+window-rule {
+    // 匹配 QQ 图片查看器
+    match app-id="QQ" title="^图片查看器$"
+    open-floating true
+}
+
+window-rule {
+    // 匹配 SPlayer 视频播放器
+    match app-id="SPlayer"
+    open-floating true
+}
+
+environment {
     // Fcitx5 环境设置
     "XMODIFIERS" "@im=fcitx"
     "GTK_IM_MODULE" "fcitx"
@@ -760,4 +762,12 @@ binds {
     "ELECTRON_OZONE_PLATFORM_HINT" "auto"
 }
 
-
+// 背景模糊参数
+blur {
+    // off
+    on
+    passes 3
+    offset 3
+    noise 0.02
+    saturation 1.5
+}
