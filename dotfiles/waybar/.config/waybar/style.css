@@ -4,7 +4,6 @@
  */
 
 /* --- 1. 引入 Hellwal 生成的颜色变量 --- */
-/* 需要使用绝对路径确保 Waybar 在启动时能准确加载 */
 @import url("../../.cache/hellwal/colors-waybar.css");
 
 /* --- 2. 全局基础设置 --- */
@@ -31,6 +30,7 @@ window#waybar {
 #clock,
 #battery,
 #tray,
+#custom-backlight,
 #custom-fcitx, 
 #custom-updates,
 #custom-weather,
@@ -38,6 +38,7 @@ window#waybar {
 #custom-launcher,
 #custom-music,
 #custom-music.playing,
+#custom-recorder,
 #custom-power{
     padding: 0 12px;
     margin: 4px 3px;         /* 上下 4px 留白，左右 3px 间距 */
@@ -109,18 +110,37 @@ window#waybar {
 /* 托盘区 */
 /* 防止托盘因为图标缺失变成一个 0 宽度的黑洞 */
 
-#tray {
-    min-width: 20px;
+/* 将 #tray 整合进你的通用胶囊定义中 */
+#cpu, 
+#memory,
+/* ... 其他模块 ... */
+#tray,
+/* ... */
+#custom-recorder {
+    padding: 0 12px;
+    margin: 4px 3px;
+    min-height: 28px;
+    border-radius: 15px;
     background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 0 8px;
+    box-shadow: inset 0 -2px 0 0 rgba(255, 255, 255, 0.1);
+    transition: background-color 0.3s ease;
 }
 
-/* 如果图标加载失败，至少保留一个位置占位 */
+/* 针对托盘的特定微调 */
+#tray {
+    padding: 0 8px; /* 稍微缩小左右内边距，让图标看起来更紧凑 */
+}
+
 #tray > widget {
-    min-width: 16px;
+    margin: 0 4px; /* 图标之间的间距 */
+    transition: all 0.2s ease;
 }
 
+#tray > widget:hover {
+    background-color: rgba(255, 255, 255, 0.1); /* 鼠标悬停时图标微亮 */
+    border-radius: 4px;
+}
+z
 /* Cava 频谱分析仪 */
 #custom-cava {
     color: @accent;
@@ -184,12 +204,16 @@ window#waybar {
 #cpu:hover, 
 #memory:hover, 
 #pulseaudio:hover, 
-#network:hover, 
+#network:hover,
+#tray:hover, 
 #clock:hover,
+#bluetooth:hover,
 #custom-fcitx:hover,
 #custom-updates:hover,
 #custom-cava:hover,
-#custom-weather:hover{
+#custom-recorder:hover,
+#custom-weather:hover,
+#custom-backlight:hover{
     background-color: rgba(255, 255, 255, 0.15);
     box-shadow: inset 0 -2px 0 0 @accent;
 }
@@ -198,37 +222,28 @@ window#waybar {
 
 /* 基础胶囊样式 (与你的 CPU/Memory 模块对齐) */
     
-#custom-recorder {
-    min-width: 110px;           /* 给一个略宽的固定值，容纳图标和计时 */
-    padding: 0;
-    margin: 4px 3px;
-    min-height: 28px;
-    border-radius: 15px;
-    font-size: 14px;
-    font-weight: 600;       /* 保持字重永久一致 */
-    border: 2px solid transparent; /* 闲置时占位，防止录制时尺寸突变 */
-    transition: background-color 0.3s ease;
-}
+/* 继承你上方的通用样式，这里只写差异化部分 */
 
-#custom-recorder.recording {
-    /* 使用 hellwal 定义的颜色 */
-    background-color: @accent; 
-    color: #11111b;
-    /* 🔴 这里的边框宽度必须和上面的 2px 完全一致 */
-    border: 2px solid @accent; 
-}
-
-/* 停止状态 */
+/* 状态：未录制 (静止) */
 #custom-recorder.stopped {
-
-    }
-
-/* 优化后的动画：只改变背景色，不添加阴影扩散 */
-@keyframes blink_solid_red {
-    0%   { background-color: #f38ba8; }
-    50%  { background-color: #ff5e81; } /* 切换到另一个坚实的红色，不带模糊 */
-    100% { background-color: #f38ba8; }
+    color: @accent; /* 暗淡的白色，不抢眼 */
 }
+
+/* 状态：录制中 (激活) */
+#custom-recorder.recording {
+    color: @fg;
+    background-color: @bg; /* 淡淡的红色背景补足质感 */
+    box-shadow: inset 0 -2px 0 0 @bg; /* 内部阴影也变为红色调 */
+    animation: blinker 2s linear infinite;
+}
+
+/* 呼吸动画：让红色小圆点律动 */
+@keyframes blinker {
+    50% {
+        opacity: 0.5;
+    }
+}
+
 
 #custom-music {
     padding: 0 15px;
@@ -247,3 +262,5 @@ window#waybar {
     color: @muted;
     border-bottom: none;
 }
+
+
