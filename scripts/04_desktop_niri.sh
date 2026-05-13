@@ -70,7 +70,7 @@ install_desktop_niri() {
     # 美化：swww (壁纸后端), hellwal (色彩方案生成), starship (终端美化)，cava（终端可视化音乐实现）
     # 功能：fcitx5 (输入法), nautilus (文件管理), mako (通知通知), hyprlock/idle (锁屏与休眠)，loupe（图片查看器），
     # blueman（蓝牙管理工具），btop（资源占用查看工具)，gnome-text-editor（文本编辑器）,ddcutil(显示器亮度调整)，nmtui（网络连接工具）
-    # seahorse gnome-keyring libsecret（密钥及管理工具）
+    # seahorse gnome-keyring libsecret（密钥及管理工具）ncdu(终端磁盘文件占用查看器) ranger（终端文件管理器）
     
     local niri_pkgs=(
         niri waybar rofi-wayland stow unzip kitty 
@@ -81,7 +81,7 @@ install_desktop_niri() {
         xdg-desktop-portal-gnome xdg-desktop-portal-wlr
         polkit-kde firfox cava nautilus loupe nautilus-python
         blueman btop gnome-text-editor ddcutil nmtui 
-        seahorse gnome-keyring libsecret
+        seahorse gnome-keyring libsecret ncdu ranger
     )
 
     echo -e "${YELLOW}>> Deploying Niri ecosystem components...${NC}"
