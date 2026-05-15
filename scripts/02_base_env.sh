@@ -6,10 +6,9 @@ setup_base() {
     echo -e "${GREEN}          Base Environment & Core Fonts${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
-    # --- 1. 软件镜像源优化 (测速/选择/恢复) ---
-    echo -e "${BLUE}>> Network optimization: Mirror speed test & selection...${NC}"
+    # --- 1. 软件镜像源优化 (多线程并行版) ---
+    echo -e "${BLUE}>> Network optimization: Parallel mirror speed test...${NC}"
     
-    # 定义国内主流镜像站
     declare -A mirrors=(
         ["Tuna (Tsinghua)"]="mirrors.tuna.tsinghua.edu.cn"
         ["Aliyun"]="mirrors.aliyun.com"
@@ -22,56 +21,40 @@ setup_base() {
     local i=1
     local ids=()
     local hosts=()
-    
-    # 执行测速循环
+    local temp_results="/tmp/mirror_ping_results"
+    rm -f "$temp_results"
+
+    # [核心优化]：并行执行测速
     for name in "${!mirrors[@]}"; do
         host=${mirrors[$name]}
-        # 测试 3 次 ping 取平均值，超时 2 秒
-        latency=$(ping -c 3 -W 2 "$host" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
-        
-        if [ -n "$latency" ]; then
-            printf "   %d) | %-18s | %s ms\n" "$i" "$name" "$latency"
-        else
-            printf "   %d) | %-18s | ${RED}Timeout${NC}\n" "$i" "$name"
-        fi
-        
-        ids+=($i)
+        # 记录顺序，方便后续展示
         hosts+=($host)
+        ids+=($i)
+        
+        # 将 ping 任务丢入后台并行执行，结果写入临时文件
+        (
+            # -c 2 足够测出延迟，减少总发包量
+            latency=$(ping -c 2 -W 2 "$host" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
+            if [ -z "$latency" ]; then
+                echo "$name|${RED}Timeout${NC}" >> "$temp_results"
+            else
+                echo "$name|$latency ms" >> "$temp_results"
+            fi
+        ) &
         ((i++))
     done
 
-    echo -e "   r) | Restore Official    | (Reset to default)"
-    echo -e "   n) | Skip / Keep Current | --"
-    echo -e "   --------------------------------------"
+    echo -e "${YELLOW}>> Testing all mirrors simultaneously...${NC}"
+    wait # 等待所有后台任务完成
 
-    read -p "Select [1-${#ids[@]} / r / n]: " mirror_choice
-    
-    # 逻辑分支处理
-    if [[ "$mirror_choice" =~ ^[1-9]$ ]] && [ "$mirror_choice" -le "${#ids[@]}" ]; then
-        # 选择国内源
-        local selected_host=${hosts[$((mirror_choice-1))]}
-        echo -e "${YELLOW}>> Switching to $selected_host...${NC}"
-        sudo sed -e 's|^metalink=|#metalink=|g' \
-            -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=https://$selected_host/fedora|g" \
-            -i.bak \
-            /etc/yum.repos.d/fedora.repo \
-            /etc/yum.repos.d/fedora-updates.repo
-        echo -e "${GREEN}✅ Mirror switched to $selected_host.${NC}"
-
-    elif [[ "$mirror_choice" == "r" ]]; then
-        # 恢复官方源：撤销注释并还原 metalink
-        echo -e "${YELLOW}>> Restoring official Fedora repositories...${NC}"
-        sudo sed -e 's|^#metalink=|metalink=|g' \
-            -e 's|^baseurl=https://.*/fedora|#baseurl=http://download.example/pub/fedora/linux|g' \
-            -i.bak \
-            /etc/yum.repos.d/fedora.repo \
-            /etc/yum.repos.d/fedora-updates.repo
-        echo -e "${GREEN}✅ Official mirrors restored.${NC}"
-
-    else
-        # 默认不切换 (n 或任意输入)
-        echo -e "${CYAN}>> No changes applied.${NC}"
-    fi
+    # 按照 ID 顺序读取结果并打印
+    for j in "${!hosts[@]}"; do
+        name=$(echo "${!mirrors[@]}" | cut -d' ' -f$((j+1)))
+        # 从临时文件中提取对应镜像的结果
+        res=$(grep "^$name|" "$temp_results" | cut -d'|' -f2)
+        printf "   %d) | %-18s | %s\n" "$((j+1))" "$name" "$res"
+    done
+    rm -f "$temp_results"
 
     # --- 2. 系统更新 (确保安装前系统版本最新) --- #
     echo -e "${YELLOW}>> Refreshing package cache and upgrading system...${NC}"
