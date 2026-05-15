@@ -110,39 +110,34 @@ setup_base() {
 
     # --- 4. Iosevka Nerd Font 本地部署 --- #
     # 不依赖外部 REPO_DIR，改为根据脚本位置自动推导
+    # [定位导航逻辑]：自动获取仓库根目录
+    # BASH_SOURCE[0] 获取脚本当前路径，dirname 获取目录，最后 cd 进去拿到绝对路径
     local CURRENT_SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
     local REPO_ROOT=$(dirname "$CURRENT_SCRIPT_DIR")
-    local REPO_FONT_SOURCE="$REPO_ROOT/assets/fonts/IosevkaNerdFont-Regular.ttf"
     
-    local FONT_DIR="$HOME/.local/share/fonts"
-    
-    # 确保目标目录物理存在
-    mkdir -p "$FONT_DIR"
+    # 定义源目录与目标目录
+    local SOURCE_FONTS_DIR="$REPO_ROOT/assets/fonts"
+    local TARGET_FONTS_DIR="$HOME/.local/share/fonts"
 
-    echo -e "${BLUE}>> Checking Iosevka font status...${NC}"
-    
-    if fc-list | grep -qi "Iosevka" || [ -f "$FONT_DIR/IosevkaNerdFont-Regular.ttf" ]; then
-        echo -e "${GREEN}✅ Iosevka font already registered or file exists. Skipping installation.${NC}"
+    # 1. 确保目标目录存在
+    mkdir -p "$TARGET_FONTS_DIR"
+
+    echo -e "${BLUE}>> 正在定位字体资产...${NC}"
+    echo -e "${CYAN}>> 仓库根目录: $REPO_ROOT${NC}"
+
+    # 2. 全量同步逻辑：将 assets/fonts 下的所有内容宽泛地部署到系统
+    if [ -d "$SOURCE_FONTS_DIR" ] && [ "$(ls -A "$SOURCE_FONTS_DIR")" ]; then
+        echo -e "${YELLOW}>> 正在从 $SOURCE_FONTS_DIR 同步字体...${NC}"
+        
+        # 使用 -u (仅更新) 和 -p (保留权限)
+        cp -upvf "$SOURCE_FONTS_DIR"/* "$TARGET_FONTS_DIR/" 2>/dev/null
+
+        echo -e "${CYAN}>> 正在刷新系统字体缓存...${NC}"
+        fc-cache -f "$TARGET_FONTS_DIR"
+        
+        echo -e "${GREEN}✅ 字体资产部署完成。${NC}"
     else
-        # 增加调试信息：打印出脚本尝试查找的真实路径
-        echo -e "${CYAN}>> Search path: $REPO_FONT_SOURCE${NC}"
-
-        if [ -f "$REPO_FONT_SOURCE" ]; then
-            echo -e "${YELLOW}>> Copying font file from repository assets...${NC}"
-            # 使用 -p 保留权限，使用 -f 强制覆盖
-            cp -pf "$REPO_FONT_SOURCE" "$FONT_DIR/"
-            
-            echo -e "${CYAN}>> Refreshing system font cache...${NC}"
-            fc-cache -f "$FONT_DIR" > /dev/null
-            echo -e "${GREEN}✅ Iosevka font local deployment completed.${NC}"
-        else
-            echo -e "${RED}❌ Error: Font asset not found at physical path!${NC}"
-            echo -e "${RED}   Please verify if the file exists at: ${BOLD}$REPO_FONT_SOURCE${NC}"
-            
-            # 自动列出 assets 目录内容帮助排查
-            echo -e "${YELLOW}>> Current content of assets/fonts directory:${NC}"
-            ls -R "$REPO_ROOT/assets" 2>/dev/null || echo "   (Directory does not exist)"
-        fi
+        echo -e "${RED}❌ 错误: 找不到源目录或目录下无文件: $SOURCE_FONTS_DIR${NC}"
     fi
 
     echo -e "${GREEN}✅ Base environment and font configuration successful.${NC}"
