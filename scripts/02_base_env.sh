@@ -6,9 +6,10 @@ setup_base() {
     echo -e "${GREEN}          Base Environment & Core Fonts${NC}"
     echo -e "${BLUE}=====================================================${NC}"
     
-    # --- 1. 软件镜像源优化 (多线程并行版) ---
-    echo -e "${BLUE}>> Network optimization: Parallel mirror speed test...${NC}"
+    # --- 1. 软件镜像源优化 (并发测速/选择/恢复) ---
+    echo -e "${BLUE}>> Network optimization: Parallel mirror speed test & selection...${NC}"
     
+    # 定义国内主流镜像站
     declare -A mirrors=(
         ["Tuna (Tsinghua)"]="mirrors.tuna.tsinghua.edu.cn"
         ["Aliyun"]="mirrors.aliyun.com"
@@ -18,43 +19,82 @@ setup_base() {
     echo -e "${CYAN}   ID | Mirror Name         | Latency (ms)${NC}"
     echo -e "   --------------------------------------"
     
+    # 创建一个临时目录用于存放并发进程的测速结果
+    TMP_DIR=$(mktemp -d)
+    
+    # 1. 并发派发测速任务
+    for name in "${!mirrors[@]}"; do
+        host=${mirrors[$name]}
+        
+        # 将()中的逻辑放入后台执行 (&)
+        # 优化 ping 参数：-c 3 发3个包，-w 3 设置整个 ping 命令硬超时为3秒，防止死锁
+        (
+            latency=$(ping -c 3 -w 3 "$host" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
+            if [ -n "$latency" ]; then
+                echo "$latency" > "$TMP_DIR/$host"
+            else
+                echo "Timeout" > "$TMP_DIR/$host"
+            fi
+        ) &
+    done
+
+    # 核心魔法：挂起主脚本，等待所有后台 & 任务执行完毕！
+    # 这样总耗时最长也就 3 秒左右
+    wait
+
     local i=1
     local ids=()
     local hosts=()
-    local temp_results="/tmp/mirror_ping_results"
-    rm -f "$temp_results"
-
-    # [核心优化]：并行执行测速
+    
+    # 2. 收集结果并格式化输出
     for name in "${!mirrors[@]}"; do
         host=${mirrors[$name]}
-        # 记录顺序，方便后续展示
-        hosts+=($host)
-        ids+=($i)
+        # 读取临时文件中的结果
+        latency=$(cat "$TMP_DIR/$host" 2>/dev/null)
         
-        # 将 ping 任务丢入后台并行执行，结果写入临时文件
-        (
-            # -c 2 足够测出延迟，减少总发包量
-            latency=$(ping -c 2 -W 2 "$host" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
-            if [ -z "$latency" ]; then
-                echo "$name|${RED}Timeout${NC}" >> "$temp_results"
-            else
-                echo "$name|$latency ms" >> "$temp_results"
-            fi
-        ) &
+        if [ "$latency" != "Timeout" ] && [ -n "$latency" ]; then
+            printf "   %d) | %-18s | %s ms\n" "$i" "$name" "$latency"
+        else
+            printf "   %d) | %-18s | ${RED}Timeout${NC}\n" "$i" "$name"
+        fi
+        
+        ids+=($i)
+        hosts+=($host)
         ((i++))
     done
 
-    echo -e "${YELLOW}>> Testing all mirrors simultaneously...${NC}"
-    wait # 等待所有后台任务完成
+    # 清理临时目录
+    rm -rf "$TMP_DIR"
 
-    # 按照 ID 顺序读取结果并打印
-    for j in "${!hosts[@]}"; do
-        name=$(echo "${!mirrors[@]}" | cut -d' ' -f$((j+1)))
-        # 从临时文件中提取对应镜像的结果
-        res=$(grep "^$name|" "$temp_results" | cut -d'|' -f2)
-        printf "   %d) | %-18s | %s\n" "$((j+1))" "$name" "$res"
-    done
-    rm -f "$temp_results"
+    echo -e "   r) | Restore Official    | (Reset to default)"
+    echo -e "   n) | Skip / Keep Current | --"
+    echo -e "   --------------------------------------"
+
+    read -p "Select [1-${#ids[@]} / r / n]: " mirror_choice
+    
+    # 逻辑分支处理
+    if [[ "$mirror_choice" =~ ^[1-9]$ ]] && [ "$mirror_choice" -le "${#ids[@]}" ]; then
+        local selected_host=${hosts[$((mirror_choice-1))]}
+        echo -e "${YELLOW}>> Switching to $selected_host...${NC}"
+        sudo sed -e 's|^metalink=|#metalink=|g' \
+            -e "s|^#baseurl=http://download.example/pub/fedora/linux|baseurl=https://$selected_host/fedora|g" \
+            -i.bak \
+            /etc/yum.repos.d/fedora.repo \
+            /etc/yum.repos.d/fedora-updates.repo
+        echo -e "${GREEN}✅ Mirror switched to $selected_host.${NC}"
+
+    elif [[ "$mirror_choice" == "r" ]]; then
+        echo -e "${YELLOW}>> Restoring official Fedora repositories...${NC}"
+        sudo sed -e 's|^#metalink=|metalink=|g' \
+            -e 's|^baseurl=https://.*/fedora|#baseurl=http://download.example/pub/fedora/linux|g' \
+            -i.bak \
+            /etc/yum.repos.d/fedora.repo \
+            /etc/yum.repos.d/fedora-updates.repo
+        echo -e "${GREEN}✅ Official mirrors restored.${NC}"
+
+    else
+        echo -e "${CYAN}>> No changes applied.${NC}"
+    fi
 
     # --- 2. 系统更新 (确保安装前系统版本最新) --- #
     echo -e "${YELLOW}>> Refreshing package cache and upgrading system...${NC}"
