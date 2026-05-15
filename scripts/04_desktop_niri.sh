@@ -77,7 +77,7 @@ install_desktop_niri() {
         fastfetch jq ImageMagick swww hellwal 
         waypaper starship hyprlock hypridle 
         gpu-screen-recorder libnotify mako 
-        dolphin fcitx5 fcitx5-chinese-addons 
+        fcitx5 fcitx5-chinese-addons 
         xdg-desktop-portal-gnome xdg-desktop-portal-wlr
         polkit-kde firfox cava nautilus loupe nautilus-python
         blueman btop gnome-text-editor ddcutil nmtui 
