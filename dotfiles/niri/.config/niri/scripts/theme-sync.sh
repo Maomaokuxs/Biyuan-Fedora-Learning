@@ -141,7 +141,7 @@ format = "[ \$symbol \$branch ](fg:$ACCENT bg:$MUTED)"
 format = "[\$all_status\$ahead_behind](fg:$ACCENT bg:$MUTED)"
 [time]
 disabled = false
-format = "[  \$time ](bg:$MUTED fg:$FG)[ ](fg:$MUTED)"
+format = "[ 󱎫 \$time ](bg:$MUTED fg:$FG)[ ](fg:$MUTED)"
 [character]
 success_symbol = '[❯](bold fg:$ACCENT)'
 error_symbol = '[❯](bold fg:red)'
