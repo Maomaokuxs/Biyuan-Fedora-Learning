@@ -637,13 +637,13 @@ binds {
     // 自定义快捷键
     // 刷新waybar,cava
     Ctrl+Alt+R hotkey-overlay-title="Refresh System UI" { 
-        spawn-sh "pkill waybar; pkill cava; pkill sed; sleep 0.1; waybar & disown" 
+        spawn-sh "pkill waybar; pkill cava; pkill sed; waybar & disown" 
     }
     // 昼夜模式切换
     Ctrl+Alt+C { spawn "~/.config/niri/scripts/toggle-theme.sh"; }
     // swww 随机切换壁纸并切换主题色
     Super+Alt+W hotkey-overlay-title="Random Wallpaper" { spawn "~/.config/niri/scripts/wallpaper.sh"; }
-    Super+Shift+W {spawn "waypaper" ; }
+    Super+B {spawn "waypaper" ; }
     // 壁纸选择
     Ctrl+Alt+W { spawn "~/.config/niri/scripts/wallpaper-picker.sh";} 
     // 音乐快捷面板
