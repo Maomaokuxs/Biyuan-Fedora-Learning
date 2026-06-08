@@ -753,7 +753,7 @@ window-rule {
 environment {
     // Fcitx5 环境设置
     "XMODIFIERS" "@im=fcitx"
-    "GTK_IM_MODULE" "fcitx"
+    // "GTK_IM_MODULE" "fcitx"
     "QT_IM_MODULE" "fcitx"
     "SDL_IM_MODULE" "fcitx"
     "CLUTTER_IM_MODULE" "fcitx"
