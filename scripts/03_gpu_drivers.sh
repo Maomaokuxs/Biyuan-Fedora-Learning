@@ -30,17 +30,27 @@ ensure_rpmfusion() {
 # --- 2. 核心安装与兜底引擎 --- #
 execute_installation() {
     local target_name="$1"
+    local extra_opts=""
     shift
+    
+    # 检测第一个参数是否是以 "-" 开头的 DNF 选项（如 --allowerasing）
+    if [[ "$1" == -* ]]; then
+        extra_opts="$1"
+        shift
+    fi
+    
     local pkgs=("$@")
     
     echo -e "${YELLOW}>> Deploying $target_name Drivers...${NC}"
-    echo -e "${CYAN}>> Command: sudo dnf install -y ${pkgs[*]}${NC}"
+    # 打印时展示附加参数
+    echo -e "${CYAN}>> Command: sudo dnf install -y $extra_opts ${pkgs[*]}${NC}"
     
-    # 尝试批量安装
-    if ! sudo dnf install -y "${pkgs[@]}"; then
+    # 尝试批量安装（带上 extra_opts）
+    if ! sudo dnf install -y $extra_opts "${pkgs[@]}"; then
         echo -e "${RED}⚠️  Installation encountered errors. Running fallback check...${NC}"
         # 兜底机制：逐个检查哪个包失败了
         for pkg in "${pkgs[@]}"; do
+            # 如果是虚包或者被降级/替换安装的包，rpm -q 有时查不到精确名，这里只做未安装提示
             if ! rpm -q "$pkg" &>/dev/null; then
                 echo -e "${RED}❌ FAILED: Package '$pkg' could not be installed.${NC}"
                 echo -e "${YELLOW}   Suggestion: Check your network, or the package name might have changed in this Fedora version.${NC}"
@@ -52,9 +62,12 @@ execute_installation() {
 }
 
 # --- 3. 驱动包具体定义 ---
-# 安装 mesa-freeworld 系列。这非常重要，因为 Fedora 自带的驱动禁用了专利视频加速（H.264/H.265），这个脚本帮你换成功能完整的版本
 install_amd_drivers() {
-    execute_installation "AMD (Freeworld)" mesa-va-drivers-freeworld mesa-vdpau-drivers-freeworld libva-utils
+    # 步骤 1：安装 Vulkan 基础驱动及工具（正常安装）
+    execute_installation "AMD Vulkan" mesa-vulkan-drivers vulkan-loader libva-utils
+    
+    # 步骤 2：安装 Freeworld 硬件加速驱动（传入 --allowerasing 参数）
+    execute_installation "AMD (Freeworld)" "--allowerasing" mesa-va-drivers-freeworld mesa-vdpau-drivers-freeworld
 }
 
 # 安装最新的 intel-media-driver，确保 Intel 核显或独显的视频硬解正常
