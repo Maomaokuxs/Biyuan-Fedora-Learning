@@ -26,7 +26,7 @@
         { "type": "packages", "key": "│  󰏗 Packages", "keyColor": "blue", "format": "{1} (rpm)" },
         { "type": "shell", "key": "│  󱆃 Shell", "keyColor": "blue" },
         { "type": "display", "key": "│  󰹑 Display", "keyColor": "blue", "compactType": "original" },
-        { "type": "wm", "key": "│  󱂬 WM", "keyColor": "blue", "format": "{1} {2} ({3})" },
+        { "type": "wm", "key": "│  󱂬 WM", "keyColor": "blue", "format": "{2} ({3})" },
         // 底部使用直角 └ 确保与顶部的 ┌ 完美对齐且不断线
         { "type": "custom", "format": "\u001b[34m└──────────────────────────────────────\u001b[0m" },
         
@@ -34,6 +34,7 @@
 
         // --- Hardware Stack 区块 ---
         { "type": "custom", "format": "\u001b[33m┌── \u001b[7m HARDWARE \u001b[27m\u001b[0m" },
+        { "type": "host", "key": "│  󰄋 Device", "keyColor": "yellow", "format": "{1}" },
         { "type": "cpu", "key": "│  󰻠 CPU", "keyColor": "yellow", "format": "{1} ({4}) @ {7} GHz" },
         { "type": "gpu", "key": "│  󰢮 GPU", "keyColor": "yellow", "format": "{2} [Discrete]" },
         { "type": "memory", "key": "│  󰑭 Memory", "keyColor": "yellow" },
