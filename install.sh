@@ -150,16 +150,10 @@ main() {
             ;;
     esac
 
-    # Phase 3: 登录管理器部署 (Greetd/Tuigreet)
-    # 【位置修正】：必须在 main 函数内部，并在 desktop_opt 赋值之后
-    if [[ "$desktop_opt" == "3" ]]; then
-        echo -e "\n${BLUE}>> Finalizing with Display Manager setup...${NC}"
-        if command -v setup_greetd_niri &> /dev/null; then
-            setup_greetd_niri
-        else
-            echo -e "${RED}❌ Error: setup_greetd_niri function not found!${NC}"
-        fi
-    fi
+    # --- Phase 3: 登录管理器部署 (迁移至desktop_niri.sh) ---
+    # 【核心修正】：彻底删掉主脚本里重复的 while 菜单代码块！
+    # 登录管理器的选择和安装已经完全在子脚本（如 04_desktop_niri.sh）内部闭环处理完毕。
+    # 这里只需要打个收尾日志，静静等待整个部署流完美谢幕即可。
     
     echo -e "\n${GREEN}✨ System deployment flow completed!${NC}"
 }
