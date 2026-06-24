@@ -79,7 +79,7 @@ install_desktop_niri() {
         gpu-screen-recorder libnotify mako 
         fcitx5 fcitx5-chinese-addons 
         xdg-desktop-portal-gnome xdg-desktop-portal-wlr
-        polkit-kde firfox cava nautilus loupe nautilus-python
+        polkit-kde firefox cava nautilus loupe nautilus-python
         blueman btop gnome-text-editor ddcutil nmtui 
         seahorse gnome-keyring libsecret ncdu ranger
     )
@@ -211,11 +211,40 @@ install_desktop_niri() {
         echo -e "${RED}❌ Error: by-mgr script not found at $REPO_DIR/scripts/by-mgr${NC}"
     fi
 
-    # --- 8. 登录管理器部署 (修正: 移入函数体内) ---
-    local GREETD_SCRIPT="$REPO_DIR/scripts/05_greetd_setup.sh"
-    if [ -f "$GREETD_SCRIPT" ]; then
-        echo -e "${YELLOW}>> Configuring display manager (greetd/tuigreet)...${NC}"
-        source "$GREETD_SCRIPT"
-        setup_greetd_niri
-    fi
+    # --- 8. 登录管理器部署 (极简双选菜单) ---
+    while true; do
+        echo -e "${BLUE}==================================================${NC}"
+        echo -e "${YELLOW}>> Please select the Display Manager configuration:${NC}"
+        echo -e "   ${CYAN}[1]${NC} greetd + tuigreet (Modern/Minimalist - Perfect for Niri)"
+        echo -e "   ${CYAN}[2]${NC} Skip / Keep Current (Do not install any display manager)"
+        echo -e "${BLUE}==================================================${NC}"
+        echo -n -e "${YELLOW}?? Enter your choice [1-2]: ${NC}"
+        
+        read -r dm_choice
+        
+        case "$dm_choice" in
+            1)
+                # 【核心修正】：将独立脚本文件名从 05 精确映射为 07_greetd_setup.sh
+                local GREETD_SCRIPT="$REPO_DIR/scripts/07_greetd_setup.sh"
+                if [ -f "$GREETD_SCRIPT" ]; then
+                    echo -e "${YELLOW}>> Deploying greetd/tuigreet...${NC}"
+                    source "$GREETD_SCRIPT"
+                    setup_greetd_niri
+                else
+                    echo -e "${RED}❌ ERROR: Setup script not found at $GREETD_SCRIPT!${NC}"
+                fi
+                break
+                ;;
+            2)
+                echo -e "${GREEN}>> Skipped display manager deployment. Keeping your current system state.${NC}"
+                # 显式重置全局或父级变量，避免主脚本尾部拦截器误判
+                export dm_choice="2"
+                break
+                ;;
+            *)
+                echo -e "${RED}❌ Invalid input! Please choose [1-2]...${NC}"
+                echo ""
+                ;;
+        esac
+    done
 }
