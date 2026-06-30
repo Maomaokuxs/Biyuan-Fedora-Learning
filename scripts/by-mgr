@@ -559,51 +559,25 @@ menu_repo_manager() {
                 sleep 2
                 ;;
             4)
-                echo -e "\n${CYAN}>> 当前共有 [ $count ] 个快照。${NC}"
-                if [ "$count" -eq 0 ]; then
+                echo -e "\n${BLUE}>> 正在打开仓库清单文件...${NC}"
+                local target_file=""
+                if [ -f "$LOCAL_REPO_LIST" ]; then
+                    target_file="$LOCAL_REPO_LIST"
+                elif [ -f "$PROJECT_REPO_LIST" ]; then
+                    target_file="$PROJECT_REPO_LIST"
+                fi
+
+                if [ -z "$target_file" ]; then
+                    echo -e "${YELLOW}>> 尚未创建仓库清单文件，请先执行导出 (选项 1)。${NC}"
                     read -p "按回车键继续..."
                     continue
                 fi
-                
-                local first_snap=$(basename "${time_list[0]}" | cut -d'_' -f1)
-                local last_snap=$(basename "${time_list[-1]}" | cut -d'_' -f1)
-                
-                echo "清理模式选择: 1) 按数量  2) 按日期"
-                read -p "请选择: " clean_type
-                
-                if [ "$clean_type" == "1" ]; then
-                    read -p "保留最近数量: " keep_count
-                    if [[ "$keep_count" =~ ^[0-9]+$ ]] && [ "$keep_count" -lt "$count" ]; then
-                        local remove_count=$((count - keep_count))
-                        for ((i=0; i<remove_count; i++)); do rm -rf "${time_list[i]}"; done
-                        echo -e "${GREEN}✅ 已清理 $remove_count 个旧快照。${NC}"
-                    else
-                        echo -e "${YELLOW}>> 输入无效或无需清理。${NC}"
-                    fi
-                elif [ "$clean_type" == "2" ]; then
-                    # --- 智能计算距今天数作为提示 ---
-                    local now_sec=$(date +%s)
-                    local oldest_sec=$(date -d "$first_snap" +%s 2>/dev/null || echo "$now_sec")
-                    local newest_sec=$(date -d "$last_snap" +%s 2>/dev/null || echo "$now_sec")
-                    local oldest_days=$(( (now_sec - oldest_sec) / 86400 ))
-                    local newest_days=$(( (now_sec - newest_sec) / 86400 ))
-                    
-                    echo -e "\n  ${PURPLE}💡 提示: 最旧快照距今 ${oldest_days} 天，最新快照距今 ${newest_days} 天。${NC}"
-                    read -p "删除多少天之前的？(输入天数): " days
-                    
-                    if [[ "$days" =~ ^[0-9]+$ ]]; then
-                        local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
-                        local del_count=0
-                        for s in "${time_list[@]}"; do
-                            local stime=$(echo "$(basename "$s")" | tr -d '_')
-                            if [ "$stime" -lt "$threshold" ]; then rm -rf "$s" && ((del_count++)); fi
-                        done
-                        echo -e "${GREEN}✅ 已清理 $del_count 个快照。${NC}"
-                    else
-                        echo -e "${RED}❌ 输入无效，请输入纯数字！${NC}"
-                    fi
-                fi
-                # [修改点] 将 sleep 替换为交互式暂停
+
+                echo -e "${CYAN}>> 编辑文件: $target_file${NC}"
+                echo -e "${YELLOW}>> 格式说明：每行一个仓库，copr 开头为 Copr 仓库，repo 开头为系统仓库。${NC}"
+                sleep 1
+                ${EDITOR:-vim} "$target_file"
+                echo -e "${GREEN}✅ 编辑完成。${NC}"
                 read -p "按回车键继续..."
                 ;;
             0) return ;;
