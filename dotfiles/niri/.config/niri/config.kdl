@@ -750,6 +750,14 @@ window-rule {
     open-floating true
 }
 
+window-rule {
+    // 匹配所有以 "Minecraft" 开头的 App ID（无论后面是什么版本号）
+    match app-id="^Minecraft"
+    
+    // 强引导：打开时自动进入 Niri 全屏
+    open-fullscreen true
+}
+
 environment {
     // Fcitx5 环境设置
     "XMODIFIERS" "@im=fcitx"
