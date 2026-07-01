@@ -35,6 +35,7 @@
         // --- Hardware Stack 区块 ---
         { "type": "custom", "format": "\u001b[33m┌── \u001b[7m HARDWARE \u001b[27m\u001b[0m" },
         { "type": "host", "key": "│  󰄋 Device", "keyColor": "yellow", "format": "{1}" },
+        { "type": "board", "key": "│  󰠫 Board", "keyColor": "yellow", "format": "{2} {1} ({3})" },
         { "type": "cpu", "key": "│  󰻠 CPU", "keyColor": "yellow", "format": "{1} ({4}) @ {7} GHz" },
         { "type": "gpu", "key": "│  󰢮 GPU", "keyColor": "yellow", "format": "{2} [Discrete]" },
         { "type": "memory", "key": "│  󰑭 Memory", "keyColor": "yellow" },
@@ -50,6 +51,7 @@
         { "type": "terminalfont", "key": "│  󰙅 Term Font", "keyColor": "magenta" },
         { "type": "theme", "key": "│  󰉼 Theme", "keyColor": "magenta" },
         { "type": "icons", "key": "│  󰀻 Icons", "keyColor": "magenta" },
+        { "type": "font", "key": "│  󰛖 Fonts", "keyColor": "magenta" },
         { "type": "localip", "key": "│  󰩟 Local IP", "keyColor": "magenta", "showIpv6": false, "format": "{1}" },
         { "type": "custom", "format": "\u001b[35m└──────────────────────────────────────\u001b[0m" },
         
