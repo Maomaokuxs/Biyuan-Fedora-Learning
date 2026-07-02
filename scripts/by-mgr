@@ -50,7 +50,7 @@ if [ ! -d "$REPO_DIR/dotfiles" ]; then
 fi
 
 DOTFILES_DIR="$REPO_DIR/dotfiles"
-BACKUP_ROOT="$HOME/.dotfiles_backup"
+BACKUP_ROOT="$HOME/.config/by-mgr/backup"
 SELF_PATH=$(realpath "$0")
 
 # 2. 安全校验：确保能找到仓库目录
@@ -64,7 +64,6 @@ fi
 USER_CONFIG_DIR="$HOME/.config/by-mgr"
 LOCAL_REPO_LIST="$USER_CONFIG_DIR/repos.list"
 PROJECT_REPO_LIST="$REPO_DIR/config/repos.list"
-BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; PURPLE='\033[0;35m'; NC='\033[0m'; BOLD='\033[1m'
 
 # --- 辅助函数 ---
 get_target_path() {
@@ -72,8 +71,7 @@ get_target_path() {
     local base_path="$HOME/.config/$mod"
     
     # 特殊路径优先级最高
-    if [[ "$mod" == "colors" ]]; then echo "$HOME/.cache/hellwal"
-    elif [[ "$mod" == "bash" ]]; then echo "$HOME/.bashrc"
+    if [[ "$mod" == "bash" ]]; then echo "$HOME/.bashrc"
     # 智能探测：处理单文件配置 (如 starship.toml)
     elif [ ! -d "$base_path" ] && [ -f "${base_path}.toml" ]; then echo "${base_path}.toml"
     elif [ ! -d "$base_path" ] && [ -f "${base_path}.conf" ]; then echo "${base_path}.conf"
@@ -228,16 +226,14 @@ menu_backup_restore() {
                         echo -e "   ${GREEN}✓ 物理还原完成${NC}"
                     else
                         # --- 模式 2：覆盖仓库并重新 Stow ---
-                        repo_target="$DOTFILES_DIR/$mod"
-                        # 处理特殊映射逻辑（根据你之前的逻辑保留）
-                        [[ "$mod" == "colors" ]] && repo_target="$DOTFILES_DIR/$mod/.cache/hellwal"
-                        [[ "$mod" == "bash" ]] && repo_target="$DOTFILES_DIR/$mod/.bashrc"
+                        rel_path="${target#$HOME/}"
+                        repo_dest="$DOTFILES_DIR/$mod/$rel_path"
                         
-                        rm -rf "$repo_target" && mkdir -p "$(dirname "$repo_target")"
+                        rm -rf "$repo_dest" && mkdir -p "$(dirname "$repo_dest")"
                         if [ -d "$backup_src" ]; then
-                            cp -a "$backup_src/." "$repo_target/"
+                            cp -aL "$backup_src/." "$repo_dest/"
                         else
-                            cp -a "$backup_src" "$repo_target"
+                            cp -aL "$backup_src" "$repo_dest"
                         fi
                         # 重新建立链接
                         cd "$DOTFILES_DIR" && stow -t ~ "$mod"
@@ -246,6 +242,110 @@ menu_backup_restore() {
                 done
 
                 echo -e "\n${GREEN}✅ 所有选定模块的还原任务已结束。${NC}"
+                read -p "按回车键继续..."
+                ;;
+            3)
+                # 逆向同步：将配置文件覆盖回仓库
+                echo -e "\n${YELLOW}>> 请选择数据来源:${NC}"
+                echo "  1) 🕰️  从历史备份点覆盖回仓库"
+                echo "  2) 💻  从当前系统配置覆盖回仓库"
+                echo "  0) 🔙 返回"
+                read -p "选择 [0-2]: " sync_src
+
+                local use_live=false
+                local selected_time=""
+
+                case "$sync_src" in
+                    0) continue ;;
+                    1)
+                        if [ "$count" -eq 0 ]; then
+                            echo -e "${RED}❌ 无历史备份！${NC}"
+                            read -p "按回车键继续..."
+                            continue
+                        fi
+                        mapfile -t display_list < <(printf '%s\n' "${time_list[@]}" | sort -r)
+                        echo -e "\n${CYAN}>> 请选择历史备份点:${NC}"
+                        for i in "${!display_list[@]}"; do echo "  $((i+1))) $(basename "${display_list[i]}")"; done
+                        echo "  0) 🔙 返回"
+                        read -p "编号: " t_idx
+                        [[ "$t_idx" == "0" || -z "$t_idx" ]] && continue
+                        selected_time="${display_list[$((t_idx-1))]}"
+                        ;;
+                    2)
+                        use_live=true
+                        echo -e "${CYAN}>> 已选择: 当前系统配置 → 仓库${NC}"
+                        ;;
+                    *) continue ;;
+                esac
+
+                # 识别可同步模块
+                declare -a mod_list
+                for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                    mod_target=$(get_target_path "$mod")
+                    if [ "$use_live" = true ]; then
+                        [ -e "$mod_target" ] || [ -L "$mod_target" ] && mod_list+=("$mod")
+                    else
+                        [ -e "${selected_time}/${mod_target#$HOME/}" ] && mod_list+=("$mod")
+                    fi
+                done
+
+                if [ ${#mod_list[@]} -eq 0 ]; then
+                    echo -e "${RED}>> 无可同步模块。${NC}"
+                    read -p "按回车键继续..."
+                    continue
+                fi
+
+                # 模块选择（支持多选）
+                echo -e "\n${CYAN}>> 请选择要覆盖到仓库的模块 (支持多选):${NC}"
+                for i in "${!mod_list[@]}"; do 
+                    echo -e "  $((i+1))) ${mod_list[i]}"
+                done
+                echo -e "  a) 🌟 全选所有模块"
+                echo -e "  0) 🔙 返回"
+                read -p "编号 (如 '1 3' 或 'a'): " m_choices
+                [[ "$m_choices" == "0" || -z "$m_choices" ]] && continue
+
+                if [[ "$m_choices" == "a" ]]; then
+                    selected_indices=($(seq 1 ${#mod_list[@]}))
+                else
+                    selected_indices=($m_choices)
+                fi
+
+                # 执行逆向同步
+                echo -e "\n${BLUE}>> 正在覆盖仓库...${NC}"
+                for idx in "${selected_indices[@]}"; do
+                    if [ "$idx" -lt 1 ] || [ "$idx" -gt "${#mod_list[@]}" ]; then
+                        echo -e "${RED}⚠️  跳过无效编号: $idx${NC}"
+                        continue
+                    fi
+
+                    mod="${mod_list[$((idx-1))]}"
+                    target=$(get_target_path "$mod")
+                    
+                    if [ "$use_live" = true ]; then
+                        src_path="$target"
+                    else
+                        src_path="${selected_time}/${target#$HOME/}"
+                    fi
+                    
+                    echo -e "${CYAN}>> 正在处理模块: $mod...${NC}"
+                    
+                    # 计算源路径在仓库中的相对位置
+                    rel_path="${target#$HOME/}"
+                    repo_dest="$DOTFILES_DIR/$mod/$rel_path"
+                    
+                    rm -rf "$repo_dest" 2>/dev/null
+                    mkdir -p "$(dirname "$repo_dest")"
+                    
+                    if [ -d "$src_path" ]; then
+                        cp -aL "$src_path/." "$repo_dest/"
+                    else
+                        cp -aL "$src_path" "$repo_dest"
+                    fi
+                    echo -e "   ${GREEN}✓ 模块 [$mod] 已覆盖到仓库${NC}"
+                done
+
+                echo -e "\n${GREEN}✅ 逆向同步完成！仓库文件已更新。${NC}"
                 read -p "按回车键继续..."
                 ;;
             4)
@@ -342,6 +442,13 @@ menu_sync_deploy() {
                         fi
                         echo -e "  [📁 Physical] $module"
                     fi
+                done
+                # 同步 starship 模板到 by-mgr 本地模板库
+                if [ -f "$DOTFILES_DIR/starship/.config/starship_base.toml" ]; then
+                    mkdir -p "$HOME/.config/by-mgr/templates"
+                    cp -aL "$DOTFILES_DIR/starship/.config/starship_base.toml" "$HOME/.config/by-mgr/templates/"
+                    echo -e "  [📋 Template] starship_base.toml → by-mgr templates"
+                fi
                 done
                 echo -e "\n${GREEN}✅ 部署完成！${NC}"
                 read -p "按回车键继续..."
@@ -440,7 +547,7 @@ EOF
     fi
 
     if [[ "$target_dm" == "greetd" && ! -f /etc/greetd/config.toml ]]; then
-        [ -f "$REPO_DIR/scripts/05_greetd_setup.sh" ] && source "$REPO_DIR/scripts/05_greetd_setup.sh" && setup_greetd_niri
+        [ -f "$REPO_DIR/scripts/07_greetd_setup.sh" ] && source "$REPO_DIR/scripts/07_greetd_setup.sh" && setup_greetd_niri
     fi
 
     echo -e "${YELLOW}>> 切换服务链路...${NC}"
@@ -559,51 +666,19 @@ menu_repo_manager() {
                 sleep 2
                 ;;
             4)
-                echo -e "\n${CYAN}>> 当前共有 [ $count ] 个快照。${NC}"
-                if [ "$count" -eq 0 ]; then
-                    read -p "按回车键继续..."
-                    continue
+                local edit_file=""
+                if [ -f "$LOCAL_REPO_LIST" ]; then edit_file="$LOCAL_REPO_LIST"
+                elif [ -f "$PROJECT_REPO_LIST" ]; then edit_file="$PROJECT_REPO_LIST"
                 fi
                 
-                local first_snap=$(basename "${time_list[0]}" | cut -d'_' -f1)
-                local last_snap=$(basename "${time_list[-1]}" | cut -d'_' -f1)
-                
-                echo "清理模式选择: 1) 按数量  2) 按日期"
-                read -p "请选择: " clean_type
-                
-                if [ "$clean_type" == "1" ]; then
-                    read -p "保留最近数量: " keep_count
-                    if [[ "$keep_count" =~ ^[0-9]+$ ]] && [ "$keep_count" -lt "$count" ]; then
-                        local remove_count=$((count - keep_count))
-                        for ((i=0; i<remove_count; i++)); do rm -rf "${time_list[i]}"; done
-                        echo -e "${GREEN}✅ 已清理 $remove_count 个旧快照。${NC}"
-                    else
-                        echo -e "${YELLOW}>> 输入无效或无需清理。${NC}"
-                    fi
-                elif [ "$clean_type" == "2" ]; then
-                    # --- 智能计算距今天数作为提示 ---
-                    local now_sec=$(date +%s)
-                    local oldest_sec=$(date -d "$first_snap" +%s 2>/dev/null || echo "$now_sec")
-                    local newest_sec=$(date -d "$last_snap" +%s 2>/dev/null || echo "$now_sec")
-                    local oldest_days=$(( (now_sec - oldest_sec) / 86400 ))
-                    local newest_days=$(( (now_sec - newest_sec) / 86400 ))
-                    
-                    echo -e "\n  ${PURPLE}💡 提示: 最旧快照距今 ${oldest_days} 天，最新快照距今 ${newest_days} 天。${NC}"
-                    read -p "删除多少天之前的？(输入天数): " days
-                    
-                    if [[ "$days" =~ ^[0-9]+$ ]]; then
-                        local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
-                        local del_count=0
-                        for s in "${time_list[@]}"; do
-                            local stime=$(echo "$(basename "$s")" | tr -d '_')
-                            if [ "$stime" -lt "$threshold" ]; then rm -rf "$s" && ((del_count++)); fi
-                        done
-                        echo -e "${GREEN}✅ 已清理 $del_count 个快照。${NC}"
-                    else
-                        echo -e "${RED}❌ 输入无效，请输入纯数字！${NC}"
-                    fi
+                if [ -z "$edit_file" ]; then
+                    echo -e "${RED}>> 未找到清单文件，请先执行导出。${NC}"
+                    sleep 1; continue
                 fi
-                # [修改点] 将 sleep 替换为交互式暂停
+                
+                echo -e "${CYAN}>> 正在打开: $edit_file${NC}"
+                ${EDITOR:-vim} "$edit_file"
+                echo -e "${GREEN}✅ 清单文件已保存。${NC}"
                 read -p "按回车键继续..."
                 ;;
             0) return ;;

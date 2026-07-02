@@ -1,6 +1,6 @@
 /* 引入 Hellwal 生成的颜色变量 */
 /* 可以使用绝对路径以及相对路径，不能使用$HOME 参数来替代 */
-@import "~/.cache/hellwal/colors-rofi.rasi"
+@import "~/.cache/by-mgr/hellwal/color-rofi.rasi"
 
 /* 全局变量 */
 

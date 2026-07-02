@@ -1,5 +1,5 @@
 /* 引入全局动态调色板 */
-@import "~/.cache/hellwal/colors-rofi.rasi"
+@import "~/.cache/by-mgr/hellwal/color-rofi.rasi"
 
 * {
     background-color: transparent;

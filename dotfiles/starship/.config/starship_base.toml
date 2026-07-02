@@ -1,0 +1,22 @@
+palette = "hellwal"
+format = """$os$username$directory$git_branch$git_status$time$line_break$character"""
+[os]
+disabled = false
+format = "[](accent)[ ](bg:accent fg:bg)"
+[username]
+show_always = true
+format = "[ $user ](bg:accent fg:bg)[](fg:accent bg:muted)"
+[directory]
+format = "[ $path ](bg:muted fg:fg)"
+truncation_length = 3
+[git_branch]
+symbol = ""
+format = "[ $symbol $branch ](fg:accent bg:muted)"
+[git_status]
+format = "[$all_status$ahead_behind](fg:accent bg:muted)"
+[time]
+disabled = false
+format = "[  $time ](bg:muted fg:fg)[ ](fg:muted)"
+[character]
+success_symbol = '[❯](bold fg:accent)'
+error_symbol = '[❯](bold fg:red)'

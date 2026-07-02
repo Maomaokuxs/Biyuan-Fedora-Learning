@@ -7,7 +7,7 @@
 // Find the full list of options on the wiki:
 // https://niri-wm.github.io/niri/Configuration:-Input
 
-include "colors.kdl"
+include "~/.cache/by-mgr/hellwal/color-niri.kdl"
 
 input {
     keyboard {

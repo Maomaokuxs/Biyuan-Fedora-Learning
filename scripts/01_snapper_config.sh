@@ -113,7 +113,7 @@ setup_snapper_and_backup() {
 
 # --- 4. 按时间全量静默备份物理文件 ---
 
-    local BACKUP_ROOT="$HOME/.dotfiles_backup"
+    local BACKUP_ROOT="$HOME/.config/by-mgr/backup"
     local date_tag=$(date +%Y%m%d_%H%M%S)
     local current_backup_dir="$BACKUP_ROOT/$date_tag"
     
@@ -128,7 +128,6 @@ setup_snapper_and_backup() {
             local src="$HOME/.config/$module"
             
             # 2. 特殊路径映射
-            [[ "$module" == "colors" ]] && src="$HOME/.cache/hellwal"
             [[ "$module" == "bash" ]] && src="$HOME/.bashrc"
             
             # 3. 智能探测：如果默认目录不存在，尝试探测同名文件
