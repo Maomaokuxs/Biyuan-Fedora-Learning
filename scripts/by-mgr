@@ -449,7 +449,6 @@ menu_sync_deploy() {
                     cp -aL "$DOTFILES_DIR/starship/.config/starship_base.toml" "$HOME/.config/by-mgr/templates/"
                     echo -e "  [📋 Template] starship_base.toml → by-mgr templates"
                 fi
-                done
                 echo -e "\n${GREEN}✅ 部署完成！${NC}"
                 read -p "按回车键继续..."
                 ;;
