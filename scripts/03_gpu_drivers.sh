@@ -84,7 +84,7 @@ install_nvidia_drivers() {
 # --- 4. 主干交互逻辑 ---
 setup_gpu_drivers() {
     echo -e "\n${BLUE}=====================================================${NC}"
-    echo -e "${GREEN}  [Phase 3] Hybrid GPU Acceleration Setup${NC}"
+    echo -e "${GREEN}          GPU Acceleration Setup${NC}"
     echo -e "${BLUE}=====================================================${NC}"
 
     # 硬件扫描

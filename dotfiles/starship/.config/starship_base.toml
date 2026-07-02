@@ -20,16 +20,3 @@ format = "[  $time ](bg:muted fg:fg)[ ](fg:muted)"
 [character]
 success_symbol = '[❯](bold fg:accent)'
 error_symbol = '[❯](bold fg:red)'
-[palettes.hellwal]
-bg = "#0d0e15"
-fg = "#deffff"
-accent = "#4089c7"
-muted = "#373c5b"
-color0 = "#0d0e15"
-color1 = "#255375"
-color2 = "#325762"
-color3 = "#257ebd"
-color4 = "#4089c7"
-color5 = "#888487"
-color6 = "#8494b4"
-color7 = "#a6e5ff"

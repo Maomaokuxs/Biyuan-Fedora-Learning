@@ -52,41 +52,68 @@ chmod +x ./install.sh
 ```text
 Biyuan-Fedora-Learning/
 ├── README.md                    # 安装指引
-├── config/                      # 纯数据清单
-│   └── repos.list               # 软件仓库清单，用 by-mgr 生成的增量补齐列表
+├── install.sh                   # 安装脚本
+├── config/
+│   └── repos.list               # 软件仓库清单
 │
 ├── scripts/                     # 【逻辑层】执行脚本
-│   ├── by-mgr                   # 核心引擎：所有的备份、部署、系统维护逻辑
-│   ├── 01_snapper_config.sh     # 基础环境与依赖包安装脚本
-|   ├── 02_base_env.sh           # 配置基础环境
-|   ├── 03_gpu_driver.sh         # 配置显卡驱动
-|   ├── 04_desktop_niri.sh       # 配置 niri 桌面环境
+│   ├── by-mgr                   # 核心引擎：备份、部署、系统维护
+│   ├── utils.sh                 # 公共工具函数
+│   ├── 01_snapper_config.sh     # 基础环境与依赖包安装
+│   ├── 02_base_env.sh           # 配置基础环境
+│   ├── 03_gpu_drivers.sh        # 配置显卡驱动
+│   ├── 04_desktop_niri.sh       # 配置 niri 桌面环境
 │   ├── 05_desktop_kde.sh        # 配置 KDE 桌面环境
-|   ├── 06_desktop_gnome.sh      # 配置 Gnome 桌面环境
-|   ├── 07_greetd_setup.sh       # 配置 Greetd/Tuigreet 作为窗口管理器
-|   └── by-mgr                   # 备份与恢复及更新配置文件
+│   ├── 06_desktop_gnome.sh      # 配置 Gnome 桌面环境
+│   └── 07_greetd_setup.sh       # 配置 Greetd/Tuigreet
 │
-├── dotfiles/                    # 【资产层】各个软件的配置文件 (通过 Stow 或 Physical 部署)
-|    ├── bash/
-│    │   └── .bashrc             # 终端环境变量
-│    ├── colors/
-│    │   └── .cache/hellwal/     # Hellwal 色彩调度中心的全局配色缓存
-│    ├── niri/
-│    │   └── .config/niri/
-│    │       └── config.kdl      # Niri 核心配置文件 (平铺逻辑、快捷键、启动项)
-│    ├── waybar/
-│    │   └── .config/waybar/     # 顶部/底部状态栏配置及 CSS 样式
-│    ├── rofi/
-│    │   └── .config/rofi/       # 启动器与应用抽屉样式
-│    ├── mako/
-│    │   └── .config/mako/       # 桌面通知守护进程配置
-│    ├── nvim/
-│    │   └── .config/nvim/       # Neovim 编辑器配置
-│    ├── starship/
-│    │   └── .config/
-│    │       └── starship.toml   # 终端提示符的高级美化
-│    └── cava/
-|        └── .config/cava/config # 终端音频频谱跳动特效配置
-|      
-└── install.sh                   # 安装脚本
+├── dotfiles/                    # 【资产层】配置文件 (Stow 部署)
+│   ├── fastfetch/
+│   │   └── .config/fastfetch/
+│   │       └── config.jsonc     # Fastfetch 系统信息展示
+│   ├── hypr/
+│   │   └── .config/hypr/
+│   │       ├── hypridle.conf    # 空闲监听配置
+│   │       └── hyprlock.conf    # 锁屏界面 (由 theme-sync 生成)
+│   ├── kitty/
+│   │   └── .config/kitty/
+│   │       └── kitty.conf       # 终端配置，引入 color-kitty.conf
+│   ├── niri/
+│   │   └── .config/niri/
+│   │       ├── config.kdl       # Niri 核心配置 (平铺、快捷键、启动项)
+│   │       ├── keybinds.kdl     # 快键键配置
+│   │       └── scripts/
+│   │           ├── theme-sync.sh        # 壁纸取色 & 全局配色分发
+│   │           ├── wallpaper.sh         # 随机壁纸切换
+│   │           ├── wallpaper-picker.sh  # 壁纸选择器
+│   │           ├── init-wallpaper.sh    # 初始化壁纸
+│   │           └── toggle-theme.sh      # 昼夜模式切换
+│   ├── rofi/
+│   │   └── .config/rofi/
+│   │       ├── config.rasi      # Rofi 全局配置
+│   │       ├── scripts/         # 菜单脚本 (powermenu/music/recorder)
+│   │       └── themes/          # 主题样式，引入 color-rofi.rasi
+│   ├── starship/
+│   │   └── .config/
+│   │       ├── starship.toml        # 终端提示符 (palette 拼接生成)
+│   │       └── starship_base.toml   # Starship 基础模板
+│   ├── waybar/
+│   │   └── .config/waybar/
+│   │       ├── config.jsonc     # Waybar 模块布局
+│   │       ├── style.css        # 样式表，引入 color-waybar.css
+│   │       └── scripts/         # 模块脚本 (天气/音乐/更新等)
+│   ├── xdg-desktop-portal/
+│   │   └── .config/xdg-desktop-portal/
+│   │       └── niri-portals.conf
+│   └── bash/
+│       └── .bashrc              # 终端环境变量
+│
+└── 配色生成路径 (theme-sync.sh 输出)
+    ~/.cache/by-mgr/hellwal/
+    ├── global-palette.env       # 中央色彩数据库 (唯一数据源)
+    ├── color-niri.kdl           # Niri 边框配色
+    ├── color-waybar.css         # Waybar 颜色变量
+    ├── color-rofi.rasi          # Rofi 颜色变量
+    ├── color-kitty.conf         # Kitty 配色 (含 16 色)
+    └── color-starship.toml      # Starship palette 切片
 ```

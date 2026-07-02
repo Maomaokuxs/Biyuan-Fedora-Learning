@@ -109,7 +109,6 @@ install_desktop_niri() {
                     
                     # 2. 强力清理同名物理文件夹 (防止 stow 冲突报错)
                     local target_dir="$HOME/.config/$module"
-                    [[ "$module" == "colors" ]] && target_dir="$HOME/.cache/hellwal"
                     [ -d "$target_dir" ] && [ ! -L "$target_dir" ] && rm -rf "$target_dir"
 
                     # 3. 重新建立干净的软链接
@@ -129,7 +128,6 @@ install_desktop_niri() {
                     
                     # 2. 暴力拔除（防止由于路径变动导致 stow 无法识别的“死链接”）
                     local target_dir="$HOME/.config/$module"
-                    [[ "$module" == "colors" ]] && target_dir="$HOME/.cache/hellwal"
                     [ -L "$target_dir" ] && rm -f "$target_dir"
                     
                     # 如果之前是物理文件夹，先清空，防止文件交错残留
@@ -140,6 +138,12 @@ install_desktop_niri() {
                     echo -e "  [📁 Physical] $module"
                 done
                 echo -e "${GREEN}✅ Configuration physical detachment complete!${NC}"
+                # 同步 starship 模板到 by-mgr 本地模板库
+                if [ -f "$DOTFILES_DIR/starship/.config/starship_base.toml" ]; then
+                    mkdir -p "$HOME/.config/by-mgr/templates"
+                    cp -aL "$DOTFILES_DIR/starship/.config/starship_base.toml" "$HOME/.config/by-mgr/templates/"
+                    echo -e "${GREEN}✅ Starship template cached to by-mgr templates.${NC}"
+                fi
                 break
                 ;;
             0)

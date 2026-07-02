@@ -4,7 +4,7 @@
  */
 
 /* --- 1. 引入 Hellwal 生成的颜色变量 --- */
-@import url("../../.cache/hellwal/colors-waybar.css");
+@import url("../../.cache/by-mgr/hellwal/color-waybar.css");
 
 /* --- 2. 全局基础设置 --- */
 * {
@@ -40,8 +40,8 @@ window#waybar {
 #custom-music.playing,
 #custom-recorder,
 #custom-power{
-    padding: 0 12px;
-    margin: 4px 3px;         /* 上下 4px 留白，左右 3px 间距 */
+    padding: 0 8px;
+    margin: 4px 1px;         /* 上下 4px 留白，左右 1px 间距 */
     min-height: 28px;        /* 28px + 4px*2 = 36px，完美填充 Waybar */
     border-radius: 15px;     /* 彻底圆角化，形成胶囊状 */
     background-color: rgba(255, 255, 255, 0.05); /* 微弱透明背景 */
@@ -117,8 +117,8 @@ window#waybar {
 #tray,
 /* ... */
 #custom-recorder {
-    padding: 0 12px;
-    margin: 4px 3px;
+    padding: 0 8px;
+    margin: 4px 1px;
     min-height: 28px;
     border-radius: 15px;
     background-color: rgba(255, 255, 255, 0.05);
@@ -128,11 +128,11 @@ window#waybar {
 
 /* 针对托盘的特定微调 */
 #tray {
-    padding: 0 8px; /* 稍微缩小左右内边距，让图标看起来更紧凑 */
+    padding: 0 6px; /* 稍微缩小左右内边距，让图标看起来更紧凑 */
 }
 
 #tray > widget {
-    margin: 0 4px; /* 图标之间的间距 */
+    margin: 0 2px; /* 图标之间的间距 */
     transition: all 0.2s ease;
 }
 

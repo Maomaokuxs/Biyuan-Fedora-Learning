@@ -35,33 +35,3 @@ safe_install() {
         echo -e "${GREEN}>> [Skip] All base dependencies met. Proceeding to configuration.${NC}"
     fi
 }
-
-# --- Stow 软链接部署 ---
-deploy_module() {
-    local module_name=$1
-    local timestamp=$(date +%Y%m%d_%H%M%S)
-    # 如果没有定义 BACKUP_ROOT，给一个默认值
-    : "${BACKUP_ROOT:=$HOME/.dotfiles_backup}"
-    local bdir="$BACKUP_ROOT/${timestamp}_$module_name"
-    local check_path=""
-    
-    # 修正 bashrc 的判断路径
-    if [ "$module_name" == "bash" ]; then
-        check_path="$HOME/.bashrc"
-    else
-        check_path="$HOME/.config/$module_name"
-    fi
-
-    # 如果有旧配置，执行备份
-    if [ -e "$check_path" ] && [ ! -L "$check_path" ]; then
-        echo -e "${YELLOW}>> [Backup] Legacy config found. Backing up: $module_name${NC}"
-        mkdir -p "$bdir"
-        cp -rf "$check_path" "$bdir/"
-        rm -rf "$check_path" # 移除物理文件以便 stow 可以创建软链接
-    fi
-
-    cd "$DOTFILES_DIR"
-    # 使用 -R 替代 -v -t ~ 往往更简洁
-    stow -R -t ~ "$module_name" 2>/dev/null
-    echo -e "${BLUE}>> [Config] Module mapping applied: $module_name${NC}"
-}
