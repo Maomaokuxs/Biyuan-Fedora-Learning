@@ -81,28 +81,28 @@ if [ -f "$FINAL_WALLPAPER" ]; then
     # 如果目标目录成功拿到了默认壁纸（通过刚才的软链接）
     echo -e "\033[0;32m✅ 锁定默认壁纸: $FINAL_WALLPAPER\033[0m"
     
-    # 既然成功部署了，就在这里打上烙印，以后再也不执行了
-    touch "$INIT_LOCK"
-    echo -e "\033[0;32m✅ Initialization lock created: $INIT_LOCK\033[0m"
 else
     echo -e "\033[0;31m❌ Error: 未找到指定的默认壁纸 ($DEFAULT_WALL_NAME)\033[0m"
     
     # 兜底求生逻辑：在刚才导入的壁纸中随便抓一张作为默认
     FINAL_WALLPAPER=$(ls "$WALL_DEST_DIR"/*.{png,jpg,jpeg,webp} 2>/dev/null | head -n 1)
     
-    if [ -n "$FINAL_WALLPAPER" ]; then
-        echo -e "\033[0;33m⚠️  Fallback: 随机提取一张壁纸作为兜底: $FINAL_WALLPAPER\033[0m"
-        touch "$INIT_LOCK" # 既然找到兜底的了，也打上锁防止下次再跑
+    if [ -z "$FINAL_WALLPAPER" ]; then
+        echo -e "\033[0;31m❌ Fatal: No wallpaper file available at all.\033[0m"
+        exit 1
     fi
+    echo -e "\033[0;33m⚠️  Fallback: 随机提取一张壁纸作为兜底: $FINAL_WALLPAPER\033[0m"
 fi
 
 # --- 5. 激活视觉引擎 ---
-if [ -f "$FINAL_WALLPAPER" ]; then
-    if [ -f "$THEME_SYNC_SCRIPT" ]; then
-        echo ">> Found visual engine: $THEME_SYNC_SCRIPT"
-        chmod +x "$THEME_SYNC_SCRIPT"
-        # 使用 bash 调用确保稳定性
-        bash "$THEME_SYNC_SCRIPT" "$FINAL_WALLPAPER"
+if [ -f "$THEME_SYNC_SCRIPT" ]; then
+    echo ">> Found visual engine: $THEME_SYNC_SCRIPT"
+    chmod +x "$THEME_SYNC_SCRIPT"
+    # 使用 bash 调用确保稳定性
+    bash "$THEME_SYNC_SCRIPT" "$FINAL_WALLPAPER"
+    # 主题同步成功后创建锁文件，确保下次不再重复执行
+    touch "$INIT_LOCK"
+    echo -e "\033[0;32m✅ Initialization lock created: $INIT_LOCK\033[0m"
     else
         echo -e "\033[0;31m⚠️  Error: Cannot locate engine at $THEME_SYNC_SCRIPT\033[0m"
         

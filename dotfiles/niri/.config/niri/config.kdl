@@ -679,7 +679,6 @@ binds {
   spawn-at-startup "~/.local/bin/dot-sync"
 
   //默认壁纸
-  spawn-at-startup "swww-daemon" // 推荐使用 swww 处理动态切换
   spawn-at-startup "~/.config/niri/scripts/init-wallpaper.sh"
 
   // 锁屏
