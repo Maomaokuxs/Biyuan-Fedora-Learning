@@ -666,8 +666,6 @@ binds {
   // polkit代理（ 提权工具）
     // kde 
     spawn-at-startup "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
-    //hyprland
-    spawn-at-startup "/usr/libexec/hyprpolkitagent" 
   
   // swww
   spawn-at-startup "swww-daemon"
@@ -675,9 +673,6 @@ binds {
   // 通知
   spawn-at-startup "mako"
   
-  // 自动同步配置文件脚本
-  spawn-at-startup "~/.local/bin/dot-sync"
-
   //默认壁纸
   spawn-at-startup "~/.config/niri/scripts/init-wallpaper.sh"
 
