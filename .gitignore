@@ -1,0 +1,32 @@
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+*.pub
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS
+Thumbs.db
+Desktop.ini
+
+# Build / temp
+*.log
+*.tmp
+dist/
+build/

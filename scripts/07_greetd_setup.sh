@@ -17,28 +17,32 @@ setup_greetd_niri() {
     echo -e "${YELLOW}>> Setting hardware permissions for $g_user...${NC}"
     sudo usermod -aG video,render "$g_user"
 
-    # --- 3. 智能内核参数配置 (保持不变，确保 Wayland 兼容性) ---
-    local grub_file="/etc/default/grub"
-    local updated=false
-    echo -e "${BLUE}>> Detecting GPU type for kernel optimization...${NC}"
-    
-    if lspci | grep -qi "nvidia"; then
-        echo -e "${CYAN}>> NVIDIA GPU detected. Applying fixes...${NC}"
-        local params="nvidia-drm.modeset=1 nvidia_drm.fbdev=1 ibt=off"
-        if ! grep -q "nvidia-drm.modeset=1" "$grub_file"; then
-            sudo sed -i "/^GRUB_CMDLINE_LINUX=/ s/\"$/ $params\"/" "$grub_file"
-            updated=true
+    # --- 3. 智能内核参数配置 (VM 环境下跳过) ---
+    if ! is_vm; then
+        local grub_file="/etc/default/grub"
+        local updated=false
+        echo -e "${BLUE}>> Detecting GPU type for kernel optimization...${NC}"
+        
+        if lspci | grep -qi "nvidia"; then
+            echo -e "${CYAN}>> NVIDIA GPU detected. Applying fixes...${NC}"
+            local params="nvidia-drm.modeset=1 nvidia_drm.fbdev=1 ibt=off"
+            if ! grep -q "nvidia-drm.modeset=1" "$grub_file"; then
+                sudo sed -i "/^GRUB_CMDLINE_LINUX=/ s/\"$/ $params\"/" "$grub_file"
+                updated=true
+            fi
+        elif lspci | grep -qiE "amd|ati"; then
+            if ! grep -q "amdgpu.modeset=1" "$grub_file"; then
+                sudo sed -i "/^GRUB_CMDLINE_LINUX=/ s/\"$/ amdgpu.modeset=1\"/" "$grub_file"
+                updated=true
+            fi
         fi
-    elif lspci | grep -qiE "amd|ati"; then
-        if ! grep -q "amdgpu.modeset=1" "$grub_file"; then
-            sudo sed -i "/^GRUB_CMDLINE_LINUX=/ s/\"$/ amdgpu.modeset=1\"/" "$grub_file"
-            updated=true
-        fi
-    fi
 
-    if [ "$updated" = true ]; then
-        echo -e "${YELLOW}>> Rebuilding GRUB configuration...${NC}"
-        sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+        if [ "$updated" = true ]; then
+            echo -e "${YELLOW}>> Rebuilding GRUB configuration...${NC}"
+            sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+        fi
+    else
+        echo -e "${YELLOW}>> Skipping GPU kernel parameters (VM detected).${NC}"
     fi
 
     # --- 4. 编写启动配置 (根据你的要求修改) ---
