@@ -83,6 +83,15 @@ install_nvidia_drivers() {
 
 # --- 4. 主干交互逻辑 ---
 setup_gpu_drivers() {
+    # VM 环境自动跳过
+    if is_vm; then
+        echo -e "\n${YELLOW}=====================================================${NC}"
+        echo -e "${YELLOW}  ⚡ Running inside a virtual machine.${NC}"
+        echo -e "${YELLOW}  GPU driver installation skipped (not applicable).${NC}"
+        echo -e "${YELLOW}=====================================================${NC}"
+        return 0
+    fi
+
     echo -e "\n${BLUE}=====================================================${NC}"
     echo -e "${GREEN}          GPU Acceleration Setup${NC}"
     echo -e "${BLUE}=====================================================${NC}"

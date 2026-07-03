@@ -665,19 +665,25 @@ menu_repo_manager() {
                 sleep 2
                 ;;
             4)
-                local edit_file=""
-                if [ -f "$LOCAL_REPO_LIST" ]; then edit_file="$LOCAL_REPO_LIST"
-                elif [ -f "$PROJECT_REPO_LIST" ]; then edit_file="$PROJECT_REPO_LIST"
+                echo -e "\n${BLUE}>> 正在打开仓库清单文件...${NC}"
+                local target_file=""
+                if [ -f "$LOCAL_REPO_LIST" ]; then
+                    target_file="$LOCAL_REPO_LIST"
+                elif [ -f "$PROJECT_REPO_LIST" ]; then
+                    target_file="$PROJECT_REPO_LIST"
                 fi
-                
-                if [ -z "$edit_file" ]; then
-                    echo -e "${RED}>> 未找到清单文件，请先执行导出。${NC}"
-                    sleep 1; continue
+
+                if [ -z "$target_file" ]; then
+                    echo -e "${YELLOW}>> 尚未创建仓库清单文件，请先执行导出 (选项 1)。${NC}"
+                    read -p "按回车键继续..."
+                    continue
                 fi
-                
-                echo -e "${CYAN}>> 正在打开: $edit_file${NC}"
-                ${EDITOR:-vim} "$edit_file"
-                echo -e "${GREEN}✅ 清单文件已保存。${NC}"
+
+                echo -e "${CYAN}>> 编辑文件: $target_file${NC}"
+                echo -e "${YELLOW}>> 格式说明：每行一个仓库，copr 开头为 Copr 仓库，repo 开头为系统仓库。${NC}"
+                sleep 1
+                ${EDITOR:-vim} "$target_file"
+                echo -e "${GREEN}✅ 编辑完成。${NC}"
                 read -p "按回车键继续..."
                 ;;
             0) return ;;

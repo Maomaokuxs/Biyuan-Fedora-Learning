@@ -1,3 +1,15 @@
+# --- VM 环境检测 ---
+is_vm() {
+    if command -v systemd-detect-virt &> /dev/null; then
+        systemd-detect-virt -q && return 0
+    fi
+    # 降级检测
+    if grep -qi "hypervisor" /proc/cpuinfo 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
 # --- 智能包管理器 (增强日志输出版) ---
 safe_install() {
     local pkgs="$1"
