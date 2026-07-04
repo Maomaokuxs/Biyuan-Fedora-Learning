@@ -65,6 +65,14 @@ USER_CONFIG_DIR="$HOME/.config/by-mgr"
 LOCAL_REPO_LIST="$USER_CONFIG_DIR/repos.list"
 PROJECT_REPO_LIST="$REPO_DIR/config/repos.list"
 
+# --- fzf 检测 ---
+if command -v fzf &> /dev/null && [[ "$1" != "--text" ]]; then
+    USE_TUI=true
+    FZF_THEME="--color=fg:#cdd6f4,bg:#1e1e2e,hl:#cba6f7,fg+:#cdd6f4,bg+:#313244,hl+:#f5c2e7,info:#89b4fa,header:#a6adc8,prompt:#a6e3a1,pointer:#f38ba8,marker:#f9e2af,spinner:#fab387 --layout=reverse --border=rounded --no-info --no-separator --cycle --tiebreak=index"
+else
+    USE_TUI=false
+fi
+
 # --- 辅助函数 ---
 get_target_path() {
     local mod="$1"
