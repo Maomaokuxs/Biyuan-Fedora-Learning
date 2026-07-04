@@ -6,34 +6,20 @@ install_desktop_niri() {
     echo -e "${GREEN}  [Phase 3] Niri Desktop Environment Deployment${NC}"
     echo -e "${BLUE}=====================================================${NC}"
 
-    # --- 1. 调用基础环境脚本 ---
-    local BASE_SCRIPT="$REPO_DIR/scripts/02_base_env.sh"
-    if [ -f "$BASE_SCRIPT" ]; then
+    # --- 1. 调用基础环境 ---
+    if command -v setup_base &> /dev/null; then
         echo -e "${YELLOW}>> Checking and deploying base runtime environment...${NC}"
-        chmod +x "$BASE_SCRIPT"
-        source "$BASE_SCRIPT"
-        if command -v setup_base &> /dev/null; then
-            setup_base
-        fi
+        setup_base
+    else
+        echo -e "${RED}❌ Error: 'setup_base' function not found!${NC}"
     fi
 
-    # --- 2. 调用独立显卡驱动脚本 ---
-    # 增加兜底：如果 REPO_DIR 没传过来，默认找当前目录的 scripts
-    local GPU_SCRIPT="${REPO_DIR:-$HOME/Documents/github/Biyuan-Fedora-Learning}/scripts/03_gpu_drivers.sh"
-    
-    if [ -f "$GPU_SCRIPT" ]; then
+    # --- 2. 调用独立显卡驱动 ---
+    if command -v setup_gpu_drivers &> /dev/null; then
         echo -e "${YELLOW}>> Loading external GPU driver configuration module...${NC}"
-        chmod +x "$GPU_SCRIPT"
-        source "$GPU_SCRIPT"
-        
-        # 【核心修正】：调用的函数名必须与 03 脚本里的定义完全一致
-        if command -v setup_gpu_drivers &> /dev/null; then
-            setup_gpu_drivers
-        else
-            echo -e "${RED}❌ Error: 'setup_gpu_drivers' function not found in 03_gpu_drivers.sh!${NC}"
-        fi
+        setup_gpu_drivers
     else
-        echo -e "${RED}❌ Error: Cannot find GPU script at $GPU_SCRIPT${NC}"
+        echo -e "${RED}❌ Error: 'setup_gpu_drivers' function not found!${NC}"
     fi
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
@@ -215,40 +201,47 @@ install_desktop_niri() {
         echo -e "${RED}❌ Error: by-mgr script not found at $REPO_DIR/scripts/by-mgr${NC}"
     fi
 
-    # --- 8. 登录管理器部署 (极简双选菜单) ---
-    while true; do
-        echo -e "${BLUE}==================================================${NC}"
-        echo -e "${YELLOW}>> Please select the Display Manager configuration:${NC}"
-        echo -e "   ${CYAN}[1]${NC} greetd + tuigreet (Modern/Minimalist - Perfect for Niri)"
-        echo -e "   ${CYAN}[2]${NC} Skip / Keep Current (Do not install any display manager)"
-        echo -e "${BLUE}==================================================${NC}"
-        echo -n -e "${YELLOW}?? Enter your choice [1-2]: ${NC}"
-        
-        read -r dm_choice
-        
-        case "$dm_choice" in
-            1)
-                # 【核心修正】：将独立脚本文件名从 05 精确映射为 07_greetd_setup.sh
-                local GREETD_SCRIPT="$REPO_DIR/scripts/07_greetd_setup.sh"
-                if [ -f "$GREETD_SCRIPT" ]; then
-                    echo -e "${YELLOW}>> Deploying greetd/tuigreet...${NC}"
+    # --- 8. 登录管理器部署 ---
+    local GREETD_SCRIPT="$REPO_DIR/scripts/07_greetd_setup.sh"
+    if [ ! -f "$GREETD_SCRIPT" ]; then
+        echo -e "${RED}❌ ERROR: Setup script not found at $GREETD_SCRIPT!${NC}"
+        return 1
+    fi
+
+    # 检测是否已有其他登录管理器
+    local existing_dm=""
+    for dm in gdm sddm lightdm greetd plasmalogin; do
+        if rpm -q "$dm" &>/dev/null; then
+            existing_dm="$dm"
+            break
+        fi
+    done
+
+    if [ -n "$existing_dm" ]; then
+        echo -e "${CYAN}>> Detected existing display manager: $existing_dm, skipping greetd.${NC}"
+    else
+        while true; do
+            echo -e "\n${BLUE}==================================================${NC}"
+            echo -e "${YELLOW}>> No display manager found. Please select:${NC}"
+            echo -e "   ${CYAN}[1]${NC} greetd + tuigreet (Recommended for Niri)"
+            echo -e "   ${CYAN}[2]${NC} Skip (No display manager)"
+            echo -e "${BLUE}==================================================${NC}"
+            read -p "Enter your choice [1-2]: " dm_choice
+
+            case "$dm_choice" in
+                1)
                     source "$GREETD_SCRIPT"
                     setup_greetd_niri
-                else
-                    echo -e "${RED}❌ ERROR: Setup script not found at $GREETD_SCRIPT!${NC}"
-                fi
-                break
-                ;;
-            2)
-                echo -e "${GREEN}>> Skipped display manager deployment. Keeping your current system state.${NC}"
-                # 显式重置全局或父级变量，避免主脚本尾部拦截器误判
-                export dm_choice="2"
-                break
-                ;;
-            *)
-                echo -e "${RED}❌ Invalid input! Please choose [1-2]...${NC}"
-                echo ""
-                ;;
-        esac
-    done
+                    break
+                    ;;
+                2)
+                    echo -e "${YELLOW}>> Skipped display manager deployment.${NC}"
+                    break
+                    ;;
+                *)
+                    echo -e "${RED}❌ Invalid input! Please choose [1-2].${NC}"
+                    ;;
+            esac
+        done
+    fi
 }
