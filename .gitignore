@@ -25,6 +25,9 @@ id_ed25519
 Thumbs.db
 Desktop.ini
 
+# Notes (excluded from repo)
+notes/
+
 # Build / temp
 *.log
 *.tmp
