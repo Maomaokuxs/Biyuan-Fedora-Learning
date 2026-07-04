@@ -1,8 +1,8 @@
 #!/bin/bash
 # 文件位置: scripts/03_gpu_drivers.sh
 # 描述: 智能显卡驱动部署模块 (支持自动检测、手动覆盖与单包报错兜底)
-
-CYAN='\033[0;36m'; BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+# 独立运行时自动加载依赖
+[ "${BASH_SOURCE[0]}" == "${0}" ] && SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) && [ -f "$SCRIPT_DIR/utils.sh" ] && source "$SCRIPT_DIR/utils.sh"
 
 # --- 1. 仓库检测与自愈机制 --- # 
 # 检查并自动添加 RPM Fusion（Free 和 Non-Free）第三方仓库
