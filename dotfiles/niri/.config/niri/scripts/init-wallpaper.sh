@@ -112,8 +112,8 @@ if [ -f "$THEME_SYNC_SCRIPT" ]; then
             bash "$ALT_SYNC" "$FINAL_WALLPAPER"
         else
             if [ -n "$WAYLAND_DISPLAY" ]; then
-                swww query &>/dev/null || swww init &>/dev/null
-                swww img "$FINAL_WALLPAPER" --transition-type center
+                awww query &>/dev/null || awww init &>/dev/null
+                awww img "$FINAL_WALLPAPER" --transition-type center
             fi
         fi
     fi

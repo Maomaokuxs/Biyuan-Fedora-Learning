@@ -13,9 +13,9 @@ fi
 
 # 检测当前是否运行在 Wayland 图形环境下
 if [ -n "$WAYLAND_DISPLAY" ]; then
-    if command -v swww &> /dev/null; then
-        swww query &>/dev/null || swww init &>/dev/null
-        swww img "$WALLPAPER" --transition-type grow --transition-pos center --transition-duration 2
+    if command -v awww &> /dev/null; then
+        awww query &>/dev/null || awww init &>/dev/null
+        awww img "$WALLPAPER" --transition-type grow --transition-pos center --transition-duration 2
     fi
 else
     echo -e "\033[0;33mℹ️  检测到当前非 Wayland 图形环境，已跳过壁纸实时渲染。\033[0m"

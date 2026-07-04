@@ -38,11 +38,11 @@ install_desktop_niri() {
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
-    # --- 3. 配置三方仓库 (新增 Starship 仓库) ---
+    # --- 3. 配置三方仓库 ---
     echo -e "${BLUE}>> Enabling visual engine and desktop component repository...${NC}"
     
     # 启用 Hyprland 兼容生态仓库
-    sudo dnf copr enable -y hermitfeather/hyprland
+    sudo dnf copr enable -y eddievs/hyprland
     
     # 新增: 启用 Starship 官方 Copr 仓库
     echo -e "${YELLOW}>> Enabling Starship shell prompt repository...${NC}"
