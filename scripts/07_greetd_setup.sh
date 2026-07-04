@@ -1,6 +1,8 @@
 #!/bin/bash
 # File: scripts/07_greetd_setup.sh
 # 中文注释：Greetd + Tuigreet 综合部署脚本（支持 NVIDIA/AMD/Intel）
+# 独立运行时自动加载依赖
+[ "${BASH_SOURCE[0]}" == "${0}" ] && SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd) && [ -f "$SCRIPT_DIR/utils.sh" ] && source "$SCRIPT_DIR/utils.sh"
 
 setup_greetd_niri() {
     echo -e "${BLUE}=====================================================${NC}"
