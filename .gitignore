@@ -16,6 +16,7 @@ id_ed25519
 # IDE
 .idea/
 .vscode/
+.obsidian/
 *.swp
 *.swo
 *~
