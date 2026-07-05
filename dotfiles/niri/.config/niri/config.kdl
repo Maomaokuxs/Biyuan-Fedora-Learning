@@ -88,7 +88,7 @@ output "HDMI-A-1" {
     // for the resolution.
     // If the mode is omitted altogether or is invalid, niri will pick one automatically.
     // Run `niri msg outputs` while inside a niri instance to list all outputs and their modes.
-    mode "1920x1080@119.879"
+    mode "1920x1080@120.000"
 
     // You can use integer or fractional scale, for example use 1.5 for 150% scale.
     scale 1
@@ -106,8 +106,16 @@ output "HDMI-A-1" {
     // so to put another output directly adjacent to it on the right, set its x to 1920.
     // If the position is unset or results in an overlap, the output is instead placed
     // automatically.
-    position x=0 y=0
+    position x=1706 y=0
 }
+
+output "eDP-1" {
+    off
+    mode "2560x1600@120.001"  // 笔记本在左边
+    scale 1.5
+    position x=0 y=0       // 1920 = HDMI 的逻辑宽度
+}
+
 
 // Settings that influence how windows are positioned and sized.
 // Find more information on the wiki:
