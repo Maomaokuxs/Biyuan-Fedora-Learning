@@ -670,6 +670,9 @@ binds {
   // awww
   spawn-at-startup "awww-daemon"
   
+  // kitty 标题栏（仅 niri 隐藏，退出即恢复）
+  spawn-at-startup "~/.config/niri/scripts/niri-kitty-decor.sh"
+  
   // 通知
   spawn-at-startup "mako"
   
