@@ -61,7 +61,7 @@ EOF
     # --- 5. 设置启动目标与启用服务 ---
     echo -e "${YELLOW}>> Finalizing system services...${NC}"
     sudo systemctl set-default graphical.target
-    sudo systemctl disable gdm sddm lightdm &> /dev/null
+    sudo systemctl disable gdm sddm lightdm plasmalogin &> /dev/null
     sudo systemctl enable greetd
 
     echo -e "${GREEN}✅ Greetd deployment complete!${NC}"
