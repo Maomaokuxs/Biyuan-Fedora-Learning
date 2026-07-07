@@ -3,7 +3,7 @@ copr ackerman/nexus
 copr alternateved/niri
 copr atim/starship
 copr hermitfeather/hyprland
-copr kylegospo/grub-btrfs
+copr pego-copr/grub-btrfs
 copr tjuhasz/node-mass-preb
 repo fedora
 repo fedora-cisco-openh264
