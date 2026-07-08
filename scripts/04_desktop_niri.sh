@@ -101,6 +101,12 @@ install_desktop_niri() {
                     cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
                     echo -e "  [🔗 Linked] $module"
                 done
+                # 同步 starship 模板到 by-mgr 本地模板库
+                if [ -f "$DOTFILES_DIR/starship/.config/starship_base.toml" ]; then
+                    mkdir -p "$HOME/.config/by-mgr/templates"
+                    cp -aL "$DOTFILES_DIR/starship/.config/starship_base.toml" "$HOME/.config/by-mgr/templates/"
+                    echo -e "  [📋 Template] starship_base.toml → by-mgr templates"
+                fi
                 echo -e "${GREEN}✅ Configuration deployment complete!${NC}"
                 break
                 ;;
