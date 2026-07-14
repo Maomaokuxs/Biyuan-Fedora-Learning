@@ -23,7 +23,7 @@
         { "type": "os", "key": "│  󰘳 OS", "keyColor": "blue", "format": "{2} {8} {10}" },
         { "type": "kernel", "key": "│   Kernel", "keyColor": "blue" },
         { "type": "uptime", "key": "│  󱎫 Uptime", "keyColor": "blue" },
-        { "type": "packages", "key": "│  󰏗 Packages", "keyColor": "blue", "format": "{1} (rpm)" },
+        { "type": "packages", "key": "│  󰏗 Packages", "keyColor": "blue", "format": "{rpm} (rpm)" },
         { "type": "shell", "key": "│  󱆃 Shell", "keyColor": "blue" },
         { "type": "display", "key": "│  󰹑 Display", "keyColor": "blue", "compactType": "original" },
         { "type": "wm", "key": "│  󱂬 WM", "keyColor": "blue", "format": "{2} ({3})" },
