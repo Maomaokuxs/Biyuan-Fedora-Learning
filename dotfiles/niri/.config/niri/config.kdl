@@ -110,7 +110,7 @@ output "HDMI-A-1" {
 }
 
 output "eDP-1" {
-    off
+    //off
     mode "2560x1600@120.001"  // 笔记本在左边
     scale 1.5
     position x=0 y=0       // 1920 = HDMI 的逻辑宽度
@@ -671,7 +671,10 @@ binds {
   // fcitx5
   spawn-at-startup "fcitx5" "-d"
   
-  // polkit代理（ 提权工具）
+    // kded6: KDE 守护进程，负责配色变更通知
+    spawn-at-startup "kded6"
+
+   // polkit代理（ 提权工具）
     // kde 
     spawn-at-startup "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
   
@@ -689,7 +692,7 @@ binds {
 
   // 锁屏
   // 1. 同步环境：告诉系统底层当前的显示协议和桌面环境
-  spawn-at-startup "dbus-update-activation-environment" "--systemd" "WAYLAND_DISPLAY" "XDG_CURRENT_DESKTOP"
+  spawn-at-startup "dbus-update-activation-environment" "--systemd" "WAYLAND_DISPLAY" "XDG_CURRENT_DESKTOP" "QT_QPA_PLATFORMTHEME"
 
   // 2. 启动中枢：开启闲置监听守护进程
   spawn-at-startup "hypridle"
@@ -770,6 +773,10 @@ environment {
     "QT_IM_MODULE" "fcitx"
     "SDL_IM_MODULE" "fcitx"
     "CLUTTER_IM_MODULE" "fcitx"
+    
+    // KDE 套件完整初始化需要 XDG_CURRENT_DESKTOP 包含 KDE
+    "XDG_CURRENT_DESKTOP" "KDE:niri"
+    "QT_QPA_PLATFORMTHEME" "kde"
     
     // 这里的设置会让大多数程序原生使用 Wayland 协议
     "ELECTRON_OZONE_PLATFORM_HINT" "auto"
