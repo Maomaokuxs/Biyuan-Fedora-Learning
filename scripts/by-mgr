@@ -1033,7 +1033,229 @@ menu_display_manager() {
     done
 }
 # --- 主循环 ---
-# --- 主循环 ---
+# --- CLI 分发（有参数 → 直接执行命令，无参数 → 交互菜单）---
+if [ $# -gt 0 ] && [[ "$1" != "--text" ]]; then
+    USE_TUI=false
+    cmd="$1"; shift
+
+    show_help() {
+        echo -e "${BOLD}Biyuan 配置管理引擎 (by-mgr)${NC}"
+        echo ""
+        echo "用法: by-mgr [命令] [选项]"
+        echo ""
+        echo "备份命令:"
+        echo "  snapshot, -s          创建当前系统配置快照"
+        echo "  restore, -r [编号|last] 从历史快照还原配置（编号1=最新）"
+        echo "  list, -l              列出所有快照（编号 + 时间）"
+        echo "  reverse-sync, -rs     逆向同步当前配置覆盖到仓库"
+        echo "  clean, -c -k <N>      保留最近 N 个快照，删除其余"
+        echo "  clean, -c -d <天数>   删除 N 天前的旧快照"
+        echo ""
+        echo "部署命令:"
+        echo "  deploy, -d [stow|phy] Stow/物理部署配置（默认 stow）"
+        echo "  ota, update, -u        从 GitHub 拉取最新版 by-mgr"
+        echo ""
+        echo "常用:"
+        echo "  --help, -h            显示此帮助"
+        echo "  --text                强制文本模式（无 fzf）"
+        exit 0
+    }
+
+    _cmd_snapshot() {
+        date_tag=$(date +%Y%m%d_%H%M%S)
+        current_backup_dir="$BACKUP_ROOT/$date_tag"
+        mkdir -p "$current_backup_dir"
+        local backed_any=false
+        for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            src=$(get_target_path "$module")
+            if [ -e "$src" ] || [ -L "$src" ]; then
+                [ -d "$src" ] && [ ! -L "$src" ] && [ -z "$(ls -A "$src" 2>/dev/null)" ] && continue
+                rel_path="${src#$HOME/}"
+                dest="$current_backup_dir/$rel_path"
+                mkdir -p "$(dirname "$dest")"
+                cp -aL "$src" "$dest" 2>/dev/null && backed_any=true
+            fi
+        done
+        if [ "$backed_any" = true ]; then
+            echo -e "${GREEN}✅ 快照已保存: $date_tag${NC}"
+        else
+            rm -rf "$current_backup_dir"
+            echo -e "${YELLOW}>> 无需备份。${NC}"
+        fi
+    }
+
+    _cmd_restore() {
+        mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort -r)
+        if [ ${#time_list[@]} -eq 0 ]; then
+            echo -e "${RED}❌ 无历史备份！${NC}"
+            exit 1
+        fi
+        local selected_time=""
+        local arg="${1:-}"
+        if [[ "$arg" == "last" || "$arg" == "-1" ]]; then
+            # 直接选最新的
+            selected_time="${time_list[0]}"
+        elif [[ "$arg" =~ ^[0-9]+$ ]] && [ "$arg" -ge 1 ] && [ "$arg" -le ${#time_list[@]} ]; then
+            # 按编号选择（1 = 最新）
+            selected_time="${time_list[$((arg-1))]}"
+        elif [ -n "$arg" ]; then
+            # 按时间戳精确匹配
+            for t in "${time_list[@]}"; do
+                if [[ "$(basename "$t")" == "$arg" ]]; then
+                    selected_time="$t"; break
+                fi
+            done
+            [ -z "$selected_time" ] && { echo -e "${RED}❌ 未找到快照: $arg${NC}"; echo "可用快照:"; printf '  %2d) %s\n' $(i=1; for t in "${time_list[@]}"; do echo "$((i++)) ${t##*/}"; done); exit 1; }
+        else
+            # 无参数 → 交互选择
+            echo "可用快照:"
+            for i in "${!time_list[@]}"; do echo "  $((i+1))) $(basename "${time_list[i]}")"; done
+            read -p "选择快照编号 (1-${#time_list[@]}，0 取消): " choice < /dev/tty
+            [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#time_list[@]} ] || { echo "已取消"; exit 0; }
+            selected_time="${time_list[$((choice-1))]}"
+        fi
+        echo -e "${BLUE}>> 正在从 $(basename "$selected_time") 还原...${NC}"
+        for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            mod_target=$(get_target_path "$mod")
+            backup_src="${selected_time}/${mod_target#$HOME/}"
+            [ -e "$backup_src" ] || continue
+            echo -e "  ${CYAN}还原: $mod${NC}"
+            target=$(get_target_path "$mod")
+            cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
+            clean_target "$target"
+            if [ -d "$backup_src" ]; then
+                mkdir -p "$target" && cp -a "$backup_src/." "$target/"
+            else
+                mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+            fi
+        done
+        echo -e "${GREEN}✅ 还原完成！${NC}"
+    }
+
+    _cmd_reverse_sync() {
+        echo -e "${BLUE}>> 正在将当前系统配置覆盖回仓库...${NC}"
+        for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            target=$(get_target_path "$mod")
+            [ -e "$target" ] || [ -L "$target" ] || continue
+            rel_path="${target#$HOME/}"
+            repo_dest="$DOTFILES_DIR/$mod/$rel_path"
+            rm -rf "$repo_dest" 2>/dev/null
+            mkdir -p "$(dirname "$repo_dest")"
+            if [ -d "$target" ] && [ ! -L "$target" ]; then
+                cp -aL "$target/." "$repo_dest/"
+            else
+                cp -aL "$target" "$repo_dest"
+            fi
+            echo -e "  ${GREEN}✓ $mod${NC}"
+        done
+        echo -e "${GREEN}✅ 逆向同步完成！${NC}"
+    }
+
+    _cmd_clean() {
+        mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort)
+        local count=${#time_list[@]}
+        [ "$count" -eq 0 ] && { echo "无快照可清理。"; exit 0; }
+        case "$1" in
+            -k)
+                local keep="$2"
+                [[ "$keep" =~ ^[0-9]+$ ]] && [ "$keep" -lt "$count" ] || { echo "无效数量"; exit 1; }
+                local remove_count=$((count - keep))
+                for ((i=0; i<remove_count; i++)); do rm -rf "${time_list[i]}"; done
+                echo -e "${GREEN}✅ 已清理 $remove_count 个旧快照，保留 $keep 个。${NC}"
+                ;;
+            -d)
+                local days="$2"
+                [[ "$days" =~ ^[0-9]+$ ]] || { echo "无效天数"; exit 1; }
+                local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
+                local del_count=0
+                for s in "${time_list[@]}"; do
+                    local stime=$(echo "$(basename "$s")" | tr -d '_')
+                    [ "$stime" -lt "$threshold" ] && rm -rf "$s" && ((del_count++))
+                done
+                echo -e "${GREEN}✅ 已清理 $del_count 个 $days 天前的快照。${NC}"
+                ;;
+            *) echo "用法: by-mgr clean -k <N>  或  by-mgr clean -d <天数>"; exit 1 ;;
+        esac
+    }
+
+    _cmd_deploy() {
+        local mode="${1:-stow}"
+        echo -e "\n${BLUE}>> 正在部署配置 (${mode})...${NC}"
+        for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            [[ "$module" == "bash" ]] && continue
+            local target=$(get_target_path "$module")
+            cd "$DOTFILES_DIR" && stow -D -t ~ "$module" 2>/dev/null
+            clean_target "$target"
+            if [ "$mode" == "stow" ]; then
+                cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
+                echo -e "  [🔗 Linked] $module"
+            else
+                if [ -d "$DOTFILES_DIR/$module/.config" ]; then
+                    cp -a "$DOTFILES_DIR/$module/.config/." "$HOME/.config/" 2>/dev/null
+                elif [ -f "$DOTFILES_DIR/$module/.config/$module.toml" ]; then
+                    cp -a "$DOTFILES_DIR/$module/.config/$module.toml" "$HOME/.config/" 2>/dev/null
+                else
+                    cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null
+                fi
+                echo -e "  [📁 Physical] $module"
+            fi
+        done
+        if [ -f "$DOTFILES_DIR/starship/.config/starship_base.toml" ]; then
+            mkdir -p "$HOME/.config/by-mgr/templates"
+            cp -aL "$DOTFILES_DIR/starship/.config/starship_base.toml" "$HOME/.config/by-mgr/templates/"
+        fi
+        local WALLPAPER=$(swww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
+        [ -z "$WALLPAPER" ] && WALLPAPER=$(awww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
+        [ -n "$WALLPAPER" ] && [ -f "$HOME/.config/niri/scripts/theme-sync.sh" ] && bash "$HOME/.config/niri/scripts/theme-sync.sh" "$WALLPAPER"
+        echo -e "${GREEN}✅ 部署完成！${NC}"
+    }
+
+    _cmd_list() {
+        mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort -r)
+        if [ ${#time_list[@]} -eq 0 ]; then
+            echo "（无快照）"
+            exit 0
+        fi
+        printf " %-4s %s\n" "编号" "时间"
+        echo   " ---- ----"
+        for i in "${!time_list[@]}"; do
+            printf " %-4s %s\n" "$((i+1))" "$(basename "${time_list[i]}")"
+        done
+    }
+
+    _cmd_ota() {
+        echo -e "${YELLOW}>> 正在连接远程仓库检查 by-mgr 最新版本...${NC}"
+        local RAW_URL="https://raw.githubusercontent.com/Maomaokuxs/Biyuan-Fedora-Learning/main/scripts/by-mgr"
+        local TMP_FILE="/tmp/by-mgr-latest.sh"
+        if curl -sLf "$RAW_URL" -o "$TMP_FILE"; then
+            if head -n 1 "$TMP_FILE" | grep -q "#!/bin/bash"; then
+                cp -f "$TMP_FILE" "$SELF_PATH" && chmod +x "$SELF_PATH"
+                rm -f "$TMP_FILE"
+                echo -e "${GREEN}✨ OTA 更新成功！${NC}"
+            else
+                echo -e "${RED}❌ 更新失败：远程文件格式不正确。${NC}"
+                rm -f "$TMP_FILE"; exit 1
+            fi
+        else
+            echo -e "${RED}❌ 更新失败：无法连接到远程仓库。${NC}"
+            exit 1
+        fi
+    }
+
+    case "$cmd" in
+        snapshot|-s)      _cmd_snapshot ;;
+        restore|-r)       _cmd_restore "$@" ;;
+        reverse-sync|-rs) _cmd_reverse_sync ;;
+        clean|-c)         _cmd_clean "$@" ;;
+        deploy|-d)        _cmd_deploy "$@" ;;
+        list|-l)           _cmd_list ;;
+        ota|update|-u)    _cmd_ota ;;
+        --help|-h|help)   show_help ;;
+        *) echo -e "${RED}未知命令: $cmd${NC}"; echo "运行 by-mgr --help 查看用法"; exit 1 ;;
+    esac
+    exit 0
+fi
+
 while true; do
     clear
     main_opt=$(printf "%s|%s|%s\n" \
