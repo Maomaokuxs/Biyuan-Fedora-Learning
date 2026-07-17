@@ -215,6 +215,9 @@ padding=15
 margin=20
 font=JetBrainsMono Nerd Font 10
 default-timeout=5000
+
+[summary="本地系统消息服务"]
+invisible=1
 EOF
 echo "   ✔ Mako 配色 -> ~/.config/mako/config"
 
