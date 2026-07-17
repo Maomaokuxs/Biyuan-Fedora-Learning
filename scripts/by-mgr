@@ -141,11 +141,13 @@ _fzf_confirm() {
 
 # --- 操作完成（TUI 不暂停，文本模式暂停）---
 _done() {
+    local msg="${1:-操作已执行完成}"
+    local header="${2:-✅ 执行完成}"
     if [ "$USE_TUI" = true ]; then
         echo "继续" | fzf --delimiter='|' --with-nth=1 \
-            --preview='echo 操作已执行完成' \
+            --preview="echo $msg" \
             --preview-window='up:2:wrap,border-bottom' ${FZF_THEME} \
-            --header='✅ 执行完成' \
+            --header="$header" \
             --prompt='按 Enter 继续 > ' \
         > /dev/null
     else
@@ -249,9 +251,9 @@ menu_backup_restore() {
                 local t_idx=$(printf '%s\n' "${time_list[@]}" | tac | nl -w1 -s'|' | while IFS='|' read -r n t; do
                     echo "$n|$(basename "$t")|$t"
                 done | _fzf_menu "选择历史备份点")
-                [ -z "$t_idx" ] || [ "$t_idx" = "0" ] && continue
+                [ -z "$t_idx" ] || [ "$t_idx" = "0" ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
                 selected_time=$(printf '%s\n' "${time_list[@]}" | tac | sed -n "${t_idx}p")
-                [ -z "$selected_time" ] && continue
+                [ -z "$selected_time" ] && { echo -e "${RED}>> 无效的快照选择。${NC}"; _done; continue; }
 
                 # 2. 识别该时间点内包含的可恢复模块
                 declare -a mod_list
@@ -272,11 +274,11 @@ menu_backup_restore() {
                 else
                     selected_indices=($sel)
                 fi
-                [ ${#selected_indices[@]} -eq 0 ] && continue
+                [ ${#selected_indices[@]} -eq 0 ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
 
                 # 4. 选择还原模式
                 local r_type=$(printf "%s|%s|%s\n"                     "1" "物理还原" "直接复制备份文件到系统目录"                     "2" "Stow 还原" "覆盖仓库文件后重新建立软链接"                 | _fzf_menu "还原模式")
-                [[ ! "$r_type" =~ ^[12]$ ]] && continue
+                [[ ! "$r_type" =~ ^[12]$ ]] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
 
                 # 5. 循环执行还原操作
                 echo -e "\n${BLUE}>> 正在开始恢复任务...${NC}"
@@ -333,7 +335,7 @@ menu_backup_restore() {
                 local selected_time=""
 
                 case "$sync_src" in
-                    0) continue ;;
+                    0) echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue ;;
                     1)
                         if [ "$count" -eq 0 ]; then
                             echo -e "${RED}❌ 无历史备份！${NC}"
@@ -344,7 +346,7 @@ menu_backup_restore() {
                         local t_idx=$(printf '%s\n' "${time_list[@]}" | tac | nl -w1 -s'|' | while IFS='|' read -r n t; do
                             echo "$n|$(basename "$t")|$t"
                         done | _fzf_menu "选择历史备份点")
-                        [[ "$t_idx" == "0" || -z "$t_idx" ]] && continue
+                        [[ "$t_idx" == "0" || -z "$t_idx" ]] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
                         selected_time="${display_list[$((t_idx-1))]}"
                         ;;
                     2)
@@ -380,7 +382,7 @@ menu_backup_restore() {
                 else
                     selected_indices=($sel)
                 fi
-                [ ${#selected_indices[@]} -eq 0 ] && continue
+                [ ${#selected_indices[@]} -eq 0 ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
 
                 # 执行逆向同步
                 echo -e "\n${BLUE}>> 正在覆盖仓库...${NC}"
@@ -430,9 +432,11 @@ menu_backup_restore() {
             local last_snap=$(basename "${time_list[-1]}" | cut -d'_' -f1)
             
             local clean_type=$(printf "%s|%s|%s\n" "1" "按数量" "保留最近 N 个快照" "2" "按日期" "删除 N 天前的快照" | _fzf_menu "清理模式")
+            [ -z "$clean_type" ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
             
             if [ "$clean_type" = "1" ]; then
-                read -p "保留最近数量: " keep_count
+                read -p "保留最近数量 (回车取消): " keep_count
+                [ -z "$keep_count" ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
                 if [[ "$keep_count" =~ ^[0-9]+$ ]] && [ "$keep_count" -lt "$count" ]; then
                     local remove_count=$((count - keep_count))
                     for ((i=0; i<remove_count; i++)); do rm -rf "${time_list[i]}"; done
@@ -449,7 +453,8 @@ menu_backup_restore() {
                 local newest_days=$(( (now_sec - newest_sec) / 86400 ))
                 
                 echo -e "  ${PURPLE}💡 提示: 最旧快照距今 ${oldest_days} 天，最新快照距今 ${newest_days} 天。${NC}"
-                read -p "删除多少天之前的？: " days
+                read -p "删除多少天之前的？(回车取消): " days
+                [ -z "$days" ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
                 
                 if [[ "$days" =~ ^[0-9]+$ ]]; then
                     local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
@@ -474,6 +479,7 @@ menu_backup_restore() {
                 ;;
             *)
                 # 捕捉无效输入
+                echo -e "${YELLOW}>> 已取消。${NC}"
                 continue 
                 ;;
         esac
@@ -488,6 +494,7 @@ menu_sync_deploy() {
 
         case "$sub_mode" in
             1|2)
+                clear
                 echo -e "\n${BLUE}>> 正在部署配置...${NC}"
                 for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
                     [[ "$module" == "bash" ]] && continue
@@ -514,11 +521,18 @@ menu_sync_deploy() {
                     cp -aL "$DOTFILES_DIR/starship/.config/starship_base.toml" "$HOME/.config/by-mgr/templates/"
                     echo -e "  [📋 Template] starship_base.toml → by-mgr templates"
                 fi
+                # 同步 mako 模板到 by-mgr 本地模板库
+                if [ -f "$DOTFILES_DIR/mako/.config/mako/config_base" ]; then
+                    mkdir -p "$HOME/.config/by-mgr/templates"
+                    cp -aL "$DOTFILES_DIR/mako/.config/mako/config_base" "$HOME/.config/by-mgr/templates/"
+                    echo -e "  [📋 Template] mako/config_base → by-mgr templates"
+                fi
                 # 部署后重新生成配色
                 local WALLPAPER=$(swww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
                 [ -z "$WALLPAPER" ] && WALLPAPER=$(awww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
-                [ -n "$WALLPAPER" ] && [ -f "$HOME/.config/niri/scripts/theme-sync.sh" ] && bash "$HOME/.config/niri/scripts/theme-sync.sh" "$WALLPAPER"
+                [ -n "$WALLPAPER" ] && [ -f "$HOME/.config/niri/scripts/theme-sync.sh" ] && bash "$HOME/.config/niri/scripts/theme-sync.sh" "$WALLPAPER" > /dev/null 2>&1
                 echo -e "\n${GREEN}✅ 部署完成！${NC}"
+                clear
                 _done
                 ;;
             3)
@@ -549,7 +563,7 @@ menu_sync_deploy() {
                 _done
                 ;;
             0) return ;;
-            *) continue ;;
+            *) echo -e "${YELLOW}>> 已取消。${NC}"; continue ;;
         esac
     done
 }
@@ -560,6 +574,7 @@ ask_snapper_snapshot() {
     echo -e "\n${YELLOW}>> 正在检测系统环境与 Snapper 快照支持...${NC}"
     if command -v snapper &> /dev/null && [ "$(sudo ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
         echo -e "${CYAN}检测到 Snapper 已就绪。${NC}"
+        local snap_confirm=""
         [ "$(_fzf_confirm "是否在操作前创建系统快照？")" = "是" ] && snap_confirm=y
         if [[ "$snap_confirm" =~ ^[Yy]$ ]]; then
             _sudo_guard "Snapper 快照" || return
@@ -589,8 +604,8 @@ menu_dm_switcher() {
         1) target_dm="greetd"; dm_pkg="greetd"; extra_pkg="tuigreet" ;;
         2) target_dm="plasmalogin"; dm_pkg="plasma-login-manager"; extra_pkg="" ;;
         3) target_dm="gdm"; dm_pkg="gdm"; extra_pkg="" ;;
-        0) return ;;
-        *) return ;;
+        0) echo -e "${YELLOW}>> 已取消。${NC}"; return ;;
+        *) echo -e "${YELLOW}>> 已取消。${NC}"; return ;;
     esac
 
     ask_snapper_snapshot "DM切换"
@@ -762,6 +777,7 @@ menu_repo_manager() {
                 _done
                 ;;
             0) return ;;
+            *) echo -e "${YELLOW}>> 已取消。${NC}"; continue ;;
         esac
     done
 }
@@ -851,6 +867,7 @@ menu_system_config() {
             3) menu_default_editor ;;
             4) task_setup_plymouth ;;
             0) return ;;
+            *) echo -e "${YELLOW}>> 已取消。${NC}"; continue ;;
         esac
     done
 }
@@ -1204,6 +1221,10 @@ if [ $# -gt 0 ] && [[ "$1" != "--text" ]]; then
             mkdir -p "$HOME/.config/by-mgr/templates"
             cp -aL "$DOTFILES_DIR/starship/.config/starship_base.toml" "$HOME/.config/by-mgr/templates/"
         fi
+        if [ -f "$DOTFILES_DIR/mako/.config/mako/config_base" ]; then
+            mkdir -p "$HOME/.config/by-mgr/templates"
+            cp -aL "$DOTFILES_DIR/mako/.config/mako/config_base" "$HOME/.config/by-mgr/templates/"
+        fi
         local WALLPAPER=$(swww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
         [ -z "$WALLPAPER" ] && WALLPAPER=$(awww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
         [ -n "$WALLPAPER" ] && [ -f "$HOME/.config/niri/scripts/theme-sync.sh" ] && bash "$HOME/.config/niri/scripts/theme-sync.sh" "$WALLPAPER"
@@ -1270,6 +1291,6 @@ while true; do
         2) menu_sync_deploy ;;
         3) menu_system_config ;;
         0) echo -e "\n${GREEN}再见, ${USER}!${NC}\n"; exit 0 ;;
-        *) sleep 1 ;;
+        *) echo -e "\n${GREEN}再见, ${USER}!${NC}\n"; exit 0 ;; 
     esac
 done
