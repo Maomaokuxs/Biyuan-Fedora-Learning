@@ -1,23 +1,107 @@
 #!/bin/bash
-# 文件位置: scripts/theme-sync.sh
+# theme-sync.sh — 统一配色分发引擎
+#
+# 依赖: sudo dnf install -y hellwal kde-material-you-colors jq libnotify awww
+
+# 核心隔离：8 核以上锁到后半核心，避免抢 awww 渲染
+if [ "$(nproc)" -ge 8 ]; then
+    exec taskset -c $(( $(nproc) / 2 ))-$(( $(nproc) - 1 )) nice -n 19 ionice -c 3 bash "$0" "$@"
+fi
+
+# 调试模式: theme-sync.sh --debug <wallpaper>
+if [ "$1" = "--debug" ]; then DEBUG=true; shift; else DEBUG=false; fi
+_debug() { $DEBUG && echo "[DEBUG] $(date +%H:%M:%S) $*" >> /tmp/theme-sync-debug.log; }
+
+_debug "========== theme-sync START =========="
+_debug "PID=$$ ARG=$1"
+
 
 # ==========================================
-# 0. 环境感知与输入检查
+# 0. 壁纸检测：传入路径 > 自动检测 > 缓存兜底
 # ==========================================
-WALLPAPER=$(readlink -f "$1")
+detect_wallpaper() {
+    # KDE Plasma 环境下优先读 Plasma 配置
+    if pgrep -x plasmashell >/dev/null 2>&1; then
+        if [ -f "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" ]; then
+            local wp
+            wp=$(grep -Po '^Image=\K.*' "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" | head -1)
+            if [ -n "$wp" ]; then
+                wp="${wp#file://}"
+                wp="${wp#file:}"
+                [ -n "$wp" ] && [ -f "$wp" ] && echo "$wp" && return 0
+fi
+        fi
+    fi
+
+    # 方法1: waypaper 配置
+    if [ -f "$HOME/.config/waypaper/config.ini" ]; then
+        local wp
+        wp=$(grep -Po '^wallpaper\s*=\s*\K.*' "$HOME/.config/waypaper/config.ini" | head -1)
+        wp=$(eval echo "$wp" 2>/dev/null)
+        [ -n "$wp" ] && [ -f "$wp" ] && echo "$wp" && return 0
+    fi
+
+    # 方法2: KDE Plasma 配置（兼容 file:// 前缀，非 KDE 环境兜底）
+    if [ -f "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" ]; then
+        local wp
+        wp=$(grep -Po '^Image=\K.*' "$HOME/.config/plasma-org.kde.plasma.desktop-appletsrc" | head -1)
+        if [ -n "$wp" ]; then
+            wp="${wp#file://}"
+            wp="${wp#file:}"
+            [ -n "$wp" ] && [ -f "$wp" ] && echo "$wp" && return 0
+        fi
+    fi
+
+    # 方法3: 缓存兜底
+    if [ -f "$HOME/.cache/by-mgr/last-wallpaper" ]; then
+        local wp
+        wp=$(cat "$HOME/.cache/by-mgr/last-wallpaper")
+        [ -n "$wp" ] && [ -f "$wp" ] && echo "$wp" && return 0
+    fi
+
+    return 1
+}
+
+WALLPAPER=""
+if [ -n "$1" ] && [ -f "$1" ]; then
+    WALLPAPER=$(readlink -f "$1")
+    _debug "wallpaper arg provided: $1"
+else
+    echo ">> 未提供壁纸路径，尝试自动检测..."
+    WALLPAPER=$(detect_wallpaper)
+fi
+
 if [ -z "$WALLPAPER" ] || [ ! -f "$WALLPAPER" ]; then
-    echo -e "\033[0;31m❌ 错误: 未提供有效的壁纸路径。\033[0m"
-    echo "用法: $0 /路径/到/壁纸.png"
+    _debug "wallpaper detected: $WALLPAPER"
+    echo -e "\033[0;31m❌ 错误: 无法获取壁纸路径。\033[0m"
+    notify-send -i dialog-error "主题同步失败" "无法获取壁纸路径" -t 5000 2>/dev/null &
     exit 1
 fi
 
-# 检测当前是否运行在 Wayland 图形环境下
-if [ -n "$WAYLAND_DISPLAY" ]; then
+# 缓存壁纸路径，检测是否真正变更
+mkdir -p "$HOME/.cache/by-mgr"
+last_wp=$(cat "$HOME/.cache/by-mgr/last-wallpaper" 2>/dev/null)
+if [ "$WALLPAPER" == "$last_wp" ]; then
+    WALLPAPER_CHANGED=false
+else
+    WALLPAPER_CHANGED=true
+    echo "$WALLPAPER" > "$HOME/.cache/by-mgr/last-wallpaper"
+fi
+
+# 检测是否在 KDE Plasma 环境下（避免与 KDE 壁纸管理冲突）
+IN_KDE=false
+_debug "IN_KDE=$IN_KDE WAYLAND=$WAYLAND_DISPLAY"
+if pgrep -x plasmashell >/dev/null 2>&1; then
+    IN_KDE=true
+fi
+
+# Wayland 壁纸渲染：仅在非 KDE 环境下执行（KDE 自行管理壁纸）
+if [ -n "$WAYLAND_DISPLAY" ] && ! $IN_KDE; then
     if command -v awww &> /dev/null; then
         awww query &>/dev/null || awww init &>/dev/null
         awww img "$WALLPAPER" --transition-type grow --transition-pos center --transition-duration 2
     fi
-else
+elif ! $IN_KDE; then
     echo -e "\033[0;33mℹ️  检测到当前非 Wayland 图形环境，已跳过壁纸实时渲染。\033[0m"
 fi
 
@@ -26,6 +110,7 @@ fi
 # ==========================================
 echo ">> 正在分析壁纸色彩 (内存处理)..."
 JSON_DATA=$(hellwal -i "$WALLPAPER" -j)
+_debug "hellwal returned $(echo $JSON_DATA | wc -c) bytes"
 
 BG=$(echo "$JSON_DATA" | jq -r '.special.background // .colors.color0 // "#1e1e2e"')
 FG=$(echo "$JSON_DATA" | jq -r '.special.foreground // .colors.color15 // "#ffffff"')
@@ -41,7 +126,19 @@ if [[ ! "$BG" =~ ^# ]] || [[ ! "$ACCENT" =~ ^# ]]; then
 fi
 
 echo -e "\033[0;32m✨ 调色板生成成功！\033[0m"
+_debug "colors: BG=$BG FG=$FG ACCENT=$ACCENT MUTED=$MUTED"
 echo "   背景: $BG | 文字: $FG | 强调色: $ACCENT | 辅色: $MUTED"
+
+# 生成 KDE 配色方案
+if $IN_KDE && command -v kde-material-you-colors &>/dev/null; then
+    echo "🎨 正在应用 KDE Plasma Material You 配色..."
+    kde-material-you-colors -f "$WALLPAPER" 2>/dev/null &
+    _debug "kde-material-you-colors called"
+elif command -v kde-material-you-colors &>/dev/null; then
+    echo "🎨 正在生成 KDE 配色方案..."
+    kde-material-you-colors -f "$WALLPAPER" 2>/dev/null &
+    _debug "kde-material-you-colors (niri) called"
+fi
 
 # ==========================================
 # 2. 核心：生成全系统唯一的中央色彩数据库
@@ -118,6 +215,9 @@ padding=15
 margin=20
 font=JetBrainsMono Nerd Font 10
 default-timeout=5000
+
+[summary="本地系统消息服务"]
+invisible=1
 EOF
 echo "   ✔ Mako 配色 -> ~/.config/mako/config"
 
@@ -165,7 +265,30 @@ else
     echo "   ⚠️  未找到 starship_base.toml，跳过 Starship 配色"
 fi
 
-# --- H. Hyprlock (Fedora 独有) ---
+# --- H. Mako (通知配色) ---
+cat << EOF > "$TARGET_DIR/color-mako.conf"
+background-color=$BG
+text-color=$FG
+border-color=$MUTED
+progress-color=over $ACCENT
+EOF
+echo "   ✔ Mako 配色切片 -> $TARGET_DIR/color-mako.conf"
+
+MAKO_BASE=""
+if [ -f "$HOME/.config/mako/config_base" ]; then
+    MAKO_BASE="$HOME/.config/mako/config_base"
+elif [ -f "$HOME/.config/by-mgr/templates/config_base" ]; then
+    MAKO_BASE="$HOME/.config/by-mgr/templates/config_base"
+fi
+
+if [ -f "$MAKO_BASE" ]; then
+    cat "$MAKO_BASE" "$TARGET_DIR/color-mako.conf" > "$HOME/.config/mako/config"
+    echo "   ✔ Mako 配色 -> ~/.config/mako/config (模板拼接)"
+else
+    echo "   ⚠️  未找到 mako 模板，跳过 Mako 配色"
+fi
+
+# --- I. Hyprlock (Fedora 独有) ---
 mkdir -p ~/.config/hypr
 
 cat <<EOF > ~/.config/hypr/hyprlock.conf
@@ -253,9 +376,14 @@ if [ -n "$WAYLAND_DISPLAY" ]; then
 
     # 3. 信号弹方式重载 Waybar 和其他组件
     kill -USR1 $(pidof kitty) 2>/dev/null
+    _debug "waybar pid: $(pgrep -x waybar 2>/dev/null || echo none)"
     killall -SIGUSR2 waybar 2>/dev/null
+    _debug "waybar reload signal sent"
     
     echo -e "\033[0;32m🎉 桌面组件已刷新！\033[0m"
+    [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色更新完成" -t 3000 2>/dev/null &
+    _debug "notify-send: 配色更新完成"
 else
     echo -e "\033[0;33mℹ️  当前处于 TTY 环境，跳过进程热重载。\033[0m"
+    [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色文件已生成" -t 3000 2>/dev/null &
 fi
