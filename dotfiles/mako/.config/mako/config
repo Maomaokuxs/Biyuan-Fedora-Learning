@@ -1,0 +1,13 @@
+border-size=2
+border-radius=8
+padding=15
+margin=20
+font=JetBrainsMono Nerd Font 10
+default-timeout=5000
+
+[summary="本地系统消息服务"]
+invisible=1
+background-color=#21201d
+text-color=#ffffff
+border-color=#8d887b
+progress-color=over #929377
