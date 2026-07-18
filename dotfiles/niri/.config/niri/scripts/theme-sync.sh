@@ -265,7 +265,30 @@ else
     echo "   ⚠️  未找到 starship_base.toml，跳过 Starship 配色"
 fi
 
-# --- H. Hyprlock (Fedora 独有) ---
+# --- H. Mako (通知配色) ---
+cat << EOF > "$TARGET_DIR/color-mako.conf"
+background-color=$BG
+text-color=$FG
+border-color=$MUTED
+progress-color=over $ACCENT
+EOF
+echo "   ✔ Mako 配色切片 -> $TARGET_DIR/color-mako.conf"
+
+MAKO_BASE=""
+if [ -f "$HOME/.config/mako/config_base" ]; then
+    MAKO_BASE="$HOME/.config/mako/config_base"
+elif [ -f "$HOME/.config/by-mgr/templates/config_base" ]; then
+    MAKO_BASE="$HOME/.config/by-mgr/templates/config_base"
+fi
+
+if [ -f "$MAKO_BASE" ]; then
+    cat "$MAKO_BASE" "$TARGET_DIR/color-mako.conf" > "$HOME/.config/mako/config"
+    echo "   ✔ Mako 配色 -> ~/.config/mako/config (模板拼接)"
+else
+    echo "   ⚠️  未找到 mako 模板，跳过 Mako 配色"
+fi
+
+# --- I. Hyprlock (Fedora 独有) ---
 mkdir -p ~/.config/hypr
 
 cat <<EOF > ~/.config/hypr/hyprlock.conf
