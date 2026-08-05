@@ -123,6 +123,7 @@ setup_base() {
     # 包含了你指定的 JetBrains Mono, Noto Emoji, Noto CJK
     local pkgs=(
         dnf-plugins-core figlet git curl wget
+        fzf
         jetbrains-mono-fonts-all.noarch
         google-noto-emoji-fonts.noarch
         google-noto-sans-cjk-fonts.noarch
