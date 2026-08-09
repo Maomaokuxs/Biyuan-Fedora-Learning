@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+"""Minimal drop-in replacement for plasma-apply-colorscheme.
+
+Intended for use under non-KDE Wayland compositors (e.g. niri) where the
+real binary (shipped in the ~580MB plasma-workspace package) is not available.
+
+It replicates the useful behaviour of the original: reads a .colors scheme
+file and writes its Colors:/WM/KDE groups plus the active scheme name into
+~/.config/kdeglobals, then notifies running KDE/Qt applications through the
+org.kde.KGlobalSettings DBus signal so they repaint.
+"""
+
+import argparse
+import configparser
+import hashlib
+import os
+import subprocess
+import sys
+
+KDE_GLOBALS = os.path.expanduser("~/.config/kdeglobals")
+COLOR_SCHEMES = os.path.expanduser("~/.local/share/color-schemes")
+
+# Groups that belong to the color scheme and must be merged into kdeglobals
+# (mirrors the KDE applyScheme colorSetGroupList + WM + KDE).
+SCHEME_GROUPS = (
+    "Colors:Button",
+    "Colors:Complementary",
+    "Colors:Header",
+    "Colors:Header][Inactive",
+    "Colors:Selection",
+    "Colors:Tooltip",
+    "Colors:View",
+    "Colors:Window",
+    "ColorEffects:Disabled",
+    "ColorEffects:Inactive",
+    "WM",
+    "KDE",
+)
+
+
+def sha1_file(path: str) -> str:
+    h = hashlib.sha1()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def apply_scheme(scheme_path: str) -> str:
+    """Merge a .colors file into kdeglobals and return the scheme name."""
+    scheme_name = os.path.basename(scheme_path)
+    if scheme_name.endswith(".colors"):
+        scheme_name = scheme_name[: -len(".colors")]
+
+    src = configparser.ConfigParser(interpolation=None)
+    src.optionxform = str
+    src.read(scheme_path, encoding="utf-8")
+
+    dst = configparser.ConfigParser(interpolation=None)
+    dst.optionxform = str
+    if os.path.exists(KDE_GLOBALS):
+        dst.read(KDE_GLOBALS, encoding="utf-8")
+
+    # replace every targeted group with the new values (delete stale ones too)
+    for group in SCHEME_GROUPS:
+        if dst.has_section(group):
+            dst.remove_section(group)
+        if group in src:
+            dst.add_section(group)
+            for key, value in src.items(group):
+                dst.set(group, key, value)
+
+    if not dst.has_section("General"):
+        dst.add_section("General")
+    dst.set("General", "ColorScheme", scheme_name)
+    dst.set("General", "ColorSchemeHash", sha1_file(scheme_path))
+
+    os.makedirs(os.path.dirname(KDE_GLOBALS), exist_ok=True)
+    with open(KDE_GLOBALS, "w", encoding="utf-8") as f:
+        dst.write(f, space_around_delimiters=False)
+
+    return scheme_name
+
+
+def notify_kde():
+    """Send the KGlobalSettings PaletteChanged signal so apps repaint."""
+    try:
+        subprocess.run(
+            [
+                "dbus-send",
+                "--session",
+                "--type=signal",
+                "/KGlobalSettings",
+                "org.kde.KGlobalSettings.notifyChange",
+                "int32:0",
+                "int32:0",
+            ],
+            check=False,
+        )
+    except Exception:
+        pass
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Apply a Plasma color scheme")
+    parser.add_argument("scheme", nargs="?", default=None)
+    parser.add_argument("-l", "--list-schemes", action="store_true")
+    parser.add_argument("-a", "--accent-color", default=None)
+    args = parser.parse_args()
+
+    if args.list_schemes:
+        for name in sorted(n for n in os.listdir(COLOR_SCHEMES) if n.endswith(".colors")):
+            print(name)
+        return 0
+
+    if not args.scheme:
+        parser.print_help()
+        return 1
+
+    # mirror original: passing a full path uses only the last part
+    scheme = args.scheme.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+    if scheme.endswith(".colors"):
+        scheme = scheme[: -len(".colors")]
+
+    path = os.path.join(COLOR_SCHEMES, scheme + ".colors")
+    if not os.path.exists(path):
+        print(f"Could not find theme {scheme}", file=sys.stderr)
+        return 1
+
+    name = apply_scheme(path)
+    notify_kde()
+    print(f"Successfully applied the color scheme {name}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -52,8 +52,15 @@ install_desktop_niri() {
     sudo dnf copr enable -y ackerman/nexus
 
     # 启用 KDE Material You 配色仓库 (theme-sync 依赖)
-    echo -e "${CYAN}>> Enabling kde-material-you-colors COPR repository...${NC}"
-    sudo dnf copr enable -y luisbocanegra/kde-material-you-colors
+    # 注: kde-material-you-colors 官方发布在 openSUSE Build Service (OBS),
+    #      luisbocanegra/kde-material-you-colors COPR 可能不存在, 以 OBS repofile 为准。
+    # 保留原 COPR 启用可见 (仅注释, 不删减):
+    # sudo dnf copr enable -y luisbocanegra/kde-material-you-colors
+    echo -e "${CYAN}>> Enabling kde-material-you-colors OBS repository...${NC}"
+    sudo dnf config-manager addrepo \
+        --from-repofile=https://download.opensuse.org/repositories/home:luisbocanegra/Fedora_44/home:luisbocanegra.repo || \
+        dnf config-manager --add-repo \
+        https://download.opensuse.org/repositories/home:luisbocanegra/Fedora_44/home:luisbocanegra.repo
 
     # 3. 执行补全安装
     # 核心：niri (窗口管理器), waybar (状态栏), rofi-wayland (启动器)
@@ -78,6 +85,14 @@ install_desktop_niri() {
     echo -e "${YELLOW}>> Deploying Niri ecosystem components...${NC}"
     # 使用 --skip-unavailable 增强容错性
     sudo dnf install -y "${niri_pkgs[@]}" --skip-unavailable
+
+    # --- 4.1 KDE/Qt 配色读取基石: plasma-integration ---
+    # 提供 Qt6 的 KDE plasma 平台主题 (KDEPlasmaPlatformTheme6.so),
+    # 让 Dolphin 在内的所有 KDE/Qt 应用读取 ~/.config/kdeglobals 里 [Colors:*] 的配色。
+    # 必须 --setopt=install_weak_deps=False, 否则 dnf 默认会连带安装整套
+    # plasma-desktop / plasma-workspace / kwin / ibus / vlc (= 整个 KDE)。
+    echo -e "${YELLOW}>> Installing plasma-integration (KDE/Qt color scheme bridge)...${NC}"
+    sudo dnf install -y --setopt=install_weak_deps=False plasma-integration
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
     
@@ -181,7 +196,7 @@ install_desktop_niri() {
         # 1. 部署 by-mgr 工具
         cp "$REPO_DIR/scripts/by-mgr" "$BIN_DIR/by-mgr"
         chmod +x "$BIN_DIR/by-mgr"
-        
+
         # 定义配置文件路径
         local BASH_RC="$HOME/.bashrc"
         local ZSH_RC="$HOME/.zshrc"
