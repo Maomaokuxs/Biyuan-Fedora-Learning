@@ -8,6 +8,11 @@ It replicates the useful behaviour of the original: reads a .colors scheme
 file and writes its Colors:/WM/KDE groups plus the active scheme name into
 ~/.config/kdeglobals, then notifies running KDE/Qt applications through the
 org.kde.KGlobalSettings DBus signal so they repaint.
+
+When the real binary from plasma-workspace is present, this script hands off
+to it immediately: ~/.local/bin shadows /usr/bin in PATH, and only the real
+implementation writes the full set of [Colors:*][Active/Inactive/Disabled]
+variant groups, so using the fallback directly would reset the KDE theme.
 """
 
 import argparse
@@ -16,6 +21,10 @@ import hashlib
 import os
 import subprocess
 import sys
+
+REAL_BINARY = "/usr/bin/plasma-apply-colorscheme"
+if os.path.isfile(REAL_BINARY):
+    os.execv(REAL_BINARY, [REAL_BINARY] + sys.argv[1:])
 
 KDE_GLOBALS = os.path.expanduser("~/.config/kdeglobals")
 COLOR_SCHEMES = os.path.expanduser("~/.local/share/color-schemes")
