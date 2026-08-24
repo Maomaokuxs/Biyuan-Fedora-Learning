@@ -2,9 +2,9 @@
 
 - 这是一个为满足自己分享欲并在学习中总结而建立的仓库，当作参考使用，且中内容目的是解决我当前的问题和论坛上看到的一些问题，早期的内容目录结构并不是很完善，文章标题就已经写明了相关问题，方便查看，后续会有所改善。
 
-- 现在主仓库中的是我使用的配置文件，通常适用于最小化安装的 Fedora GNU/Linux 操作系统，主要是 niri，如果有其他桌面环境也可以尝试使用，因为我使用了极简的窗口管理器，暂时会禁用掉你的 Sddm 或者 Gnome 其他的也有 Kde 和 Gnome 可供选择。
+- 现在主仓库中的是我使用的配置文件，通常适用于最小化安装的 Fedora GNU/Linux 操作系统，主要是 Niri 和 KDE 桌面环境，如果有其他桌面环境也可以尝试使用，因为我使用了极简的登录管理器，如果在安装前有其他登录管理器可以跳过安装。
 
-- 对于使用 Fedora 新手可以先看一下这一部分[建议](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki/%E4%BD%BF%E7%94%A8fedora%E7%9A%84%E5%BB%BA%E8%AE%AE)。
+- 对于使用 Fedora 的新手朋友可以先看一下这一部分[建议](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki/%E4%BD%BF%E7%94%A8fedora%E7%9A%84%E5%BB%BA%E8%AE%AE)。
 
 - 请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki)页面查看。
 
@@ -16,7 +16,9 @@
 
 ## 说明
 
-曾经我安装过许多的发行版，我觉得选择发行版确实是一件比较重要的事，我现在已经习惯了使用 Fedora ，最初我都喜欢接受默认，如今倒也开始使用窗口管理器，不知道是不是使用了 Linux 就喜欢简单些，去深究这些功能是怎么实现的，当然我至今依旧是小白，这些脚本是在 AI 的帮助下完成的，由我提出想法经由 AI 去完成，不得不说 Gemini 确实很强，但是 WIKI 中的内容重要的部分是参照其他的帖子然后自己尝试写下的可行方案，如今为了想要体验 niri 的用户分享我的配置文件。
+曾经我安装过许多的发行版，我觉得选择发行版确实是一件比较重要的事，我现在已经习惯了使用 Fedora GNU/Linux，最初我都喜欢接受默认，如今倒也开始使用窗口管理器，不知道是不是使用了 Linux 就喜欢简单些，去深究这些功能是怎么实现的，当然我至今依旧是小白，这些脚本是在 AI 的帮助下完成的，由我提出想法经由 AI 去完成，不得不说 Gemini 确实很强，现在主要是 Opencode 配合 Deepseek 使用 。
+
+WIKI 中的内容重要的部分是参照其他的帖子然后自己尝试写下的可行方案，如今为了想要体验 Niri 的用户分享我的配置文件。
 
 ## 桌面环境截图
 
@@ -117,3 +119,37 @@ Biyuan-Fedora-Learning/
     ├── color-kitty.conf         # Kitty 配色 (含 16 色)
     └── color-starship.toml      # Starship palette 切片
 ```
+
+## 涉及到的部分软件包
+
+- [snapper](https://github.com/openSUSE/snapper)
+- [Btrfs-Assistant](https://gitlab.com/btrfs-assistant/btrfs-assistant)
+- [grub-btrfs](https://github.com/Antynea/grub-btrfs)
+- [dnf5-autosnapper](https://github.com/douglascdev/dnf5-autosnapper)
+- [niri](https://github.com/niri-wm/niri)
+- [waybar](https://github.com/alexays/waybar)
+- [rofi-wayland](https://github.com/in0ni/rofi-wayland)
+- [stow](https://github.com/aspiers/stow)
+- [fzf](https://github.com/junegunn/fzf)
+- [kitty](https://github.com/kovidgoyal/kitty)
+- [fastfetch](https://github.com/fastfetch-cli/fastfetch)
+- [gwenview](https://github.com/kde/gwenview)
+- [hellwal](https://github.com/danihek/hellwal)
+- [waypaper](https://github.com/anufrievroman/waypaper)
+- [starship](https://github.com/starship/starship)
+- [hyprlock](https://github.com/hyprwm/hyprlock)
+- [mako](https://github.com/emersion/mako)
+- [fcitx5](https://github.com/fcitx/fcitx5)
+- [cava](https://github.com/karlstav/cava)
+- [dolphin](https://github.com/kde/dolphin)
+- [blueman](https://github.com/blueman-project/blueman)
+- [btop](https://github.com/aristocratos/btop)
+- [kate](https://github.com/kde/kate)
+- [ddcutil](https://github.com/rockowitz/ddcutil)
+- [nmtui](https://github.com/vimlinuz/nmtui)
+- [kwallet](https://github.com/KDE/kwallet)
+- [ncdu](https://github.com/rofl0r/ncdu)
+- [ranger](https://github.com/ranger/ranger)
+- [kde-material-you-colors](https://github.com/luisbocanegra/kde-material-you-colors)
+- [playerctl](https://github.com/altdesktop/playerctl)
+- [brightnessctl](https://github.com/Hummer12007/brightnessctl)
