@@ -37,7 +37,7 @@ fi
     if [ -f "$HOME/.config/waypaper/config.ini" ]; then
         local wp
         wp=$(grep -Po '^wallpaper\s*=\s*\K.*' "$HOME/.config/waypaper/config.ini" | head -1)
-        wp=$(eval echo "$wp" 2>/dev/null)
+        wp="${wp/#\~/$HOME}"   # 仅展开 ~，不用 eval（防止文件名含 & 等元字符被截断）
         [ -n "$wp" ] && [ -f "$wp" ] && echo "$wp" && return 0
     fi
 
@@ -73,7 +73,7 @@ fi
 
 if [ -z "$WALLPAPER" ] || [ ! -f "$WALLPAPER" ]; then
     _debug "wallpaper detected: $WALLPAPER"
-    echo -e "\033[0;31m❌ 错误: 无法获取壁纸路径。\033[0m"
+    echo -e "\033[0;31m错误: 无法获取壁纸路径。\033[0m"
     notify-send -i dialog-error "主题同步失败" "无法获取壁纸路径" -t 5000 2>/dev/null &
     exit 1
 fi
@@ -102,15 +102,41 @@ if [ -n "$WAYLAND_DISPLAY" ] && ! $IN_KDE; then
         awww img "$WALLPAPER" --transition-type grow --transition-pos center --transition-duration 2
     fi
 elif ! $IN_KDE; then
-    echo -e "\033[0;33mℹ️  检测到当前非 Wayland 图形环境，已跳过壁纸实时渲染。\033[0m"
+    echo -e "\033[0;33m检测到当前非 Wayland 图形环境，已跳过壁纸实时渲染。\033[0m"
 fi
 
 # ==========================================
 # 1. 内存取色与拦截兜底
 # ==========================================
 echo ">> 正在分析壁纸色彩 (内存处理)..."
-JSON_DATA=$(hellwal -i "$WALLPAPER" -j)
+# hellwal 内置 stb 解码器不支持 webp/avif 等格式，先统一转码为 png 副本再取色
+HELLWAL_SRC="$WALLPAPER"
+TMP_PNG=""
+case "${WALLPAPER,,}" in
+    *.png|*.jpg|*.jpeg|*.bmp|*.tga|*.gif) : ;;
+    *)
+        TMP_PNG=$(mktemp /tmp/by-mgr-XXXXXX.png)
+        # ffmpeg 解码 webp/avif 又快又稳；magick 对某些 8K VP8 会卡死，仅作兜底且限时
+        if command -v ffmpeg &>/dev/null && timeout 30 ffmpeg -y -loglevel error -i "$WALLPAPER" -frames:v 1 "$TMP_PNG" 2>/dev/null && [ -s "$TMP_PNG" ]; then
+            HELLWAL_SRC="$TMP_PNG"
+            _debug "converted to png via ffmpeg: $TMP_PNG"
+        elif command -v magick &>/dev/null && timeout 60 magick "$WALLPAPER" "$TMP_PNG" 2>/dev/null && [ -s "$TMP_PNG" ]; then
+            HELLWAL_SRC="$TMP_PNG"
+            _debug "converted to png via magick: $TMP_PNG"
+        else
+            rm -f "$TMP_PNG"; TMP_PNG=""
+        fi ;;
+esac
+
+JSON_DATA=$(hellwal -i "$HELLWAL_SRC" -j 2>/dev/null)
 _debug "hellwal returned $(echo $JSON_DATA | wc -c) bytes"
+[ -n "$TMP_PNG" ] && rm -f "$TMP_PNG"
+
+if [ -z "$JSON_DATA" ]; then
+    echo -e "\033[0;31mhellwal 无法解析该壁纸（格式不支持或文件损坏），已保留原配色。\033[0m"
+    notify-send -i dialog-error "主题同步失败" "hellwal 无法解析: $(basename "$WALLPAPER")" -t 5000 2>/dev/null &
+    exit 1
+fi
 
 BG=$(echo "$JSON_DATA" | jq -r '.special.background // .colors.color0 // "#1e1e2e"')
 FG=$(echo "$JSON_DATA" | jq -r '.special.foreground // .colors.color15 // "#ffffff"')
@@ -121,29 +147,29 @@ MUTED=$(echo "$JSON_DATA" | jq -r '.colors.color8 // .colors.color0 // "#45475a"
 [[ "$BG" == "#000000" || "$BG" == "#111111" ]] && BG="#1e1e2e"
 
 if [[ ! "$BG" =~ ^# ]] || [[ ! "$ACCENT" =~ ^# ]]; then
-    echo -e "\033[0;31m❌ 提取颜色失败。\033[0m"
+    echo -e "\033[0;31m提取颜色失败。\033[0m"
     exit 1
 fi
 
-echo -e "\033[0;32m✨ 调色板生成成功！\033[0m"
+echo -e "\033[0;32m调色板生成成功！\033[0m"
 _debug "colors: BG=$BG FG=$FG ACCENT=$ACCENT MUTED=$MUTED"
 echo "   背景: $BG | 文字: $FG | 强调色: $ACCENT | 辅色: $MUTED"
 
 # 生成 KDE 配色方案
 if $IN_KDE && command -v kde-material-you-colors &>/dev/null; then
-    echo "🎨 正在应用 KDE Plasma Material You 配色..."
-    kde-material-you-colors -f "$WALLPAPER" 2>/dev/null &
+    echo "正在应用 KDE Plasma Material You 配色..."
+    kde-material-you-colors -f "$WALLPAPER" >/dev/null 2>&1 &
     _debug "kde-material-you-colors called"
 elif command -v kde-material-you-colors &>/dev/null; then
-    echo "🎨 正在生成 KDE 配色方案..."
-    kde-material-you-colors -f "$WALLPAPER" 2>/dev/null &
+    echo "正在生成 KDE 配色方案..."
+    kde-material-you-colors -f "$WALLPAPER" >/dev/null 2>&1 &
     _debug "kde-material-you-colors (niri) called"
 fi
 
 # ==========================================
 # 2. 核心：生成全系统唯一的中央色彩数据库
 # ==========================================
-echo "💾 正在固化中央色彩数据库 -> global-palette.env"
+echo "正在固化中央色彩数据库 -> global-palette.env"
 TARGET_DIR="$HOME/.cache/by-mgr/hellwal"
 mkdir -p "$TARGET_DIR"
 PALETTE_FILE="$TARGET_DIR/global-palette.env"
@@ -156,12 +182,12 @@ echo "$JSON_DATA" | jq -r --arg bg "$BG" --arg fg "$FG" --arg acc "$ACCENT" --ar
   (.colors | to_entries[] | "\(.key | ascii_upcase)=\"\(.value)\"")
 ' > "$PALETTE_FILE"
 
-echo "   ✔ 中央色彩数据库 -> $PALETTE_FILE"
+echo "   中央色彩数据库 -> $PALETTE_FILE"
 
 # ==========================================
 # 3. 分发：将唯一数据源映射到各应用配置文件
 # ==========================================
-echo "🏭 正在为各应用分发色彩配置..."
+echo "正在为各应用分发色彩配置..."
 source "$PALETTE_FILE"
 
 # --- A. Niri (color-niri.kdl) ---
@@ -173,7 +199,7 @@ layout {
     }
 }
 EOF
-echo "   ✔ Niri 配色 -> $TARGET_DIR/color-niri.kdl"
+echo "   Niri 配色 -> $TARGET_DIR/color-niri.kdl"
 
 # --- B. Waybar (color-waybar.css) ---
 cat <<EOF > "$TARGET_DIR/color-waybar.css"
@@ -182,13 +208,13 @@ cat <<EOF > "$TARGET_DIR/color-waybar.css"
 @define-color accent $ACCENT;
 @define-color muted $MUTED;
 EOF
-echo "   ✔ Waybar 配色 -> $TARGET_DIR/color-waybar.css"
+echo "   Waybar 配色 -> $TARGET_DIR/color-waybar.css"
 
 # --- C. Rofi (color-rofi.rasi) ---
 cat <<EOF > "$TARGET_DIR/color-rofi.rasi"
 * { bg: $BG; fg: $FG; accent: $ACCENT; muted: $MUTED; }
 EOF
-echo "   ✔ Rofi 配色 -> $TARGET_DIR/color-rofi.rasi"
+echo "   Rofi 配色 -> $TARGET_DIR/color-rofi.rasi"
 
 # --- D. Cava (Fedora 独有) ---
 mkdir -p ~/.config/cava
@@ -200,7 +226,7 @@ source = auto
 background = '$BG'
 foreground = '$ACCENT'
 EOF
-echo "   ✔ Cava 配色 -> ~/.config/cava/config"
+echo "   Cava 配色 -> ~/.config/cava/config"
 
 # --- E. Mako (Fedora 独有) ---
 mkdir -p ~/.config/mako
@@ -219,7 +245,7 @@ default-timeout=5000
 [summary="本地系统消息服务"]
 invisible=1
 EOF
-echo "   ✔ Mako 配色 -> ~/.config/mako/config"
+echo "   Mako 配色 -> ~/.config/mako/config"
 
 # --- F. Neovim (Fedora 独有) ---
 mkdir -p ~/.config/nvim/lua/utils
@@ -228,10 +254,10 @@ local M = {}
 M.bg = "$BG"; M.fg = "$FG"; M.accent = "$ACCENT"; M.muted = "$MUTED"
 return M
 EOF
-echo "   ✔ Neovim 配色 -> ~/.config/nvim/lua/utils/theme_colors.lua"
+echo "   Neovim 配色 -> ~/.config/nvim/lua/utils/theme_colors.lua"
 
 # --- G. Starship (归档至中央缓存) ---
-echo "🏭 正在为 Starship 分发色彩切片..."
+echo "正在为 Starship 分发色彩切片..."
 
 cat << EOF > "$TARGET_DIR/color-starship.toml"
 [palettes.hellwal]
@@ -260,9 +286,9 @@ fi
 
 if [ -f "$STARSHIP_BASE" ]; then
     cat "$STARSHIP_BASE" "$TARGET_DIR/color-starship.toml" > "$HOME/.config/starship.toml"
-    echo "   ✔ Starship 配色 -> ~/.config/starship.toml (模板拼接)"
+    echo "   Starship 配色 -> ~/.config/starship.toml (模板拼接)"
 else
-    echo "   ⚠️  未找到 starship_base.toml，跳过 Starship 配色"
+    echo "   未找到 starship_base.toml，跳过 Starship 配色"
 fi
 
 # --- H. Mako (通知配色) ---
@@ -272,7 +298,7 @@ text-color=$FG
 border-color=$MUTED
 progress-color=over $ACCENT
 EOF
-echo "   ✔ Mako 配色切片 -> $TARGET_DIR/color-mako.conf"
+echo "   Mako 配色切片 -> $TARGET_DIR/color-mako.conf"
 
 MAKO_BASE=""
 if [ -f "$HOME/.config/mako/config_base" ]; then
@@ -283,9 +309,9 @@ fi
 
 if [ -f "$MAKO_BASE" ]; then
     cat "$MAKO_BASE" "$TARGET_DIR/color-mako.conf" > "$HOME/.config/mako/config"
-    echo "   ✔ Mako 配色 -> ~/.config/mako/config (模板拼接)"
+    echo "   Mako 配色 -> ~/.config/mako/config (模板拼接)"
 else
-    echo "   ⚠️  未找到 mako 模板，跳过 Mako 配色"
+    echo "   未找到 mako 模板，跳过 Mako 配色"
 fi
 
 # --- I. Hyprlock (Fedora 独有) ---
@@ -345,7 +371,7 @@ label {
     valign = bottom
 }
 EOF
-echo "   ✔ Hyprlock 配色 -> ~/.config/hypr/hyprlock.conf"
+echo "   Hyprlock 配色 -> ~/.config/hypr/hyprlock.conf"
 
 # --- I. Kitty (color-kitty.conf) ---
 cat <<EOF > "$TARGET_DIR/color-kitty.conf"
@@ -358,7 +384,7 @@ selection_background $ACCENT
 EOF
 
 echo "$JSON_DATA" | jq -r '.colors | to_entries[] | "\(.key) \(.value)"' >> "$TARGET_DIR/color-kitty.conf"
-echo "   ✔ Kitty 配色 -> $TARGET_DIR/color-kitty.conf"
+echo "   Kitty 配色 -> $TARGET_DIR/color-kitty.conf"
 
 # ==========================================
 # 4. 信号弹：强制引发热重载
@@ -371,7 +397,7 @@ if [ -n "$WAYLAND_DISPLAY" ]; then
     
     # 2. 重载 Kitty（如果正在运行）
     if command -v kitty &> /dev/null && pgrep -x kitty > /dev/null; then
-        kitty @ load-config 2>/dev/null && echo "   ✔ Kitty 配置已重载"
+        kitty @ load-config 2>/dev/null && echo "   Kitty 配置已重载"
     fi
 
     # 3. 信号弹方式重载 Waybar 和其他组件
@@ -380,10 +406,10 @@ if [ -n "$WAYLAND_DISPLAY" ]; then
     killall -SIGUSR2 waybar 2>/dev/null
     _debug "waybar reload signal sent"
     
-    echo -e "\033[0;32m🎉 桌面组件已刷新！\033[0m"
+    echo -e "\033[0;32m桌面组件已刷新！\033[0m"
     [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色更新完成" -t 3000 2>/dev/null &
     _debug "notify-send: 配色更新完成"
 else
-    echo -e "\033[0;33mℹ️  当前处于 TTY 环境，跳过进程热重载。\033[0m"
+    echo -e "\033[0;33m当前处于 TTY 环境，跳过进程热重载。\033[0m"
     [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色文件已生成" -t 3000 2>/dev/null &
 fi
