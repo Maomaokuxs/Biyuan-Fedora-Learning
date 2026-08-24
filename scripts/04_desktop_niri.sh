@@ -71,7 +71,7 @@ install_desktop_niri() {
     
     local niri_pkgs=(
         niri waybar rofi-wayland stow unzip kitty 
-        fastfetch jq ImageMagick awww hellwal 
+        fastfetch jq awww hellwal 
         waypaper starship hyprlock hypridle 
         gpu-screen-recorder libnotify mako 
         fcitx5 fcitx5-chinese-addons 
