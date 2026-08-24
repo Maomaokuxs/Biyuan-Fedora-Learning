@@ -3,17 +3,24 @@
 #
 # 依赖: sudo dnf install -y hellwal kde-material-you-colors jq libnotify awww
 
-# 核心隔离：8 核以上锁到后半核心，避免抢 awww 渲染
-if [ "$(nproc)" -ge 8 ]; then
-    exec taskset -c $(( $(nproc) / 2 ))-$(( $(nproc) - 1 )) nice -n 19 ionice -c 3 bash "$0" "$@"
-fi
+# 优先级隔离：最低 CPU/IO 优先级，避免取色抢占 awww 渲染（不锁核，交给调度器）
+exec nice -n 19 ionice -c 3 bash "$0" "$@"
 
-# 调试模式: theme-sync.sh --debug <wallpaper>
-if [ "$1" = "--debug" ]; then DEBUG=true; shift; else DEBUG=false; fi
+# 用法: theme-sync.sh [--debug] [--no-render] [wallpaper]
+# --no-render: 调用方（如 waypaper）已自行渲染壁纸时，跳过 awww 切换动画，仅同步配色
+DEBUG=false; NO_RENDER=false; WALLPAPER_ARG=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --debug)     DEBUG=true ;;
+        --no-render) NO_RENDER=true ;;
+        *)           WALLPAPER_ARG="$1" ;;
+    esac
+    shift
+done
 _debug() { $DEBUG && echo "[DEBUG] $(date +%H:%M:%S) $*" >> /tmp/theme-sync-debug.log; }
 
 _debug "========== theme-sync START =========="
-_debug "PID=$$ ARG=$1"
+_debug "PID=$$ ARG=$WALLPAPER_ARG NO_RENDER=$NO_RENDER"
 
 
 # ==========================================
@@ -63,9 +70,9 @@ fi
 }
 
 WALLPAPER=""
-if [ -n "$1" ] && [ -f "$1" ]; then
-    WALLPAPER=$(readlink -f "$1")
-    _debug "wallpaper arg provided: $1"
+if [ -n "$WALLPAPER_ARG" ] && [ -f "$WALLPAPER_ARG" ]; then
+    WALLPAPER=$(readlink -f "$WALLPAPER_ARG")
+    _debug "wallpaper arg provided: $WALLPAPER_ARG"
 else
     echo ">> 未提供壁纸路径，尝试自动检测..."
     WALLPAPER=$(detect_wallpaper)
@@ -95,12 +102,15 @@ if pgrep -x plasmashell >/dev/null 2>&1; then
     IN_KDE=true
 fi
 
-# Wayland 壁纸渲染：仅在非 KDE 环境下执行（KDE 自行管理壁纸）
-if [ -n "$WAYLAND_DISPLAY" ] && ! $IN_KDE; then
+# Wayland 壁纸渲染：仅在非 KDE 环境且调用方未自行渲染时执行
+if [ -n "$WAYLAND_DISPLAY" ] && ! $IN_KDE && ! $NO_RENDER; then
     if command -v awww &> /dev/null; then
         awww query &>/dev/null || awww init &>/dev/null
-        awww img "$WALLPAPER" --transition-type grow --transition-pos center --transition-duration 2
+        awww img "$WALLPAPER" --transition-type random --transition-pos center --transition-duration 2
     fi
+elif $NO_RENDER; then
+    echo ">> 调用方已渲染壁纸，跳过切换动画（仅同步配色）"
+    _debug "render skipped by --no-render"
 elif ! $IN_KDE; then
     echo -e "\033[0;33m检测到当前非 Wayland 图形环境，已跳过壁纸实时渲染。\033[0m"
 fi
@@ -323,7 +333,7 @@ cat <<EOF > ~/.config/hypr/hyprlock.conf
 # 1. 背景：使用当前壁纸，并加上高级的毛玻璃模糊效果
 background {
     monitor =
-    path = $WALLPAPER
+    path = "$WALLPAPER"
     blur_passes = 3
     blur_size = 8
 }
