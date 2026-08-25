@@ -1,4 +1,4 @@
-/* * Waybar 终极整合版：流光胶囊仪表盘
+/* * Waybar 等宽终端 HUD 风 · 圆角色块版
  * 适配 Niri 桌面环境 & Hellwal 动态配色
  * 维护者: Biyuan
  */
@@ -6,92 +6,140 @@
 /* --- 1. 引入 Hellwal 生成的颜色变量 --- */
 @import url("../../.cache/by-mgr/hellwal/color-waybar.css");
 
-/* --- 2. 全局基础设置 --- */
+/* --- 2. 全局基础设置：等宽字体，适配色块比例 --- */
+/* 与 kitty 终端保持同源：图标由 JetBrainsMono Nerd Font 渲染 */
 * {
-    font-family: "Iosevka Nerd Font", "JetBrainsMono Nerd Font";
-    font-size: 14px;
+    font-family: "JetBrainsMono Nerd Font", "Iosevka Nerd Font";
+    font-size: 13px;
     min-height: 0;
 }
 
 window#waybar {
-    background-color: @bg; /* 使用 Hellwal 提取的安全底色 */
-    color: @fg;            /* 全局文字颜色 */
-    border-bottom: 2px solid @muted; /* 底部暗线过渡，增加立体感 */
-    transition: all 0.5s ease-in-out;
+    background-color: @bg;
+    color: @fg;
 }
 
-/* --- 3. 通用胶囊模块样式 (核心对齐逻辑) --- */
-/* 统一所有模块的高度、圆角和背景，确保横向排布一致 */
-#cpu, 
+/* --- 3. 通用色块样式 (核心)：内缩圆角矩形、按组配色 --- */
+/* 几何：32px 色块悬浮于 45px 栏内，上下留 5px 呼吸位 */
+#cpu,
 #memory,
 #bluetooth,
-#pulseaudio, 
-#network, 
+#pulseaudio,
+#network,
 #clock,
 #battery,
 #tray,
 #custom-backlight,
-#custom-fcitx, 
+#custom-fcitx,
 #custom-updates,
 #custom-weather,
 #custom-cava,
 #custom-launcher,
 #custom-music,
-#custom-music.playing,
 #custom-recorder,
-#custom-power{
-    padding: 0 8px;
-    margin: 4px 1px;         /* 上下 4px 留白，左右 1px 间距 */
-    min-height: 28px;        /* 28px + 4px*2 = 36px，完美填充 Waybar */
-    border-radius: 15px;     /* 彻底圆角化，形成胶囊状 */
-    background-color: rgba(255, 255, 255, 0.05); /* 微弱透明背景 */
-    box-shadow: inset 0 -2px 0 0 rgba(255, 255, 255, 0.1); /* 内部阴影增加质感 */
-    transition: background-color 0.3s ease;
+#custom-power {
+    padding: 0 10px;
+    margin: 5px 2px;
+    min-height: 28px;
+    border-radius: 9px;
+    border: none;
+    background-color: @accent; /* 默认：橄榄色（信息组） */
+    color: @fg;
+    transition: all 0.15s ease-out;
 }
 
-/* --- 4. 左侧启动器：Rofi 入口 --- */
+/* --- 4. 分组配色：让功能分区一目了然 --- */
+
+/* 几何校正：时钟/启动器为大字符标签，固定高度下基线易偏移，
+   改为对称内边距自居中，总高仍与 32px 色块带对齐 */
+#clock {
+    padding: 0 10px;
+}
+
 #custom-launcher {
-    background-color: transparent; /* 启动器保持简洁 */
-    box-shadow: none;
-    font-size: 30px;
-    text-shadow: 0px 0px 5px @accent;
-    color: @accent;
-    padding-right: 0px;
-    margin-left: 0px;
+    font-size: 16px;
+    padding: 0 10px;
 }
 
-/* --- 5. 弹性几何工作区指示器 (Workspace) --- */
+
+/* 系统监控组：亮一档的橄榄 */
+#cpu,
+#memory,
+#battery,
+#custom-backlight {
+    background-color: mix(@accent, @fg, 0.14);
+}
+
+/* 连接与设备组：暖砖红 */
+#network,
+#bluetooth,
+#pulseaudio {
+    background-color: shade(@muted, 1.15);
+}
+
+/* 媒体组：橄榄与砖红的中间土色 */
+#custom-cava,
+#custom-music.playing {
+    background-color: mix(@accent, @muted, 0.5);
+}
+
+/* 时间锚点：全栏最亮的反色块 */
+#clock {
+    color: @bg;
+    background-color: @fg;
+    font-weight: bold;
+}
+
+/* 框架按钮：半透明暗块，衬托中间的实色模块 */
+#custom-launcher,
+#custom-power {
+    background-color: alpha(@muted, 0.75);
+}
+
+/* 空闲态：低饱和暗淡块 */
+#custom-updates.uptodate,
+#custom-recorder.stopped,
+#custom-music.paused {
+    background-color: alpha(@muted, 0.8);
+    color: alpha(@fg, 0.75);
+}
+
+/* --- 5. 左侧启动器：Rofi 入口 --- */
+#custom-launcher {
+    margin-left: 4px;
+}
+
+/* --- 6. 弹性工作区指示器 (Workspace) --- */
 #workspaces {
     background: transparent;
-    margin: 0 5px;
+    margin: 0 4px;
     padding: 0;
 }
 
 #workspaces button {
-    /* 1. 基础状态：极简细线 */
+    /* 基础状态：暗色小方块，居中于 42px 栏 */
     padding: 0px;
-    margin: 15px 4px;      /* 调整 margin 使 6px 的线条精准居中 (15+6+15=36) */
-    min-width: 15px;
-    min-height: 6px;       /* 初始线条厚度 */
-    background-color: rgba(255, 255, 255, 0.2);
+    margin: 12px 2px;
+    min-width: 16px;
+    min-height: 18px;
+    background-color: alpha(@fg, 0.35);
     border: none;
     border-radius: 4px;
-    transition: all 0.3s ease-in-out; 
+    transition: all 0.2s ease-in-out;
 }
 
 #workspaces button.active,
 #workspaces button.focused {
-    background-color: @accent; /* 使用动态强调色 */
-    min-width: 45px;           /* 激活时拉长，产生视觉引导 */
-    min-height: 8px;           /* 激活时稍微加厚 */
-    margin-top: 14px;          /* 相应调整间距保持总高 (14+8+14=36) */
-    margin-bottom: 14px;
-    box-shadow: 0 0 8px @accent;
+    background-color: @fg;
+    min-width: 42px;
+    min-height: 22px;       /* 比非激活 (14px) 略高，避免失衡 */
+    margin-top: 10px;
+    margin-bottom: 10px;
+    border-radius: 6px;
 }
 
-/* 鼠标悬停预览 */
 #workspaces button:hover {
-    background-color: @bg;
+    background-color: alpha(@fg, 0.7);
     min-width: 25px;
 }
 
@@ -101,166 +149,99 @@ window#waybar {
     font-size: 0px;
 }
 
-/* --- 6. 系统状态细节微调 --- */
+/* --- 7. 系统状态细节 --- */
 
-/* 内存模块：左侧颜色锚点 */
-#memory {
-}
-
-/* 托盘区 */
-/* 防止托盘因为图标缺失变成一个 0 宽度的黑洞 */
-
-/* 将 #tray 整合进你的通用胶囊定义中 */
-#cpu, 
-#memory,
-/* ... 其他模块 ... */
-#tray,
-/* ... */
-#custom-recorder {
-    padding: 0 8px;
-    margin: 4px 1px;
-    min-height: 28px;
-    border-radius: 15px;
-    background-color: rgba(255, 255, 255, 0.05);
-    box-shadow: inset 0 -2px 0 0 rgba(255, 255, 255, 0.1);
-    transition: background-color 0.3s ease;
-}
-
-/* 针对托盘的特定微调 */
+/* 托盘区：min-height 对纯图标盒不生效，用对称内边距撑高；
+   注意 min-height 不含内边距，需覆盖通用值防止叠加超高 (18+7*2=32) */
 #tray {
-    padding: 0 6px; /* 稍微缩小左右内边距，让图标看起来更紧凑 */
+    padding: 0 6px;
 }
 
 #tray > widget {
-    margin: 0 2px; /* 图标之间的间距 */
-    transition: all 0.2s ease;
+    margin: 0 1px;           /* 缩小图标间距 */
+    transition: all 0.15s ease-out;
 }
 
 #tray > widget:hover {
-    background-color: rgba(255, 255, 255, 0.1); /* 鼠标悬停时图标微亮 */
-    border-radius: 4px;
+    background-color: alpha(@fg, 0.3);
+    border-radius: 5px;
 }
 
-/* Cava 频谱分析仪 */
+/* Cava 频谱分析仪：等宽字符波形 */
 #custom-cava {
-    color: @accent;
     font-family: "JetBrainsMono Nerd Font";
-    font-size: 16px;
-    text-shadow: 0px 0px 5px @accent;
+    font-size: 14px;
     padding: 0 10px;
 }
 
 /* 天气模块 */
 #custom-weather {
     font-weight: bold;
-    color: @fg;
 }
 
-/* 默认状态：系统最新 */
-#custom-updates.uptodate {
-    color: @fg;
-    padding: 0 5px;
-}
-
-/* 有普通更新 */
+/* 更新模块三态：有更新用橄榄默认 / 内核更新反色告警 */
 #custom-updates.normal {
-    color: @accent; /* 普通更新也可以用强调色，或者你喜欢的其他颜色 */
+    background-color: @accent;
 }
 
-/* 🚀 内核更新：使用强调色，加粗，并执行闪烁动画 */
 #custom-updates.kernel {
-    color: @fg;        /* 使用你的强调色变量 */
+    color: @bg;              /* 反色告警块 */
+    background-color: @fg;
     font-weight: bold;
-    padding: 0 5px;
     animation: blinker 2s linear infinite;
 }
 
-/* 闪烁动画保持不变 */
+/* 终端式闪烁动画 */
 @keyframes blinker {
     50% { opacity: 0.3; }
 }
 
-/* --- Fcitx5 输入法状态胶囊 --- */
+/* --- Fcitx5 输入法状态 --- */
 #custom-fcitx {
-    color: @fg; /* 使用强调色突出当前状态 */
     font-weight: bold;
-    padding: 0 15px;
-    margin: 4px 3px;
-    min-height: 28px;
-    border-radius: 15px;
+    padding: 0 10px;
 }
 
-/* --- 7. 右侧电源按钮 --- */
+/* --- 右侧电源按钮 --- */
 #custom-power {
-    background-color: transparent;
-    box-shadow: none;
-    color: @fg;
-    font-size: 16px;
-    padding-right: 20px;
+    font-size: 15px;
+    padding-right: 10px;
+    margin-right: 4px;
 }
 
-/* --- 8. 交互反馈 --- */
-/* 鼠标悬停时胶囊变亮，并显示强调色底线 */
-#cpu:hover, 
-#memory:hover, 
-#pulseaudio:hover, 
+/* --- 8. 交互反馈：反色悬停 (经典终端选中效果) --- */
+#cpu:hover,
+#memory:hover,
+#pulseaudio:hover,
 #network:hover,
-#tray:hover, 
-#clock:hover,
 #bluetooth:hover,
+#battery:hover,
+#tray:hover,
 #custom-fcitx:hover,
-#custom-updates:hover,
+#custom-updates.normal:hover,
 #custom-cava:hover,
 #custom-recorder:hover,
 #custom-weather:hover,
-#custom-backlight:hover{
-    background-color: rgba(255, 255, 255, 0.15);
-    box-shadow: inset 0 -2px 0 0 @accent;
+#custom-backlight:hover,
+#custom-music:hover,
+#custom-launcher:hover,
+#custom-power:hover {
+    background-color: @fg;
+    color: @bg;
+}
+
+/* 时钟本身已是亮块：悬停反转回底色并描边示意可点 */
+#clock:hover {
+    background-color: @bg;
+    color: @fg;
+    box-shadow: inset 0 0 0 1px @fg;
 }
 
 /* --- 视频录制提示模块 --- */
 
-/* 基础胶囊样式 (与你的 CPU/Memory 模块对齐) */
-    
-/* 继承你上方的通用样式，这里只写差异化部分 */
-
-/* 状态：未录制 (静止) */
-#custom-recorder.stopped {
-    color: @accent; /* 暗淡的白色，不抢眼 */
-}
-
-/* 状态：录制中 (激活) */
+/* 状态：录制中 (反色告警块 + 闪烁) */
 #custom-recorder.recording {
-    color: @fg;
-    background-color: @bg; /* 淡淡的红色背景补足质感 */
-    box-shadow: inset 0 -2px 0 0 @bg; /* 内部阴影也变为红色调 */
+    color: @bg;
+    background-color: @fg;
     animation: blinker 2s linear infinite;
 }
-
-/* 呼吸动画：让红色小圆点律动 */
-@keyframes blinker {
-    50% {
-        opacity: 0.5;
-    }
-}
-
-
-#custom-music {
-    padding: 0 15px;
-    margin: 4px 3px;
-    border-radius: 15px;
-    min-height: 28px;
-    transition: all 0.3s ease;
-}
-
-/* 正在播放时的样式：加深边框颜色 */
-#custom-music.playing {
-}
-
-/* 暂停时的样式：颜色变暗 */
-#custom-music.paused {
-    color: @muted;
-    border-bottom: none;
-}
-
-
