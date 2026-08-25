@@ -280,24 +280,35 @@ foreground = '$ACCENT'
 EOF
 echo "   Cava 配色 -> ~/.config/cava/config"
 
-# --- E. Mako (Fedora 独有) ---
+# --- E. Mako (完整主题：全局样式在前，条件段在后) ---
 mkdir -p ~/.config/mako
 cat <<EOF > ~/.config/mako/config
 background-color=$BG
 text-color=$FG
 border-color=$ACCENT
-progress-color=over $MUTED
+progress-color=over $ACCENT
 border-size=2
-border-radius=8
-padding=15
-margin=20
-font=JetBrainsMono Nerd Font 10
+border-radius=9
+padding=12
+margin=18
+font=JetBrainsMono Nerd Font 11
 default-timeout=5000
+max-visible=5
+
+[urgency=low]
+border-color=$MUTED
+default-timeout=3000
+
+[urgency=critical]
+border-color=$FG
+background-color=$ACCENT
+text-color=$BG
+default-timeout=0
 
 [summary="本地系统消息服务"]
 invisible=1
 EOF
-echo "   Mako 配色 -> ~/.config/mako/config"
+echo "   Mako 主题 -> ~/.config/mako/config"
 
 # --- F. Neovim (Fedora 独有) ---
 mkdir -p ~/.config/nvim/lua/utils
@@ -343,7 +354,7 @@ else
     echo "   未找到 starship_base.toml，跳过 Starship 配色"
 fi
 
-# --- H. Mako (通知配色) ---
+# --- H. Mako 配色切片（仅存档；最终主题由 E 段完整生成） ---
 cat << EOF > "$TARGET_DIR/color-mako.conf"
 background-color=$BG
 text-color=$FG
@@ -351,20 +362,6 @@ border-color=$MUTED
 progress-color=over $ACCENT
 EOF
 echo "   Mako 配色切片 -> $TARGET_DIR/color-mako.conf"
-
-MAKO_BASE=""
-if [ -f "$HOME/.config/mako/config_base" ]; then
-    MAKO_BASE="$HOME/.config/mako/config_base"
-elif [ -f "$HOME/.config/by-mgr/templates/config_base" ]; then
-    MAKO_BASE="$HOME/.config/by-mgr/templates/config_base"
-fi
-
-if [ -f "$MAKO_BASE" ]; then
-    cat "$MAKO_BASE" "$TARGET_DIR/color-mako.conf" > "$HOME/.config/mako/config"
-    echo "   Mako 配色 -> ~/.config/mako/config (模板拼接)"
-else
-    echo "   未找到 mako 模板，跳过 Mako 配色"
-fi
 
 # --- I. Hyprlock (Fedora 独有) ---
 mkdir -p ~/.config/hypr
@@ -455,6 +452,8 @@ if [ -n "$WAYLAND_DISPLAY" ]; then
     # 3. 信号弹方式重载 Waybar 和其他组件
     kill -USR1 $(pidof kitty) 2>/dev/null
     _debug "waybar pid: $(pgrep -x waybar 2>/dev/null || echo none)"
+    # 3.5 重载 mako 通知配色
+    makoctl reload >/dev/null 2>&1 && echo "   ✔ Mako 配置已重载"
     # waybar 配置已启用 reload_style_on_change，css 变化自动热重载，无需 SIGUSR2
     _debug "waybar reload signal sent"
     
