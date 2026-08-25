@@ -4,7 +4,11 @@
 # 依赖: sudo dnf install -y hellwal kde-material-you-colors jq libnotify awww
 
 # 优先级隔离：最低 CPU/IO 优先级，避免取色抢占 awww 渲染（不锁核，交给调度器）
-exec nice -n 19 ionice -c 3 bash "$0" "$@"
+# 哨兵变量防止重执行后再次进入自身（否则无限 exec 循环）
+if [ -z "$BY_MGR_NICED" ]; then
+    export BY_MGR_NICED=1
+    exec nice -n 19 ionice -c 3 bash "$0" "$@"
+fi
 
 # 用法: theme-sync.sh [--debug] [--no-render] [wallpaper]
 # --no-render: 调用方（如 waypaper）已自行渲染壁纸时，跳过 awww 切换动画，仅同步配色
