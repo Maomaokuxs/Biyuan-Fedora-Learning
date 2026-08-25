@@ -417,7 +417,7 @@ if [ -n "$WAYLAND_DISPLAY" ]; then
     # 3. 信号弹方式重载 Waybar 和其他组件
     kill -USR1 $(pidof kitty) 2>/dev/null
     _debug "waybar pid: $(pgrep -x waybar 2>/dev/null || echo none)"
-    killall -SIGUSR2 waybar 2>/dev/null
+    # waybar 配置已启用 reload_style_on_change，css 变化自动热重载，无需 SIGUSR2
     _debug "waybar reload signal sent"
     
     echo -e "\033[0;32m桌面组件已刷新！\033[0m"
