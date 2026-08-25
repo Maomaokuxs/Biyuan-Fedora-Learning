@@ -35,3 +35,7 @@ notes/
 dist/
 build/
 dotfiles/waybar/.cache/
+dotfiles/waypaper/.config/waypaper/config.ini
+dotfiles/hypr/.config/hypr/hyprlock.conf
+dotfiles/mako/.config/mako/config
+dotfiles/starship/.config/starship.toml
