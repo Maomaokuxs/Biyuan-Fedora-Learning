@@ -123,28 +123,23 @@ fi
 # 1. 内存取色与拦截兜底
 # ==========================================
 echo ">> 正在分析壁纸色彩 (内存处理)..."
-# hellwal 内置 stb 解码器不支持 webp/avif 等格式，先统一转码为 png 副本再取色
-HELLWAL_SRC="$WALLPAPER"
-TMP_PNG=""
-case "${WALLPAPER,,}" in
-    *.png|*.jpg|*.jpeg|*.bmp|*.tga|*.gif) : ;;
-    *)
-        TMP_PNG=$(mktemp /tmp/by-mgr-XXXXXX.png)
-        # ffmpeg 解码 webp/avif 又快又稳；magick 对某些 8K VP8 会卡死，仅作兜底且限时
-        if command -v ffmpeg &>/dev/null && timeout 30 ffmpeg -y -loglevel error -i "$WALLPAPER" -frames:v 1 "$TMP_PNG" 2>/dev/null && [ -s "$TMP_PNG" ]; then
-            HELLWAL_SRC="$TMP_PNG"
-            _debug "converted to png via ffmpeg: $TMP_PNG"
-        elif command -v magick &>/dev/null && timeout 60 magick "$WALLPAPER" "$TMP_PNG" 2>/dev/null && [ -s "$TMP_PNG" ]; then
-            HELLWAL_SRC="$TMP_PNG"
-            _debug "converted to png via magick: $TMP_PNG"
-        else
-            rm -f "$TMP_PNG"; TMP_PNG=""
-        fi ;;
-esac
+# hellwal 的解码器不支持 webp/avif，且扩展名经常是伪装的（png 实为 webp 等）。
+# 策略：先直接解码，失败则无条件用 ffmpeg 转码为 png 后重试。
+convert_to_png() {
+    local src="$1" dst="$2"
+    command -v ffmpeg &>/dev/null && timeout 30 ffmpeg -y -loglevel error -i "$src" -frames:v 1 "$dst" 2>/dev/null && [ -s "$dst" ]
+}
 
-JSON_DATA=$(hellwal -i "$HELLWAL_SRC" -j 2>/dev/null)
+JSON_DATA=$(hellwal -i "$WALLPAPER" -j 2>/dev/null)
+if [ -z "$JSON_DATA" ]; then
+    _debug "direct decode failed, converting via ffmpeg"
+    TMP_PNG=$(mktemp /tmp/by-mgr-XXXXXX.png)
+    if convert_to_png "$WALLPAPER" "$TMP_PNG"; then
+        JSON_DATA=$(hellwal -i "$TMP_PNG" -j 2>/dev/null)
+    fi
+    [ -n "$TMP_PNG" ] && rm -f "$TMP_PNG"
+fi
 _debug "hellwal returned $(echo $JSON_DATA | wc -c) bytes"
-[ -n "$TMP_PNG" ] && rm -f "$TMP_PNG"
 
 if [ -z "$JSON_DATA" ]; then
     echo -e "\033[0;31mhellwal 无法解析该壁纸（格式不支持或文件损坏），已保留原配色。\033[0m"
@@ -164,6 +159,36 @@ if [[ ! "$BG" =~ ^# ]] || [[ ! "$ACCENT" =~ ^# ]]; then
     echo -e "\033[0;31m提取颜色失败。\033[0m"
     exit 1
 fi
+
+# 对比度守卫：暗色壁纸常抽出近黑的 accent/muted，与背景无法区分。
+# 用 WCAG 对比度公式检测，不足时向前景色调和，直到达到最低区分度。
+ADJ=$(python3 - "$BG" "$FG" "$ACCENT" "$MUTED" <<'PY'
+import sys
+
+def lum(h):
+    h = h.lstrip('#')
+    lin = lambda c: c/12.92 if c <= 0.03928 else ((c+0.055)/1.055)**2.4
+    r, g, b = (lin(int(h[i:i+2], 16)/255) for i in (0, 2, 4))
+    return 0.2126*r + 0.7152*g + 0.0722*b
+
+def ratio(a, b):
+    la, lb = sorted((lum(a), lum(b)), reverse=True)
+    return (la+0.05)/(lb+0.05)
+
+def mix(c1, c2, t):
+    c1, c2 = c1.lstrip('#'), c2.lstrip('#')
+    return '#' + ''.join(f'{round(int(c1[i:i+2],16)*(1-t)+int(c2[i:i+2],16)*t):02x}' for i in (0, 2, 4))
+
+bg, fg, acc, mut = sys.argv[1:5]
+for _ in range(6):
+    if ratio(bg, acc) < 1.8: acc = mix(acc, fg, 0.3)
+    if ratio(bg, mut) < 1.5: mut = mix(mut, fg, 0.3)
+print(acc, mut)
+PY
+)
+ACCENT=$(echo "$ADJ" | cut -d' ' -f1)
+MUTED=$(echo "$ADJ" | cut -d' ' -f2)
+_debug "contrast guard: ACCENT=$ACCENT MUTED=$MUTED"
 
 echo -e "\033[0;32m调色板生成成功！\033[0m"
 _debug "colors: BG=$BG FG=$FG ACCENT=$ACCENT MUTED=$MUTED"
