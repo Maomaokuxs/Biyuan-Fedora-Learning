@@ -1,8 +1,9 @@
 {
     "layer": "top",
     "position": "top",
-    "height": 45, // 必须与 Rofi 的 y-offset 对齐
+    "height": 42, // 必须与 Rofi 的 y-offset 对齐
     "spacing": 4,
+    "reload_style_on_change": true, // 监视 css 文件变化，仅重载样式不重建窗口（零闪烁换色）
 
     // 模块分布情况
 
@@ -11,7 +12,7 @@
     "modules-right": ["custom/updates","custom/weather","pulseaudio","custom/backlight", "network","bluetooth", "cpu", "memory", "battery", "clock", "tray","custom/fcitx","custom/power"],
 
     "custom/launcher": {
-        "format": " 󰣛 ",
+        "format": "󰣛",
         "on-click": "rofi -show drun",
 	"on-click-right": "pkill rofi",
         "tooltip": false
@@ -80,11 +81,12 @@
     },
 
     "network": {
-    "format-wifi": "",
+    "format-wifi": "{icon}",
+    "format-icons": ["󰤥", "󰤦", "󰤧", "󰤨"], // 信号弱→满格四档动态切换
     "format-ethernet": "󰈀",
     "format-disconnected": "󰤮",
     "tooltip-format": "{ifname} via {gwaddr} 󰊗",
-    "tooltip-format-wifi": "  {essid} ({signalStrength}%)",
+    "tooltip-format-wifi": "󰤨  {essid} ({signalStrength}%)",
     "tooltip-format-ethernet": "󰈀  {ifname} ",
     "tooltip-format-disconnected": "Disconnected ⚠",
     "on-click": "kitty -e nmtui" // 点击直接在终端打开网络管理，符合博主的操作习惯
@@ -122,7 +124,7 @@
 
     "tray": {
     "icon-size": 18,    // 调小图标尺寸，间距感会更强
-    "spacing": 10,      // 直接设置图标之间的像素间距
+    "spacing": 6,       // 缩小图标之间的像素间距
     "show-passive-items": true
     },
 
