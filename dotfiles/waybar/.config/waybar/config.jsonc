@@ -34,22 +34,22 @@
     },
 
     "clock": {
-        "format": "   {:%H:%M}",
+        "format": " {:%H:%M}",
         "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
     },
 
-    "cpu": { "format": "  {usage}%" },
+    "cpu": { "format": " {usage}%" },
     
     "memory": {
         "interval": 5,
-        "format": "  {used:0.1f}G",
+        "format": " {used:0.1f}G",
         "tooltip-format": "内存已用: {used}GiB / {total}GiB",
         "on-click": "kitty --title 'System Monitor' btop",
         "on-click-right": "pkill btop"
     },
 
    "pulseaudio": {
-        "format": "{icon}  {volume}%",
+        "format": "{icon} {volume}%",
         "format-muted": "󰝟 Muted",
         "format-icons": {
             "headphone": "",
@@ -172,7 +172,7 @@
     },
 
     "custom/backlight": {
-    "format": "{icon}  {percentage}%",
+    "format": "{icon} {percentage}%",
     "format-icons": ["󰃞", "󰃟", "󰃠"],
     "return-type": "json",
     "exec": "sh -c 'val=$(ddcutil getvcp 10 --brief | awk \"{print \\$4}\"); echo \"{\\\"percentage\\\": $val}\"'",
