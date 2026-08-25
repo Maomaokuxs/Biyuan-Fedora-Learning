@@ -241,12 +241,25 @@ EOF
 echo "   Niri 配色 -> $TARGET_DIR/color-niri.kdl"
 
 # --- B. Waybar (color-waybar.css) ---
+# GLib >= 2.89 按"软链接展开后的真实路径"解析 @import，旧版按加载路径解析。
+# 若两者不一致（配置目录为软链接部署，如 stow），运行时在真实路径侧
+# 自动维护一个指向真实配色目录的桥接软链接，使两种解析汇聚于同一文件。
 cat <<EOF > "$TARGET_DIR/color-waybar.css"
 @define-color bg $BG;
 @define-color fg $FG;
 @define-color accent $ACCENT;
 @define-color muted $MUTED;
 EOF
+STYLE_LOAD_DIR="$(dirname "$HOME/.config/waybar/style.css")"
+STYLE_REAL_DIR="$(dirname "$(realpath "$HOME/.config/waybar/style.css" 2>/dev/null)")"
+if [ -n "$STYLE_REAL_DIR" ] && [ "$STYLE_REAL_DIR" != "$STYLE_LOAD_DIR" ]; then
+    # 仅对单个配色文件做文件级软链接（不链接目录）
+    BRIDGE_DIR="$STYLE_REAL_DIR/../../.cache/by-mgr/hellwal"
+    if mkdir -p "$BRIDGE_DIR" 2>/dev/null; then
+        ln -sfn "$TARGET_DIR/color-waybar.css" "$BRIDGE_DIR/color-waybar.css"
+        _debug "bridge file link ensured: $BRIDGE_DIR/color-waybar.css"
+    fi
+fi
 echo "   Waybar 配色 -> $TARGET_DIR/color-waybar.css"
 
 # --- C. Rofi (color-rofi.rasi) ---

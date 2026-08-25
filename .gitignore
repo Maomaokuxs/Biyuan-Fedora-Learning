@@ -34,3 +34,4 @@ notes/
 *.tmp
 dist/
 build/
+dotfiles/waybar/.cache/
