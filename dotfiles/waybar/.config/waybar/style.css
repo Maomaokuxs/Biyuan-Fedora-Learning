@@ -37,6 +37,11 @@ window#waybar {
 #custom-launcher,
 #custom-music,
 #custom-recorder,
+#custom-screenshot,
+#custom-picker,
+#custom-mprev,
+#custom-mplay,
+#custom-mnext,
 #custom-power {
     padding: 0 10px;
     margin: 5px 2px;
@@ -98,7 +103,6 @@ window#waybar {
 
 /* 空闲态：低饱和暗淡块 */
 #custom-updates.uptodate,
-#custom-recorder.stopped,
 #custom-music.paused {
     background-color: alpha(@muted, 0.8);
     color: alpha(@fg, 0.75);
@@ -221,6 +225,11 @@ window#waybar {
 #custom-updates.normal:hover,
 #custom-cava:hover,
 #custom-recorder:hover,
+#custom-screenshot:hover,
+#custom-picker:hover,
+#custom-mprev:hover,
+#custom-mplay:hover,
+#custom-mnext:hover,
 #custom-weather:hover,
 #custom-backlight:hover,
 #custom-music:hover,

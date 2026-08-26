@@ -7,8 +7,10 @@
 
     // 模块分布情况
 
-    "modules-left": ["custom/launcher","custom/recorder","custom/music","custom/cava","niri/window"],
-    "modules-center": ["niri/workspaces"],
+    "modules-left": ["custom/launcher","niri/workspaces","custom/recorder","custom/screenshot","custom/picker","custom/music","custom/cava","custom/mprev","custom/mplay","custom/mnext"
+        //"niri/window",
+    ],
+    "modules-center": [],
     "modules-right": ["custom/updates","custom/weather","pulseaudio","custom/backlight", "network","bluetooth", "cpu", "memory", "battery", "clock", "tray","custom/fcitx","custom/power"],
 
     "custom/launcher": {
@@ -142,9 +144,42 @@
     "format": "{}",
     "tooltip": true,
     "interval": 1800, // 每 30 分钟更新一次，避免请求太频繁
+    "signal": 10, // 后台拉取完成后自动刷新
     "exec": "~/.config/waybar/scripts/weather.py",
     "return-type": "json",
     "on-click": "kitty --hold curl wttr.in" // 点击时弹出终端显示详细的网页版天气图
+    },
+
+    "custom/screenshot": {
+        "format": "\uf030",
+        "on-click": "bash ~/.config/waybar/scripts/screenshot.sh",
+        "tooltip": false
+    },
+
+    "custom/picker": {
+        "format": "\uf1fb",
+        "on-click": "bash ~/.config/waybar/scripts/pick-color.sh",
+        "tooltip": false
+    },
+
+    "custom/mprev": {
+        "format": "\uf048",
+        "on-click": "playerctl previous",
+        "tooltip": false
+    },
+
+    "custom/mplay": {
+        "format": "{}",
+        "exec": "playerctl status 2>/dev/null | grep -q Playing && echo '\uf04c' || echo '\uf04b'",
+        "interval": 2,
+        "on-click": "playerctl play-pause",
+        "tooltip": false
+    },
+
+    "custom/mnext": {
+        "format": "\uf051",
+        "on-click": "playerctl next",
+        "tooltip": false
     },
 
     "custom/recorder": {
@@ -152,7 +187,7 @@
     "return-type": "json",
     "interval": "once",
     "signal": 9,
-    "exec": "if [ -f /tmp/recording_status ]; then TIME=$(cat /tmp/recording_status); echo \"{\\\"text\\\": \\\"󰑊 $TIME\\\", \\\"class\\\": \\\"recording\\\"}\"; else echo \"{\\\"text\\\": \\\"󰑋 OFF\\\", \\\"class\\\": \\\"stopped\\\"}\"; fi",
+    "exec": "if [ -f /tmp/recording_status ]; then TIME=$(cat /tmp/recording_status); echo \"{\\\"text\\\": \\\"󰑊\\\", \\\"class\\\": \\\"recording\\\"}\"; else echo \"{\\\"text\\\": \\\"󰑊\\\", \\\"class\\\": \\\"stopped\\\"}\"; fi",
     "on-click": "~/.config/rofi/scripts/recorder.sh",
     "on-click-right": "pkill -INT -f gpu-screen-recorder",
     "tooltip": false
@@ -163,11 +198,11 @@
     "return-type": "json",
     "interval": 2,
     "exec": "python3 ~/.config/waybar/scripts/music.py",
-    "on-click": "playerctl -p splayer play-pause",
-    "on-click-right": "playerctl -p splayer next",
-    "on-scroll-up": "playerctl -p splayer volume 0.05+",
-    "on-scroll-down": "playerctl -p splayer volume 0.05-",
-    "max-length": 30,
+    "on-click": "playerctl play-pause",
+    "on-click-right": "playerctl next",
+    "on-scroll-up": "playerctl volume 0.05+",
+    "on-scroll-down": "playerctl volume 0.05-",
+    "max-length": 22,
     "tooltip": true
     },
 
