@@ -2,8 +2,11 @@
 
 # 1. 获取更新列表
 # dnf check-update 在有更新时返回 100，所以加上 || true 防止脚本意外退出
-UPDATE_LIST=$(dnf check-update --quiet 2>/dev/null | grep '^[a-zA-Z0-9]' | tr -d '\0')
-COUNT=$(echo "$UPDATE_LIST" | grep -vc '^$')
+# dnf5 输出带 ANSI 颜色码：先剥离，再过滤汇总行（否则包行被转义符挡住、汇总行被误计）
+# 通过 PackageKit(pkcon) 获取更新：普通用户即可见完整系统状态（与软件中心一致）。
+# dnf5 check-update 在用户态元数据受限，仅能列出极少量包，不可用。
+UPDATE_LIST=$(pkcon get-updates 2>/dev/null | grep -E "\([a-z0-9-]+\)$" | sed "s/^[^ ]* *//")
+COUNT=$(echo "$UPDATE_LIST" | grep -vc "^$")
 
 # 2. 判断内核更新
 KERNEL_UPDATE=$(echo "$UPDATE_LIST" | grep -i "kernel")
@@ -12,9 +15,9 @@ KERNEL_UPDATE=$(echo "$UPDATE_LIST" | grep -i "kernel")
 if [ "$COUNT" -gt 0 ]; then
     if [ -n "$KERNEL_UPDATE" ]; then
         # 【修改点】：仅保留企鹅图标 
-        TEXT=" $COUNT"
+        TEXT=" $COUNT"
         ALT="kernel"
-        TOOLTIP=$(printf "🚨 重大更新提示：检测到新内核！\n\n%s" "$UPDATE_LIST")
+        TOOLTIP=$(printf "⚠ 重大更新提示：检测到新内核！\n\n%s" "$UPDATE_LIST")
     else
         # 普通更新使用 󰏖 (Package)
         TEXT="󰏖 $COUNT"
