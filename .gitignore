@@ -39,3 +39,5 @@ dotfiles/waypaper/.config/waypaper/config.ini
 dotfiles/hypr/.config/hypr/hyprlock.conf
 dotfiles/mako/.config/mako/config
 dotfiles/starship/.config/starship.toml
+dotfiles/waybar/.config/waybar/scripts/weather.conf
+dotfiles/waybar/.config/waybar/scripts/__pycache__/
