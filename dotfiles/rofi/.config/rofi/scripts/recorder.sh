@@ -37,21 +37,22 @@ if pgrep -f "gpu-screen-recorder" > /dev/null; then
 fi
 
 # --- Rofi 菜单配置 ---
-OPTIONS="󰕧  MP4 (H.264)\n󰕧  MKV (无损)\n󰕧  GIF (高质量转换)"
+OPTIONS="󰕧  MP4 全屏 (H.264)\n󰕧  MKV 全屏 (无损)\n󰕧  GIF 全屏\n󰹑  MP4 区域\n󰹑  MKV 区域\n󰹑  GIF 区域"
 
 CHOSEN=$(echo -e "$OPTIONS" | rofi -dmenu \
     -p "录屏中心" -i \
-    -mesg "󰑊 当前模式：全屏录制 (GPU 加速) | 点击状态栏停止" \
+    -mesg "󰑊 全屏/区域可选 | 点击状态栏停止" \
     -theme-str 'mainbox { children: [ "message", "listview" ]; }' \
     -theme-str 'entry { enabled: false; }' \
     -theme-str 'message { margin: 0 0 10px 0; padding: 8px; border-radius: 10px; border: 2px solid; border-color: inherit; }' \
-    -theme-str 'listview { lines: 3; fixed-height: true; }')
+    -theme-str 'listview { lines: 6; fixed-height: true; }')
 
 [[ -z "$CHOSEN" ]] && exit 0
 
 # --- 执行录制与计时函数 ---
 start_record() {
     local fmt=$1
+    local mode=$2  # screen 或 region
     local start_time=$(date +%s)
     local timestamp=$(date +%Y%m%d_%H%M%S)
     local out="$SAVE_DIR/rec_$timestamp.$fmt"
@@ -61,7 +62,27 @@ start_record() {
         out="/tmp/gif_tmp_$timestamp.mp4"
     fi
 
-    gpu-screen-recorder -w screen -f 60 -a "default_output" -o "$out" 2> "$LOG_FILE" &
+    local gsr_args=(-f 60 -a "default_output" -o "$out")
+    if [ "$mode" == "region" ]; then
+        if ! command -v slurp &>/dev/null; then
+            notify-send "缺少依赖" "区域录制需要 slurp" -u critical -a "Recorder"
+            return 1
+        fi
+        local geom
+        geom=$(slurp -f "%wx%h+%x+%y" 2>/dev/null)
+        [[ -z "$geom" ]] && exit 0
+        # 兼容旧版 slurp 默认输出 "X,Y WxH" -> 转为 "WxH+X+Y"
+        if [[ "$geom" == *","* ]]; then
+            geom=$(echo "$geom" | awk '{split($1,a,","); print $2"+"a[1]"+"a[2]}')
+        fi
+        gsr_args=(-w "$geom" "${gsr_args[@]}")
+        notify_msg="区域 $geom"
+    else
+        gsr_args=(-w screen "${gsr_args[@]}")
+        notify_msg="全屏"
+    fi
+
+    gpu-screen-recorder "${gsr_args[@]}" 2> "$LOG_FILE" &
     
     sleep 1.2
     if ! pgrep -f "gpu-screen-recorder" > /dev/null; then
@@ -70,7 +91,7 @@ start_record() {
         return 1
     fi
 
-    notify-send "󰑊 录制开始" "格式: ${fmt^^} | 正在捕捉全屏" -t 2000 -a "Recorder"
+    notify-send "󰑊 录制开始" "格式: ${fmt^^} | $notify_msg" -t 2000 -a "Recorder"
 
     # 计时子进程
     (
@@ -97,7 +118,10 @@ start_record() {
 }
 
 case "$CHOSEN" in
-    *"MP4"*) start_record "mp4" ;;
-    *"MKV"*) start_record "mkv" ;;
-    *"GIF"*) start_record "gif" ;;
+    *"MP4 全屏"*) start_record "mp4" "screen" ;;
+    *"MKV 全屏"*) start_record "mkv" "screen" ;;
+    *"GIF 全屏"*) start_record "gif" "screen" ;;
+    *"MP4 区域"*) start_record "mp4" "region" ;;
+    *"MKV 区域"*) start_record "mkv" "region" ;;
+    *"GIF 区域"*) start_record "gif" "region" ;;
 esac
