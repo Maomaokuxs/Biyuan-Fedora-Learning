@@ -1,0 +1,226 @@
+{
+    "custom/launcher": {
+        "format": "󰣛",
+        "on-click": "rofi -show drun",
+        "on-click-right": "pkill rofi",
+        "tooltip": false
+    },
+    "niri/workspaces": {
+        "format": "{icon}",
+        "format-icons": {
+            "default": " ",
+            "active": " ",
+            "focused": " "
+        },
+        "on-click": "activate"
+    },
+    "niri/window": {
+        "format": "󰖲 {title}",
+        "max-length": 30
+    },
+    "clock": {
+        "format": " {:%H:%M}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+    "cpu": {
+        "format": " {usage}%"
+    },
+    "memory": {
+        "interval": 5,
+        "format": " {used:0.1f}G",
+        "tooltip-format": "内存已用: {used}GiB / {total}GiB",
+        "on-click": "kitty --title 'System Monitor' btop",
+        "on-click-right": "pkill btop"
+    },
+    "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "󰝟 Muted",
+        "format-icons": {
+            "headphone": "",
+            "hands-free": "",
+            "headset": "",
+            "phone": "",
+            "portable": "",
+            "car": "",
+            "default": [
+                "",
+                "",
+                ""
+            ]
+        },
+        "on-click": "pavucontrol"
+    },
+    "bluetooth": {
+        "format": " {status}",
+        "format-disabled": "󰂲",
+        "format-connected": " {device_alias}",
+        "format-connected-battery": " {device_alias} {device_battery_percentage}%",
+        "tooltip-format": "{controller_alias}\t{controller_address}",
+        "tooltip-format-connected": "{controller_alias}\t{controller_address}\n\n{device_enumerate}",
+        "tooltip-format-enumerate-connected": "{device_alias}\t{device_address}",
+        "on-click": "blueman-manager",
+        "on-click-right": "rfkill toggle bluetooth"
+    },
+    "network": {
+        "format-wifi": "{icon}",
+        "format-icons": [
+            "󰤥",
+            "󰤦",
+            "󰤧",
+            "󰤨"
+        ],
+        "format-ethernet": "󰈀",
+        "format-disconnected": "󰤮",
+        "tooltip-format": "{ifname} via {gwaddr} 󰊗",
+        "tooltip-format-wifi": "󰤨  {essid} ({signalStrength}%)",
+        "tooltip-format-ethernet": "󰈀  {ifname} ",
+        "tooltip-format-disconnected": "Disconnected ⚠",
+        "on-click": "kitty -e nmtui"
+    },
+    "battery": {
+        "states": {
+            "warning": 30,
+            "critical": 15
+        },
+        "format": "{icon} {capacity}%",
+        "format-icons": [
+            "",
+            "",
+            "",
+            "",
+            ""
+        ]
+    },
+    "custom/cava": {
+        "exec": "~/.config/waybar/scripts/cava.sh",
+        "format": "{}",
+        "tooltip": false,
+        "on-click": "~/.config/rofi/scripts/music-menu.sh",
+        "on-click-right": "pkill rofi"
+    },
+    "custom/power": {
+        "format": "⏻",
+        "on-click": "~/.config/rofi/scripts/powermenu.sh",
+        "on-click-right": "pkill rofi",
+        "tooltip": false
+    },
+    "custom/fcitx": {
+        "interval": 1,
+        "exec": "~/.config/waybar/scripts/fcitx_status.sh",
+        "on-click": "fcitx5-remote -s",
+        "on-click-right": "fcitx5-configtool",
+        "tooltip": false
+    },
+    "tray": {
+        "icon-size": 18,
+        "spacing": 6,
+        "show-passive-items": true
+    },
+    "custom/updates": {
+        "format": "{}",
+        "exec": "~/.config/waybar/scripts/check-updates.sh",
+        "return-type": "json",
+        "on-click": "kitty --hold sh -c 'sudo dnf upgrade && pkill -RTMIN+8 waybar'",
+        "on-click-right": "pkill -RTMIN+8 waybar",
+        "interval": 3600,
+        "signal": 8
+    },
+    "custom/weather": {
+        "format": "{}",
+        "tooltip": true,
+        "interval": 1800,
+        "signal": 10,
+        "exec": "~/.config/waybar/scripts/weather.py",
+        "return-type": "json",
+        "on-click": "kitty --hold curl wttr.in"
+    },
+    "custom/screenshot": {
+        "format": "",
+        "on-click": "bash ~/.config/waybar/scripts/screenshot.sh",
+        "tooltip": false
+    },
+    "custom/picker": {
+        "format": "",
+        "on-click": "bash ~/.config/waybar/scripts/pick-color.sh",
+        "tooltip": false
+    },
+    "custom/mprev": {
+        "format": "",
+        "on-click": "playerctl previous",
+        "tooltip": false
+    },
+    "custom/mplay": {
+        "format": "{}",
+        "exec": "playerctl status 2>/dev/null | grep -q Playing && echo '' || echo ''",
+        "interval": 2,
+        "on-click": "playerctl play-pause",
+        "tooltip": false
+    },
+    "custom/mnext": {
+        "format": "",
+        "on-click": "playerctl next",
+        "tooltip": false
+    },
+    "custom/recorder": {
+        "format": "{}",
+        "return-type": "json",
+        "interval": "once",
+        "signal": 9,
+        "exec": "if [ -f /tmp/recording_status ]; then TIME=$(cat /tmp/recording_status); echo \"{\\\"text\\\": \\\"󰑊\\\", \\\"class\\\": \\\"recording\\\"}\"; else echo \"{\\\"text\\\": \\\"󰑊\\\", \\\"class\\\": \\\"stopped\\\"}\"; fi",
+        "on-click": "~/.config/rofi/scripts/recorder.sh",
+        "on-click-right": "pkill -INT -f gpu-screen-recorder",
+        "tooltip": false
+    },
+    "custom/music": {
+        "format": "{}",
+        "return-type": "json",
+        "interval": 2,
+        "exec": "python3 ~/.config/waybar/scripts/music.py",
+        "on-click": "playerctl play-pause",
+        "on-click-right": "playerctl next",
+        "on-scroll-up": "playerctl volume 0.05+",
+        "on-scroll-down": "playerctl volume 0.05-",
+        "max-length": 22,
+        "tooltip": true
+    },
+    "custom/brightness": {
+        "format": "{icon} {percentage}%",
+        "format-icons": [
+            "󰃞",
+            "󰃟",
+            "󰃠"
+        ],
+        "tooltip-format": "内接屏亮度 {percentage}%",
+        "return-type": "json",
+        "exec": "~/.config/waybar/scripts/brightness.sh",
+        "interval": 2,
+        "on-scroll-up": "~/.config/waybar/scripts/brightness.sh up",
+        "on-scroll-down": "~/.config/waybar/scripts/brightness.sh down",
+        "on-click": "~/.config/waybar/scripts/brightness.sh mid",
+        "tooltip": false
+    },
+    "custom/screen-power": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "~/.config/waybar/scripts/screen.sh",
+        "interval": 5,
+        "on-click": "bash ~/.config/waybar/scripts/screen.sh menu",
+        "tooltip": false
+    },
+    "custom/backlight": {
+        "format": "{icon} {percentage}%",
+        "format-icons": [
+            "󰃞",
+            "󰃟",
+            "󰃠"
+        ],
+        "tooltip-format": "外接屏亮度 {percentage}%",
+        "return-type": "json",
+        "exec": "sh -c 'val=$(ddcutil getvcp 10 --brief | awk \"{print \\$4}\"); echo \"{\\\"percentage\\\": $val}\"'",
+        "on-scroll-up": "ddcutil setvcp 10 + 10",
+        "on-scroll-down": "ddcutil setvcp 10 - 10",
+        "on-click": "ddcutil setvcp 10 50",
+        "interval": 30,
+        "tooltip": false
+    }
+}
