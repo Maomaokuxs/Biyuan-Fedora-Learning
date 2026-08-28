@@ -72,6 +72,31 @@ def fetch_weather():
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         loc = get_location()
+        # 国内免 key：sojson 赣州 101240701（t.weather.sojson.com），其他城市走 wttr.in 兜底
+        CITY_CODE = {"Ganzhou": "101240701", "赣州": "101240701", "Shanghai": "101020100", "Beijing": "101010100"}
+        code = CITY_CODE.get(loc, "")
+        if code:
+            try:
+                r = requests.get(f"http://t.weather.sojson.com/api/weather/city/{code}", headers=headers, timeout=10)
+                if r.status_code == 200:
+                    j = r.json()
+                    if j.get("status") == 200 and j.get("data"):
+                        data = j["data"]
+                        wendu = data.get("wendu", "??")
+                        city = j.get("cityInfo", {}).get("city", loc)
+                        fc = data.get("forecast", [{}])[0]
+                        weather = fc.get("type", "未知")
+                        high = fc.get("high", "").replace("高温 ","").replace("℃","")
+                        icon = "󰖐"
+                        if "晴" in weather: icon = "󰖙"
+                        elif "多云" in weather: icon = "󰖐"
+                        elif "雨" in weather: icon = "󰖗"
+                        elif "雷" in weather: icon = "󰙾"
+                        elif "雪" in weather: icon = "󰼶"
+                        return {"text": f"{icon} {wendu}°C", "tooltip": f"城市: {city}\n状态: {weather}\n高温: {high}°C\n湿度: {data.get('shidu','')}", "class": "weather"}
+            except Exception:
+                pass
+        # 兜底 wttr.in
         url = f"https://wttr.in/{loc}?format=j1" if loc else "https://wttr.in/?format=j1"
         response = requests.get(url, headers=headers, timeout=15)
 
