@@ -95,7 +95,7 @@
     "exec": "~/.config/waybar/scripts/cava.sh",
     "format": "{}",
     "tooltip": false,
-    "on-click": "~/.config/rofi/scripts/music-menu.sh",
+    "on-click": "bash ~/.config/waybar/scripts/toggle-music.sh",
     "on-click-right": "bash ~/.config/waybar/scripts/toggle-lyric.sh"
   },
   "custom/power": {
@@ -145,19 +145,26 @@
     "tooltip": false
   },
   "custom/mprev": {
-    "format": "",
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_music_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
     "on-click": "playerctl previous",
     "tooltip": false
   },
   "custom/mplay": {
     "format": "{}",
-    "exec": "playerctl status 2>/dev/null | grep -q Playing && echo '' || echo ''",
-    "interval": 2,
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_music_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else playerctl status 2>/dev/null | grep -q Playing && echo '{\"text\":\"\"}' || echo '{\"text\":\"\"}'; fi",
     "on-click": "playerctl play-pause",
     "tooltip": false
   },
   "custom/mnext": {
-    "format": "",
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_music_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
     "on-click": "playerctl next",
     "tooltip": false
   },
