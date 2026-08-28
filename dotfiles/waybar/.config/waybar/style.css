@@ -286,9 +286,18 @@ window#waybar {
 /* 音乐控件隐藏态（由 cava 左键切换） */
 #custom-mprev.hidden,
 #custom-mplay.hidden,
-#custom-mnext.hidden,
-#custom-music.hidden,
-#custom-lyric.hidden {
+#custom-mnext.hidden {
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    border: none;
+}
+
+/* 左侧三功能隐藏态（由 Fedora 徽标右键切换） */
+#custom-recorder.hidden,
+#custom-screenshot.hidden,
+#custom-picker.hidden {
     opacity: 0;
     margin: 0;
     padding: 0;

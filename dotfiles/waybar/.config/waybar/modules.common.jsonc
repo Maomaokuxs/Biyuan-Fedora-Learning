@@ -2,7 +2,7 @@
   "custom/launcher": {
     "format": "󰣛",
     "on-click": "rofi -show drun",
-    "on-click-right": "pkill rofi",
+    "on-click-right": "bash ~/.config/waybar/scripts/toggle-left.sh",
     "tooltip": false
   },
   "niri/workspaces": {
@@ -135,12 +135,18 @@
     "on-click": "kitty --hold curl wttr.in"
   },
   "custom/screenshot": {
-    "format": "",
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
     "on-click": "bash ~/.config/waybar/scripts/screenshot.sh",
     "tooltip": false
   },
   "custom/picker": {
-    "format": "",
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
     "on-click": "bash ~/.config/waybar/scripts/pick-color.sh",
     "tooltip": false
   },
@@ -171,9 +177,9 @@
   "custom/recorder": {
     "format": "{}",
     "return-type": "json",
-    "interval": "once",
+    "interval": 1,
     "signal": 9,
-    "exec": "if [ -f /tmp/recording_status ]; then TIME=$(cat /tmp/recording_status); echo \"{\\\"text\\\": \\\"󰑊\\\", \\\"class\\\": \\\"recording\\\"}\"; else echo \"{\\\"text\\\": \\\"󰑊\\\", \\\"class\\\": \\\"stopped\\\"}\"; fi",
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; elif [ -f /tmp/recording_status ]; then echo '{\"text\":\"󰑊\",\"class\":\"recording\"}'; else echo '{\"text\":\"󰑊\",\"class\":\"stopped\"}'; fi",
     "on-click": "~/.config/rofi/scripts/recorder.sh",
     "on-click-right": "pkill -INT -f gpu-screen-recorder",
     "tooltip": false
