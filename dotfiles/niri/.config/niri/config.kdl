@@ -320,47 +320,8 @@ animations {
     // slowdown 3.0
 }
 
-// Window rules let you adjust behavior for individual windows.
-// Find more information on the wiki:
+// Window rules 详见下方「窗口规则（按应用排序）」集中管理区
 // https://niri-wm.github.io/niri/Configuration:-Window-Rules
-
-// Work around WezTerm's initial configure bug
-// by setting an empty default-column-width.
-window-rule {
-    // This regular expression is intentionally made as specific as possible,
-    // since this is the default config, and we want no false positives.
-    // You can get away with just app-id="wezterm" if you want.
-    match app-id=r#"^org\.wezfurlong\.wezterm$"#
-    default-column-width {}
-}
-
-// Open the Firefox picture-in-picture player as floating by default.
-window-rule {
-    // This app-id regular expression will work for both:
-    // - host Firefox (app-id is "firefox")
-    // - Flatpak Firefox (app-id is "org.mozilla.firefox")
-    match app-id=r#"firefox$"# title="^Picture-in-Picture$"
-    open-floating true
-}
-
-// Example: block out two password managers from screen capture.
-// (This example rule is commented out with a "/-" in front.)
-/-window-rule {
-    match app-id=r#"^org\.keepassxc\.KeePassXC$"#
-    match app-id=r#"^org\.gnome\.World\.Secrets$"#
-
-    block-out-from "screen-capture"
-
-    // Use this instead if you want them visible on third-party screenshot tools.
-    // block-out-from "screencast"
-}
-
-// Example: enable rounded corners for all windows.
-// (This example rule is commented out with a "/-" in front.)
-/-window-rule {
-    geometry-corner-radius 12
-    clip-to-geometry true
-}
 
 binds {
     // Keys consist of modifiers separated by + signs, followed by an XKB key name
@@ -648,20 +609,20 @@ binds {
         spawn-sh "pkill waybar; pkill cava; pkill sed; waybar & disown" 
     }
     // 昼夜模式切换
-    Ctrl+Alt+C { spawn "~/.config/niri/scripts/toggle-theme.sh"; }
+    Ctrl+Alt+C hotkey-overlay-title="Toggle Day/Night Theme" { spawn "~/.config/niri/scripts/toggle-theme.sh"; }
     // awww 随机切换壁纸并切换主题色
     Super+Alt+W hotkey-overlay-title="Random Wallpaper" { spawn "~/.config/niri/scripts/wallpaper.sh"; }
-    Super+B {spawn "waypaper" ; }
+    Super+B hotkey-overlay-title="Open Waypaper" {spawn "waypaper" ; }
     // 壁纸选择
-    Ctrl+Alt+W { spawn "~/.config/niri/scripts/wallpaper-picker.sh";} 
+    Ctrl+Alt+W hotkey-overlay-title="Wallpaper Picker" { spawn "~/.config/niri/scripts/wallpaper-picker.sh";} 
     // 音乐快捷面板
-    Ctrl+Alt+M {spawn "~/.config/rofi/scripts/music-menu.sh"; }
+    Ctrl+Alt+M hotkey-overlay-title="Music Menu" {spawn "~/.config/rofi/scripts/music-menu.sh"; }
     //电源快捷面板
-    Ctrl+Alt+P {spawn "~/.config/rofi/scripts/powermenu.sh"; }
+    Ctrl+Alt+P hotkey-overlay-title="Power Menu" {spawn "~/.config/rofi/scripts/powermenu.sh"; }
     // 手动锁屏
-    Ctrl+Alt+L { spawn "hyprlock"; }
+    Ctrl+Alt+L hotkey-overlay-title="Lock Screen: hyprlock" { spawn "hyprlock"; }
     // 录屏
-    Ctrl+Alt+A { spawn "~/.config/rofi/scripts/recorder.sh"; }
+    Ctrl+Alt+A hotkey-overlay-title="Screen Recorder" { spawn "~/.config/rofi/scripts/recorder.sh"; }
 }
 
   // waypaper
@@ -700,71 +661,93 @@ binds {
   // 在 waybar 启动后延迟 5 秒（等待网络完全连接），然后强制刷新天气模块
   spawn-at-startup "sh" "-c" "sleep 5 && pkill -RTMIN+8 waybar"
 
-  // 窗口规则
-window-rule {
-         // 窗口矩形绘制设置为无背景
-         draw-border-with-background false
-         // 设置背景圆角
-         geometry-corner-radius 5
-         // 剪裁应用边缘适用圆角
-         clip-to-geometry true
-}  
-  // 窗口规则
-window-rule {
-         match app-id="waypaper"
-    
-         // 开启悬浮模式
-         open-floating true
-    
-         // 修正：Niri 的规则中设置初始大小的正确简写语法
-         default-column-width { proportion 0.5; } 
-         default-window-height { proportion 0.5; }
-}
+  // ==================== 窗口规则（按应用排序） ====================
 
-window-rule {
-         // 匹配 blueman 管理器
-         match app-id="blueman-manager"
-         open-floating true  
-         // 开启悬浮并设置初始大小
-         default-column-width { fixed 600; }
-         default-window-height { fixed 400; }
+  // --- 通用规则：所有窗口 ---
+  window-rule {
+      // 应用：全局 — 所有窗口圆角与裁剪
+      draw-border-with-background false
+      geometry-corner-radius 5
+      clip-to-geometry true
+  }
 
-}
+  // --- 应用专属规则（按 app-id 字母序） ---
 
-window-rule {
-    // 匹配 Kitty 终端
-    match app-id="kitty"
-    
-    // 开启背景效果
-    background-effect {
-        blur true
-        // 建议 xray 设置为 false，这样在平铺布局下能看到下方窗口的模糊残影
-        xray false
-    }
-    
-    // 如果你在 Kitty 配置文件里没设透明度，也可以在 Niri 这一层强制开启
-    // opacity 0.85
-}
+  // 1. blueman-manager — 蓝牙管理器
+  window-rule {
+      match app-id="blueman-manager"
+      open-floating true
+      default-column-width { fixed 600; }
+      default-window-height { fixed 400; }
+  }
 
-window-rule {
-    // 匹配 QQ 图片查看器
-    match app-id="QQ" title="^图片查看器$"
-    open-floating true
-}
+  // 2. firefox — Firefox 画中画窗口
+  window-rule {
+      // 兼容 host (firefox) 与 Flatpak (org.mozilla.firefox)
+      match app-id=r#"firefox$"# title="^Picture-in-Picture$"
+      open-floating true
+  }
 
-window-rule {
-    // 匹配 SPlayer 视频播放器
-    match app-id="SPlayer"
-    open-floating true
-}
+  // 3. kitty — Kitty 终端
+  window-rule {
+      match app-id="kitty"
+      background-effect {
+          blur true
+          xray false
+      }
+      // opacity 0.85
+  }
 
-window-rule {
-    // 匹配所有以 "Minecraft" 开头的 App ID（无论后面是什么版本号）
-    match app-id="^Minecraft"
-    
-    // 强引导：打开时自动进入 Niri 全屏
-    open-fullscreen true
-}
+  // 4. Minecraft — Minecraft 启动器/游戏（所有版本）
+  window-rule {
+      match app-id="^Minecraft"
+      open-fullscreen true
+  }
+
+  // 5. QQ — QQ 图片查看器
+  window-rule {
+      match app-id="QQ" title="^图片查看器$"
+      open-floating true
+  }
+
+  // 6. SPlayer — SPlayer 音乐播放器
+  window-rule {
+      match app-id="SPlayer"
+      open-floating true
+  }
+
+  // 7. steam — Steam 设置窗口
+  window-rule {
+      match app-id="steam" title="^Steam 设置$"
+      open-floating true
+  }
+
+  // 8. waypaper — Waypaper 壁纸管理器
+  window-rule {
+      match app-id="waypaper"
+      open-floating true
+      default-column-width { proportion 0.5; }
+      default-window-height { proportion 0.5; }
+  }
+
+  // 9. WezTerm — WezTerm 终端（修复初始列宽 bug）
+  window-rule {
+      match app-id=r#"^org\.wezfurlong\.wezterm$"#
+      default-column-width {}
+  }
+
+  // --- 示例/禁用规则（以 /- 开头，不生效） ---
+  /-window-rule {
+      // 示例：屏蔽密码管理器不被录屏捕获 — KeePassXC / GNOME Secrets
+      match app-id=r#"^org\.keepassxc\.KeePassXC$"#
+      match app-id=r#"^org\.gnome\.World\.Secrets$"#
+      block-out-from "screen-capture"
+  }
+  /-window-rule {
+      // 示例：全局圆角（已被上方通用规则替代）
+      geometry-corner-radius 12
+      clip-to-geometry true
+  }
 
 environment {
     // Fcitx5 环境设置
