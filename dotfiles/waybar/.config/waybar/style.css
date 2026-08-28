@@ -30,6 +30,8 @@ window#waybar {
 #battery,
 #tray,
 #custom-backlight,
+#custom-brightness,
+#custom-screen-power,
 #custom-fcitx,
 #custom-updates,
 #custom-weather,
@@ -232,6 +234,8 @@ window#waybar {
 #custom-mnext:hover,
 #custom-weather:hover,
 #custom-backlight:hover,
+#custom-brightness:hover,
+#custom-screen-power:hover,
 #custom-music:hover,
 #custom-launcher:hover,
 #custom-power:hover {
@@ -253,4 +257,17 @@ window#waybar {
     color: @bg;
     background-color: @fg;
     animation: blinker 2s linear infinite;
+}
+
+/* 屏幕电源模块 off 态：熄灭暗淡 */
+#custom-screen-power.off {
+    color: @muted;
+    background-color: alpha(@muted, 0.5);
+}
+
+/* 部分屏幕关闭：保持色块但用 accent 描边提示状态 */
+#custom-screen-power.internal,
+#custom-screen-power.external {
+    color: @fg;
+    box-shadow: inset 0 0 0 2px @muted;
 }
