@@ -187,7 +187,7 @@
     "on-click-right": "playerctl next",
     "on-scroll-up": "playerctl volume 0.05+",
     "on-scroll-down": "playerctl volume 0.05-",
-    "max-length": 22,
+    "max-length": 15,
     "tooltip": true
   },
   "custom/brightness": {
