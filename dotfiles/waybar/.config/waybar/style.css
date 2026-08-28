@@ -49,7 +49,7 @@ window#waybar {
 #custom-inhibit,
 #custom-power {
     padding: 0 10px;
-    margin: 5px 2px;
+    margin: 5px 1px;
     min-height: 28px;
     border-radius: 9px;
     border: none;
@@ -128,7 +128,7 @@ window#waybar {
 #workspaces button {
     /* 基础状态：暗色小方块，居中于 42px 栏 */
     padding: 0px;
-    margin: 12px 2px;
+    margin: 12px 1px;
     min-width: 16px;
     min-height: 18px;
     background-color: alpha(@fg, 0.35);
