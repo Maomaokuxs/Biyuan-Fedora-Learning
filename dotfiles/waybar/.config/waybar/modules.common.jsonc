@@ -25,6 +25,37 @@
   "cpu": {
     "format": " {usage}%"
   },
+  "custom/cpu": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else usage=$(grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {printf \"%.0f\", usage}'); printf '{\"text\":\" %s%%\"}' \"$usage\"; fi",
+    "tooltip": true
+  },
+  "custom/memory": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else used=$(free -m | awk '/Mem:/{print $3}'); total=$(free -m | awk '/Mem:/{print $2}'); printf '{\"text\":\" %.1fG\",\"tooltip\":\"内存已用: %dMiB / %dMiB\"}' \"$(awk \"BEGIN{print $used/1024}\")\" \"$used\" \"$total\"; fi",
+    "on-click": "kitty --title 'System Monitor' btop",
+    "tooltip": true
+  },
+  "custom/network": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"󰤨\",\"tooltip\":\"Network\"}'; fi",
+    "on-click": "kitty -e nmtui",
+    "tooltip": true
+  },
+  "custom/bluetooth": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; elif bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then echo '{\"text\":\"\"}'; else echo '{\"text\":\"󰂲\"}'; fi",
+    "on-click": "kcmshell6 kcm_bluetooth",
+    "tooltip": true
+  },
   "memory": {
     "interval": 5,
     "format": " {used:0.1f}G",
@@ -101,7 +132,7 @@
   "custom/power": {
     "format": "⏻",
     "on-click": "~/.config/rofi/scripts/powermenu.sh",
-    "on-click-right": "pkill rofi",
+    "on-click-right": "bash ~/.config/waybar/scripts/toggle-system.sh",
     "tooltip": false
   },
   "custom/fcitx": {
