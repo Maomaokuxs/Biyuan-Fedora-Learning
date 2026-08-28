@@ -38,7 +38,15 @@ case "$SELECTED" in
         sleep 1
         # 3. 执行物理休眠（写入 32G 交换空间并断电）
         systemctl hibernate
-        ;;   
+        ;;
+    "$LOGOUT")
+        # niri 登出：优先 niri quit，失败回退 loginctl
+        if pgrep -x niri >/dev/null 2>&1; then
+            niri msg action quit
+        else
+            loginctl terminate-session "${XDG_SESSION_ID:-$(loginctl show-user "$USER" -p Display --value 2>/dev/null)}"
+        fi
+        ;;
      "$REBOOT")
         systemctl reboot ;;
     "$SHUTDOWN")
