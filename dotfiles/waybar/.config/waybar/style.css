@@ -43,6 +43,7 @@ window#waybar {
 #custom-lyric,
 #custom-screenshot,
 #custom-picker,
+#custom-clipboard,
 #custom-mprev,
 #custom-mplay,
 #custom-mnext,
@@ -233,6 +234,7 @@ window#waybar {
 #custom-lyric:hover,
 #custom-screenshot:hover,
 #custom-picker:hover,
+#custom-clipboard:hover,
 #custom-mprev:hover,
 #custom-mplay:hover,
 #custom-mnext:hover,
@@ -297,7 +299,8 @@ window#waybar {
 /* 左侧三功能隐藏态（由 Fedora 徽标右键切换） */
 #custom-recorder.hidden,
 #custom-screenshot.hidden,
-#custom-picker.hidden {
+#custom-picker.hidden,
+#custom-clipboard.hidden {
     opacity: 0;
     margin: 0;
     padding: 0;

@@ -629,6 +629,8 @@ binds {
     Ctrl+Alt+L hotkey-overlay-title="Lock Screen: hyprlock" { spawn "hyprlock"; }
     // 录屏
     Ctrl+Alt+A hotkey-overlay-title="Screen Recorder" { spawn "~/.config/rofi/scripts/recorder.sh"; }
+    // 剪贴板历史 — CopyQ
+    Mod+Ctrl+V hotkey-overlay-title="Clipboard History" { spawn "copyq" "toggle"; }
 }
 
   // waypaper
@@ -653,15 +655,18 @@ binds {
   
   // 通知
   spawn-at-startup "mako"
-  
+
+  // 剪贴板历史 — CopyQ（已装，未装时静默跳过）
+  spawn-at-startup "sh" "-c" "command -v copyq >/dev/null && copyq & sleep 1 && copyq enable &"
+
   //默认壁纸
   spawn-at-startup "~/.config/niri/scripts/init-wallpaper.sh"
 
   // 锁屏
-  // 1. 同步环境：告诉系统底层当前的显示协议和桌面环境
+  // 同步环境：告诉系统底层当前的显示协议和桌面环境
   spawn-at-startup "dbus-update-activation-environment" "--systemd" "WAYLAND_DISPLAY" "XDG_CURRENT_DESKTOP" "QT_QPA_PLATFORMTHEME"
 
-  // 2. 启动中枢：开启闲置监听守护进程
+  // 启动中枢：开启闲置监听守护进程
   spawn-at-startup "hypridle"
   // 刷新waybar天气模块
   // 在 waybar 启动后延迟 5 秒（等待网络完全连接），然后强制刷新天气模块
@@ -679,7 +684,7 @@ binds {
 
   // --- 应用专属规则（按 app-id 字母序） ---
 
-  // 1. blueman-manager — 蓝牙管理器
+  // blueman-manager — 蓝牙管理器
   window-rule {
       match app-id="blueman-manager"
       open-floating true
@@ -687,14 +692,22 @@ binds {
       default-window-height { fixed 400; }
   }
 
-  // 2. firefox — Firefox 画中画窗口
+  // CopyQ — 剪贴板历史
+  window-rule {
+      match app-id="com.github.hluk.copyq"
+      open-floating true
+      default-column-width { fixed 700; }
+      default-window-height { fixed 500; }
+  }
+
+  // firefox — Firefox 画中画窗口
   window-rule {
       // 兼容 host (firefox) 与 Flatpak (org.mozilla.firefox)
       match app-id=r#"firefox$"# title="^Picture-in-Picture$"
       open-floating true
   }
 
-  // 3. kitty — Kitty 终端
+  // kitty — Kitty 终端
   window-rule {
       match app-id="kitty"
       background-effect {
@@ -704,13 +717,13 @@ binds {
       // opacity 0.85
   }
 
-  // 4. Minecraft — Minecraft 启动器/游戏（所有版本）
+  // Minecraft — Minecraft 启动器/游戏（所有版本）
   window-rule {
       match app-id="^Minecraft"
       open-fullscreen true
   }
 
-  // 5. QQ — QQ 图片查看器 / 设置
+  // QQ — QQ 图片查看器 / 设置
   window-rule {
       match app-id="QQ" title="^图片查看器$"
       open-floating true
@@ -720,19 +733,19 @@ binds {
       open-floating true
   }
 
-  // 6. SPlayer — SPlayer 音乐播放器
+  // SPlayer — SPlayer 音乐播放器
   window-rule {
       match app-id="SPlayer"
       open-floating true
   }
 
-  // 7. steam — Steam 设置窗口
+  // steam — Steam 设置窗口
   window-rule {
       match app-id="steam" title="^Steam 设置$"
       open-floating true
   }
 
-  // 8. waypaper — Waypaper 壁纸管理器
+  // waypaper — Waypaper 壁纸管理器
   window-rule {
       match app-id="waypaper"
       open-floating true
@@ -740,7 +753,7 @@ binds {
       default-window-height { proportion 0.5; }
   }
 
-  // 9. WezTerm — WezTerm 终端（修复初始列宽 bug）
+  // WezTerm — WezTerm 终端（修复初始列宽 bug）
   window-rule {
       match app-id=r#"^org\.wezfurlong\.wezterm$"#
       default-column-width {}
