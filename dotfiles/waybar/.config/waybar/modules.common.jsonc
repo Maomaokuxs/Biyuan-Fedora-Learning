@@ -301,14 +301,6 @@
     "on-click": "bash -c 'pkill gammastep && notify-send 护眼 已关闭 || (gammastep -O 4500 & notify-send 护眼 已开启)'",
     "tooltip": true
   },
-  "custom/wlsunset": {
-    "format": "{}",
-    "return-type": "json",
-    "interval": 1,
-    "exec": "~/.config/waybar/scripts/wlsunset.sh",
-    "on-click": "bash -c 'pkill gammastep && notify-send 护眼 已关闭 || (gammastep -O 4500 & notify-send 护眼 已开启)'",
-    "tooltip": true
-  },
   "custom/theme": {
     "format": "{}",
     "return-type": "json",
