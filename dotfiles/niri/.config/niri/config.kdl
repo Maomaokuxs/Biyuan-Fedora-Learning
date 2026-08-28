@@ -610,11 +610,10 @@ binds {
     }
     // 昼夜模式切换
     Ctrl+Alt+C hotkey-overlay-title="Toggle Day/Night Theme" { spawn "~/.config/niri/scripts/toggle-theme.sh"; }
-    // awww 随机切换壁纸并切换主题色
-    Super+Alt+W hotkey-overlay-title="Random Wallpaper" { spawn "~/.config/niri/scripts/wallpaper.sh"; }
+    // Super+Alt+W 已取消（原随机壁纸），wallpaper-picker.sh 文件保留
     Super+B hotkey-overlay-title="Open Waypaper" {spawn "waypaper" ; }
-    // 壁纸选择
-    Ctrl+Alt+W hotkey-overlay-title="Wallpaper Picker" { spawn "~/.config/niri/scripts/wallpaper-picker.sh";} 
+    // 随机壁纸（原 Super+Alt+W，现改为 Ctrl+Alt+W）
+    Ctrl+Alt+W hotkey-overlay-title="Random Wallpaper" { spawn "~/.config/niri/scripts/wallpaper.sh";} 
     // 音乐快捷面板
     Ctrl+Alt+M hotkey-overlay-title="Music Menu" {spawn "~/.config/rofi/scripts/music-menu.sh"; }
     //电源快捷面板
