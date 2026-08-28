@@ -28,14 +28,14 @@
   "custom/cpu": {
     "format": "{}",
     "return-type": "json",
-    "interval": 1,
+    "interval": 2,
     "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else usage=$(grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {printf \"%.0f\", usage}'); printf '{\"text\":\" %s%%\"}' \"$usage\"; fi",
     "tooltip": true
   },
   "custom/memory": {
     "format": "{}",
     "return-type": "json",
-    "interval": 1,
+    "interval": 2,
     "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else used=$(free -m | awk '/Mem:/{print $3}'); total=$(free -m | awk '/Mem:/{print $2}'); printf '{\"text\":\" %.1fG\",\"tooltip\":\"内存已用: %dMiB / %dMiB\"}' \"$(awk \"BEGIN{print $used/1024}\")\" \"$used\" \"$total\"; fi",
     "on-click": "kitty --title 'System Monitor' btop",
     "tooltip": true
@@ -43,7 +43,7 @@
   "custom/network": {
     "format": "{}",
     "return-type": "json",
-    "interval": 1,
+    "interval": 2,
     "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"󰤨\",\"tooltip\":\"Network\"}'; fi",
     "on-click": "kitty -e nmtui",
     "tooltip": true
@@ -51,7 +51,7 @@
   "custom/bluetooth": {
     "format": "{}",
     "return-type": "json",
-    "interval": 1,
+    "interval": 2,
     "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; elif bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then echo '{\"text\":\"\"}'; else echo '{\"text\":\"󰂲\"}'; fi",
     "on-click": "kcmshell6 kcm_bluetooth",
     "tooltip": true
@@ -292,6 +292,22 @@
     "interval": 2,
     "on-click": "bash ~/.config/waybar/scripts/inhibit.sh toggle",
     "tooltip": false
+  },
+  "custom/gammastep": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "~/.config/waybar/scripts/gammastep.sh",
+    "on-click": "bash -c 'pkill gammastep && notify-send 护眼 已关闭 || (gammastep -O 4500 & notify-send 护眼 已开启)'",
+    "tooltip": true
+  },
+  "custom/wlsunset": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "~/.config/waybar/scripts/wlsunset.sh",
+    "on-click": "bash -c 'pkill gammastep && notify-send 护眼 已关闭 || (gammastep -O 4500 & notify-send 护眼 已开启)'",
+    "tooltip": true
   },
   "custom/theme": {
     "format": "{}",
