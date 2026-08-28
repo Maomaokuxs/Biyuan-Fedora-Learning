@@ -224,8 +224,8 @@
   "custom/screen-power": {
     "format": "{}",
     "return-type": "json",
-    "exec": "~/.config/waybar/scripts/screen.sh",
-    "interval": 5,
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else ~/.config/waybar/scripts/screen.sh; fi",
     "on-click": "bash ~/.config/waybar/scripts/screen.sh menu",
     "tooltip": false
   },
@@ -265,8 +265,8 @@
   "custom/theme": {
     "format": "{}",
     "return-type": "json",
-    "exec": "bash ~/.config/waybar/scripts/auto-theme.sh",
-    "interval": 60,
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else bash ~/.config/waybar/scripts/auto-theme.sh; fi",
     "signal": 12,
     "on-click": "bash ~/.config/niri/scripts/toggle-theme.sh",
     "tooltip": true
