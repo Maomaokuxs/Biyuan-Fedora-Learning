@@ -150,6 +150,15 @@
     "on-click": "bash ~/.config/waybar/scripts/pick-color.sh",
     "tooltip": false
   },
+  "custom/clipboard": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 1,
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
+    "on-click": "copyq toggle",
+    "on-click-right": "copyq eval \"clear()\" 2>/dev/null; notify-send \"剪贴板\" \"已清空\"",
+    "tooltip": false
+  },
   "custom/mprev": {
     "format": "{}",
     "return-type": "json",
