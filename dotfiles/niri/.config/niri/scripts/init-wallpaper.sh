@@ -103,22 +103,18 @@ if [ -f "$THEME_SYNC_SCRIPT" ]; then
     # 主题同步成功后创建锁文件，确保下次不再重复执行
     touch "$INIT_LOCK"
     echo -e "\033[0;32m✅ Initialization lock created: $INIT_LOCK\033[0m"
+else
+    echo -e "\033[0;31m⚠️  Error: Cannot locate engine at $THEME_SYNC_SCRIPT\033[0m"
+    # 最后的保命逻辑：尝试从当前已安装的配置目录查找
+    ALT_SYNC="$HOME/.config/niri/scripts/theme-sync.sh"
+    if [ -f "$ALT_SYNC" ]; then
+        bash "$ALT_SYNC" "$FINAL_WALLPAPER"
     else
-        echo -e "\033[0;31m⚠️  Error: Cannot locate engine at $THEME_SYNC_SCRIPT\033[0m"
-        
-        # 最后的保命逻辑：尝试从当前已安装的配置目录查找
-        ALT_SYNC="$HOME/.config/niri/scripts/theme-sync.sh"
-        if [ -f "$ALT_SYNC" ]; then
-            bash "$ALT_SYNC" "$FINAL_WALLPAPER"
-        else
-            if [ -n "$WAYLAND_DISPLAY" ]; then
-                awww query &>/dev/null || awww init &>/dev/null
-                awww img "$FINAL_WALLPAPER" --transition-type center
-            fi
+        if [ -n "$WAYLAND_DISPLAY" ]; then
+            awww query &>/dev/null || awww init &>/dev/null
+            awww img "$FINAL_WALLPAPER" --transition-type center
         fi
     fi
-else
-    echo -e "\033[0;31m❌ Fatal: No wallpaper file available at all. Engine aborted.\033[0m"
 fi
 
 echo "✨ Visualization system initialization finished."
