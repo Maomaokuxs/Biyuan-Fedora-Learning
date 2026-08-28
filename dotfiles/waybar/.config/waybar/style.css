@@ -45,6 +45,7 @@ window#waybar {
 #custom-mprev,
 #custom-mplay,
 #custom-mnext,
+#custom-inhibit,
 #custom-power {
     padding: 0 10px;
     margin: 5px 2px;
@@ -240,6 +241,7 @@ window#waybar {
 #custom-screen-power:hover,
 #custom-music:hover,
 #custom-launcher:hover,
+#custom-inhibit:hover,
 #custom-power:hover {
     background-color: @fg;
     color: @bg;
@@ -277,4 +279,13 @@ window#waybar {
 /* 歌词关闭态：彻底隐藏 */
 #custom-lyric.hidden {
     opacity: 0;
+}
+
+/* 阻止熄屏状态 */
+#custom-inhibit.inhibited {
+    color: @bg;
+    background-color: @fg;
+}
+#custom-inhibit.idle {
+    color: @muted;
 }
