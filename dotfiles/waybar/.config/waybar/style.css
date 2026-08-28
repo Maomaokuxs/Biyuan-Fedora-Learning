@@ -283,6 +283,19 @@ window#waybar {
     opacity: 0;
 }
 
+/* 音乐控件隐藏态（由 cava 左键切换） */
+#custom-mprev.hidden,
+#custom-mplay.hidden,
+#custom-mnext.hidden,
+#custom-music.hidden,
+#custom-lyric.hidden {
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    border: none;
+}
+
 /* 阻止熄屏状态 */
 #custom-inhibit.inhibited {
     color: @bg;
