@@ -35,11 +35,11 @@ mainbox {
 }
 
 /* ==========================================
- * 3. 左侧区域 (系统信息)：60% 宽度
+ * 3. 左侧区域 (系统信息)：59% 宽度（eDP 1706/ HDMI 1920 均使关机贴右）
  * ========================================== */
 inputbar {
-    width:      60%;
-    padding:    5px 15px;
+    width:      59%;
+    padding:    5px 10px;
     children:   [ prompt ];
 }
 
@@ -50,19 +50,21 @@ prompt {
 }
 
 /* ==========================================
- * 4. 右侧区域 (电源控件)：扩张到 40% 以容纳 6 个按钮
+ * 4. 右侧区域 (电源控件)：41% 精确容纳 6 按钮（eDP 1706 需 697px/41%）
  * ========================================== */
 listview {
-    width:      40%;
+    width:      41%;
     layout:     horizontal;
-    spacing:    10px;      
-    padding:    5px;  
-    lines:      6;     /* 🔴 允许显示 6 个选项 */    
+    spacing:    4px;      
+    padding:    5px 2px;  
+    lines:      6;
+    scrollbar:  false;
+    cycle:      false;
 }
 
 /* 单个按钮的外观 */
 element {
-    padding:        0px 12px;  /* 稍微减少一点内边距，防止太拥挤 */
+    padding:        0px 8px;
     border-radius:  4px;
     text-color:     @fg;
     cursor:         pointer;
