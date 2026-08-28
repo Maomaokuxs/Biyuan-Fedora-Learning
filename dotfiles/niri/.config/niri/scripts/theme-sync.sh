@@ -366,20 +366,29 @@ echo "   Mako 配色切片 -> $TARGET_DIR/color-mako.conf"
 # --- I. Hyprlock (Fedora 独有) ---
 mkdir -p ~/.config/hypr
 
-cat <<EOF > ~/.config/hypr/hyprlock.conf
-# 由 theme-sync.sh 自动生成
+# 动态获取屏幕列表 + 焦点屏幕（niri），密码框只在焦点屏生成
+HPR_MONITORS=$(niri msg outputs 2>/dev/null | grep 'Output "' | sed 's/.*(\([^)]*\))/\1/' | sort -u)
+[ -z "$HPR_MONITORS" ] && HPR_MONITORS="eDP-1"
+FOCUS_MONITOR=$(niri msg focused-output 2>/dev/null | sed -n 's/.*(\([^)]*\))/\1/p' | head -1)
+[ -z "$FOCUS_MONITOR" ] && FOCUS_MONITOR="eDP-1"
 
-# 1. 背景：使用当前壁纸，并加上高级的毛玻璃模糊效果
+echo "# 由 theme-sync.sh 自动生成（多屏动态，密码框仅在焦点屏）" > ~/.config/hypr/hyprlock.conf
+echo "" >> ~/.config/hypr/hyprlock.conf
+for mon in $HPR_MONITORS; do
+cat >> ~/.config/hypr/hyprlock.conf <<HYPLOCK
+# 背景: $mon
 background {
-    monitor =
-    path = "$WALLPAPER"
+    monitor = $mon
+    path = $WALLPAPER
     blur_passes = 3
     blur_size = 8
 }
-
-# 2. 密码输入框：极简的胶囊形状
+HYPLOCK
+  if [ "$mon" = "$FOCUS_MONITOR" ]; then
+cat >> ~/.config/hypr/hyprlock.conf <<HYPLOCK
+# 密码输入框（焦点屏）: $mon
 input-field {
-    monitor =
+    monitor = $mon
     size = 250, 50
     outline_thickness = 2
     dots_size = 0.2
@@ -395,10 +404,12 @@ input-field {
     halign = center
     valign = center
 }
-
-# 3. 巨型时间显示
+HYPLOCK
+  fi
+cat >> ~/.config/hypr/hyprlock.conf <<HYPLOCK
+# 时间: $mon
 label {
-    monitor =
+    monitor = $mon
     text = cmd[update:1000] echo "<b><big> \$(date +"%H:%M") </big></b>"
     color = rgb(${FG:1})
     font_size = 94
@@ -408,18 +419,20 @@ label {
     valign = center
 }
 
-# 4. 音乐状态显示 (极简文字呈现)
+# 日期: $mon
 label {
-    monitor =
-    text = cmd[update:2000] echo " \$(playerctl metadata --format '{{ title }}  {{ artist }}' 2>/dev/null || echo 'No Music Playing')"
-    color = rgb(${ACCENT:1})
-    font_size = 14
+    monitor = $mon
+    text = cmd[update:60] echo "<b>\$(date +"%Y 年 %m 月 %d 日  %A")</b>"
+    color = rgb(${MUTED:1})
+    font_size = 18
     font_family = JetBrainsMono Nerd Font
-    position = 0, 30
+    position = 0, 20
     halign = center
-    valign = bottom
+    valign = center
 }
-EOF
+
+HYPLOCK
+done
 echo "   Hyprlock 配色 -> ~/.config/hypr/hyprlock.conf"
 
 # --- I. Kitty (color-kitty.conf) ---
