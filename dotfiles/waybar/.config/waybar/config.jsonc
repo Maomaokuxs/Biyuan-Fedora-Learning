@@ -16,7 +16,8 @@
       "custom/cava",
       "custom/mprev",
       "custom/mplay",
-      "custom/mnext"
+      "custom/mnext",
+      "custom/lyric"
     ],
     "modules-center": [],
     "modules-right": [
@@ -54,7 +55,8 @@
       "custom/cava",
       "custom/mprev",
       "custom/mplay",
-      "custom/mnext"
+      "custom/mnext",
+      "custom/lyric"
     ],
     "modules-center": [],
     "modules-right": [
