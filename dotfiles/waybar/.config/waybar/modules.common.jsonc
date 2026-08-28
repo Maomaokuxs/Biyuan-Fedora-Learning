@@ -239,5 +239,14 @@
     "interval": 2,
     "on-click": "bash ~/.config/waybar/scripts/inhibit.sh toggle",
     "tooltip": false
+  },
+  "custom/theme": {
+    "format": "{}",
+    "return-type": "json",
+    "exec": "bash ~/.config/waybar/scripts/auto-theme.sh",
+    "interval": 60,
+    "signal": 12,
+    "on-click": "bash ~/.config/niri/scripts/toggle-theme.sh",
+    "tooltip": true
   }
 }
