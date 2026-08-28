@@ -22,10 +22,15 @@ window#waybar {
 /* --- 3. 通用色块样式 (核心)：内缩圆角矩形、按组配色 --- */
 /* 几何：32px 色块悬浮于 45px 栏内，上下留 5px 呼吸位 */
 #cpu,
+#custom-cpu,
 #memory,
+#custom-memory,
 #bluetooth,
+#custom-bluetooth,
+#custom-bluetooth,
 #pulseaudio,
 #network,
+#custom-network,
 #clock,
 #battery,
 #tray,
@@ -75,16 +80,21 @@ window#waybar {
 
 /* 系统监控组：亮一档的橄榄 */
 #cpu,
+#custom-cpu,
 #memory,
-#battery,
-#custom-backlight {
+#custom-memory,
+#battery {
     background-color: mix(@accent, @fg, 0.14);
 }
 
 /* 连接与设备组：暖砖红 */
 #network,
+#custom-network,
 #bluetooth,
-#pulseaudio {
+#custom-bluetooth,
+#pulseaudio,
+#custom-brightness,
+#custom-backlight {
     background-color: shade(@muted, 1.15);
 }
 
@@ -221,10 +231,14 @@ window#waybar {
 
 /* --- 8. 交互反馈：反色悬停 (经典终端选中效果) --- */
 #cpu:hover,
+#custom-cpu:hover,
 #memory:hover,
+#custom-memory:hover,
 #pulseaudio:hover,
 #network:hover,
+#custom-network:hover,
 #bluetooth:hover,
+#custom-bluetooth:hover,
 #battery:hover,
 #tray:hover,
 #custom-fcitx:hover,
@@ -297,6 +311,10 @@ window#waybar {
 }
 
 /* 左侧三功能隐藏态（由 Fedora 徽标右键切换） */
+#custom-cpu.hidden,
+#custom-memory.hidden,
+#custom-network.hidden,
+#custom-bluetooth.hidden,
 #custom-recorder.hidden,
 #custom-screenshot.hidden,
 #custom-picker.hidden,
