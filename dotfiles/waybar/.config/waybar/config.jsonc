@@ -1,4 +1,7 @@
+[
 {
+    "output": "eDP-1",
+
     "layer": "top",
     "position": "top",
     "height": 42, // 必须与 Rofi 的 y-offset 对齐
@@ -11,7 +14,7 @@
         //"niri/window",
     ],
     "modules-center": [],
-    "modules-right": ["custom/updates","custom/weather","pulseaudio","custom/backlight", "network","bluetooth", "cpu", "memory", "battery", "clock", "tray","custom/fcitx","custom/power"],
+    "modules-right": ["custom/updates","custom/weather","pulseaudio","custom/brightness","custom/screen-power", "network","bluetooth", "cpu", "memory", "battery", "clock", "tray","custom/fcitx","custom/power"],
 
     "custom/launcher": {
         "format": "󰣛",
@@ -206,9 +209,32 @@
     "tooltip": true
     },
 
+    "custom/brightness": {
+    "format": "{icon} {percentage}%",
+    "format-icons": ["󰃞", "󰃟", "󰃠"],
+    "tooltip-format": "内接屏亮度 {percentage}%",
+    "return-type": "json",
+    "exec": "~/.config/waybar/scripts/brightness.sh",
+    "interval": 2,
+    "on-scroll-up": "~/.config/waybar/scripts/brightness.sh up",
+    "on-scroll-down": "~/.config/waybar/scripts/brightness.sh down",
+    "on-click": "~/.config/waybar/scripts/brightness.sh mid",
+    "tooltip": false
+    },
+
+    "custom/screen-power": {
+    "format": "{}",
+    "return-type": "json",
+    "exec": "~/.config/waybar/scripts/screen.sh",
+    "interval": 5,
+    "on-click": "bash ~/.config/waybar/scripts/screen.sh menu",
+    "tooltip": false
+    },
+
     "custom/backlight": {
     "format": "{icon} {percentage}%",
     "format-icons": ["󰃞", "󰃟", "󰃠"],
+    "tooltip-format": "外接屏亮度 {percentage}%",
     "return-type": "json",
     "exec": "sh -c 'val=$(ddcutil getvcp 10 --brief | awk \"{print \\$4}\"); echo \"{\\\"percentage\\\": $val}\"'",
     "on-scroll-up": "ddcutil setvcp 10 + 10",
@@ -218,4 +244,253 @@
     "tooltip": false
     }
 
-}
+
+    },
+{
+    "output": "HDMI-A-1",
+
+    "layer": "top",
+    "position": "top",
+    "height": 42, // 必须与 Rofi 的 y-offset 对齐
+    "spacing": 4,
+    "reload_style_on_change": true, // 监视 css 文件变化，仅重载样式不重建窗口（零闪烁换色）
+
+    // 模块分布情况
+
+    "modules-left": ["custom/launcher","niri/workspaces","custom/recorder","custom/screenshot","custom/picker","custom/music","custom/cava","custom/mprev","custom/mplay","custom/mnext"
+        //"niri/window",
+    ],
+    "modules-center": [],
+    "modules-right": ["custom/updates","custom/weather","pulseaudio","custom/backlight","custom/screen-power", "network","bluetooth", "cpu", "memory", "battery", "clock", "tray","custom/fcitx","custom/power"],
+
+    "custom/launcher": {
+        "format": "󰣛",
+        "on-click": "rofi -show drun",
+	"on-click-right": "pkill rofi",
+        "tooltip": false
+    },
+
+    "niri/workspaces": {
+    "format": "{icon}",
+    "format-icons": {
+        "default": " ", // 默认状态是一个空占位
+        "active": " ",  // 激活状态也是空占位
+        "focused": " "
+    },
+    "on-click": "activate"
+    },
+
+        "niri/window": {
+        "format": "󰖲 {title}",
+        "max-length": 30
+    },
+
+    "clock": {
+        "format": " {:%H:%M}",
+        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
+    },
+
+    "cpu": { "format": " {usage}%" },
+    
+    "memory": {
+        "interval": 5,
+        "format": " {used:0.1f}G",
+        "tooltip-format": "内存已用: {used}GiB / {total}GiB",
+        "on-click": "kitty --title 'System Monitor' btop",
+        "on-click-right": "pkill btop"
+    },
+
+   "pulseaudio": {
+        "format": "{icon} {volume}%",
+        "format-muted": "󰝟 Muted",
+        "format-icons": {
+            "headphone": "",
+            "hands-free": "",
+            "headset": "",
+            "phone": "",
+            "portable": "",
+            "car": "",
+            "default": ["", "", ""]
+        },
+        "on-click": "pavucontrol"
+    },
+
+
+    "bluetooth": {
+    "format": " {status}",
+    "format-disabled": "󰂲", // 禁用时的图标
+    "format-connected": " {device_alias}",
+    "format-connected-battery": " {device_alias} {device_battery_percentage}%",
+    "tooltip-format": "{controller_alias}\t{controller_address}",
+    "tooltip-format-connected": "{controller_alias}\t{controller_address}\n\n{device_enumerate}",
+    "tooltip-format-enumerate-connected": "{device_alias}\t{device_address}",
+    
+    // 核心配置：点击图标打开图形化管理界面
+    "on-click": "blueman-manager",
+    
+    // 右键点击可以快速切换电源开关（可选）
+    "on-click-right": "rfkill toggle bluetooth"
+    },
+
+    "network": {
+    "format-wifi": "{icon}",
+    "format-icons": ["󰤥", "󰤦", "󰤧", "󰤨"], // 信号弱→满格四档动态切换
+    "format-ethernet": "󰈀",
+    "format-disconnected": "󰤮",
+    "tooltip-format": "{ifname} via {gwaddr} 󰊗",
+    "tooltip-format-wifi": "󰤨  {essid} ({signalStrength}%)",
+    "tooltip-format-ethernet": "󰈀  {ifname} ",
+    "tooltip-format-disconnected": "Disconnected ⚠",
+    "on-click": "kitty -e nmtui" // 点击直接在终端打开网络管理，符合博主的操作习惯
+    },
+
+    "battery": {
+        "states": { "warning": 30, "critical": 15 },
+        "format": "{icon} {capacity}%",
+        "format-icons": ["", "", "", "", ""]
+    },
+
+    "custom/cava": {
+        "exec": "~/.config/waybar/scripts/cava.sh",
+        "format": "{}",
+        "tooltip": false,
+	/* 开启媒体管理工具 */
+	"on-click": "~/.config/rofi/scripts/music-menu.sh",
+        "on-click-right": "pkill rofi"
+    },
+
+    "custom/power": {
+        "format": "⏻",
+        "on-click": "~/.config/rofi/scripts/powermenu.sh", // 这里的路径要对应下一步的脚本
+        "on-click-right": "pkill rofi",
+	"tooltip": false
+    },
+
+    "custom/fcitx": {
+    "interval": 1,
+    "exec": "~/.config/waybar/scripts/fcitx_status.sh",
+    "on-click": "fcitx5-remote -s", // 点击切换下一个输入法
+    "on-click-right": "fcitx5-configtool", // 右键打开配置界面
+    "tooltip": false
+    },
+
+    "tray": {
+    "icon-size": 18,    // 调小图标尺寸，间距感会更强
+    "spacing": 6,       // 缩小图标之间的像素间距
+    "show-passive-items": true
+    },
+
+    "custom/updates": {
+    "format": "{}",
+    "exec": "~/.config/waybar/scripts/check-updates.sh",
+    "return-type": "json",
+    "on-click": "kitty --hold sh -c 'sudo dnf upgrade && pkill -RTMIN+8 waybar'",
+    "on-click-right": "pkill -RTMIN+8 waybar", // 右键点击重新检查
+    "interval": 3600, 
+    "signal": 8       
+    },
+
+    "custom/weather": {
+    "format": "{}",
+    "tooltip": true,
+    "interval": 1800, // 每 30 分钟更新一次，避免请求太频繁
+    "signal": 10, // 后台拉取完成后自动刷新
+    "exec": "~/.config/waybar/scripts/weather.py",
+    "return-type": "json",
+    "on-click": "kitty --hold curl wttr.in" // 点击时弹出终端显示详细的网页版天气图
+    },
+
+    "custom/screenshot": {
+        "format": "\uf030",
+        "on-click": "bash ~/.config/waybar/scripts/screenshot.sh",
+        "tooltip": false
+    },
+
+    "custom/picker": {
+        "format": "\uf1fb",
+        "on-click": "bash ~/.config/waybar/scripts/pick-color.sh",
+        "tooltip": false
+    },
+
+    "custom/mprev": {
+        "format": "\uf048",
+        "on-click": "playerctl previous",
+        "tooltip": false
+    },
+
+    "custom/mplay": {
+        "format": "{}",
+        "exec": "playerctl status 2>/dev/null | grep -q Playing && echo '\uf04c' || echo '\uf04b'",
+        "interval": 2,
+        "on-click": "playerctl play-pause",
+        "tooltip": false
+    },
+
+    "custom/mnext": {
+        "format": "\uf051",
+        "on-click": "playerctl next",
+        "tooltip": false
+    },
+
+    "custom/recorder": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": "once",
+    "signal": 9,
+    "exec": "if [ -f /tmp/recording_status ]; then TIME=$(cat /tmp/recording_status); echo \"{\\\"text\\\": \\\"󰑊\\\", \\\"class\\\": \\\"recording\\\"}\"; else echo \"{\\\"text\\\": \\\"󰑊\\\", \\\"class\\\": \\\"stopped\\\"}\"; fi",
+    "on-click": "~/.config/rofi/scripts/recorder.sh",
+    "on-click-right": "pkill -INT -f gpu-screen-recorder",
+    "tooltip": false
+    },    
+
+  "custom/music": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 2,
+    "exec": "python3 ~/.config/waybar/scripts/music.py",
+    "on-click": "playerctl play-pause",
+    "on-click-right": "playerctl next",
+    "on-scroll-up": "playerctl volume 0.05+",
+    "on-scroll-down": "playerctl volume 0.05-",
+    "max-length": 22,
+    "tooltip": true
+    },
+
+    "custom/brightness": {
+    "format": "{icon} {percentage}%",
+    "format-icons": ["󰃞", "󰃟", "󰃠"],
+    "tooltip-format": "内接屏亮度 {percentage}%",
+    "return-type": "json",
+    "exec": "~/.config/waybar/scripts/brightness.sh",
+    "interval": 2,
+    "on-scroll-up": "~/.config/waybar/scripts/brightness.sh up",
+    "on-scroll-down": "~/.config/waybar/scripts/brightness.sh down",
+    "on-click": "~/.config/waybar/scripts/brightness.sh mid",
+    "tooltip": false
+    },
+
+    "custom/screen-power": {
+    "format": "{}",
+    "return-type": "json",
+    "exec": "~/.config/waybar/scripts/screen.sh",
+    "interval": 5,
+    "on-click": "bash ~/.config/waybar/scripts/screen.sh menu",
+    "tooltip": false
+    },
+
+    "custom/backlight": {
+    "format": "{icon} {percentage}%",
+    "format-icons": ["󰃞", "󰃟", "󰃠"],
+    "tooltip-format": "外接屏亮度 {percentage}%",
+    "return-type": "json",
+    "exec": "sh -c 'val=$(ddcutil getvcp 10 --brief | awk \"{print \\$4}\"); echo \"{\\\"percentage\\\": $val}\"'",
+    "on-scroll-up": "ddcutil setvcp 10 + 10",
+    "on-scroll-down": "ddcutil setvcp 10 - 10",
+    "on-click": "ddcutil setvcp 10 50", // 点击恢复50%
+    "interval": 30, // 30秒同步一次物理按钮调节的数值
+    "tooltip": false
+    }
+
+
+    }
+]
