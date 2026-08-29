@@ -335,8 +335,8 @@ window#waybar {
 /* 阻止熄屏状态 */
 #custom-inhibit.inhibited {
     color: @bg;
-    background-color: @fg;
+    background-color: @accent;
 }
 #custom-inhibit.idle {
-    color: @muted;
+    color: @fg;
 }
