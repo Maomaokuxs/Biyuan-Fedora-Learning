@@ -22,6 +22,7 @@ window#waybar {
 /* --- 3. 通用色块样式 (核心)：内缩圆角矩形、按组配色 --- */
 /* 几何：32px 色块悬浮于 45px 栏内，上下留 5px 呼吸位 */
 #cpu,
+#custom-power-profiles,
 #custom-cpu,
 #memory,
 #custom-memory,
@@ -82,6 +83,7 @@ window#waybar {
 
 /* 系统监控组：亮一档的橄榄 */
 #cpu,
+#custom-power-profiles,
 #custom-cpu,
 #memory,
 #custom-memory,
@@ -233,6 +235,7 @@ window#waybar {
 
 /* --- 8. 交互反馈：反色悬停 (经典终端选中效果) --- */
 #cpu:hover,
+#custom-power-profiles:hover,
 #custom-cpu:hover,
 #memory:hover,
 #custom-memory:hover,
