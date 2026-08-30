@@ -14,7 +14,7 @@ CACHE = os.path.expanduser("~/.cache/by-mgr/weather.json")
 FRESH_SECONDS = 1800  # 30 分钟内视为新鲜
 SIGNAL = "RTMIN+10"   # 后台刷新完成后通知 waybar 重新执行本脚本
 
-CONF = os.path.expanduser("~/.config/waybar/scripts/weather.conf")
+CONF = os.path.expanduser("~/.config/by-mgr/weather.conf")
 
 # 时区 → 城市 映射（系统时区不受代理影响，默认走这里）
 TZ_CITY = {
@@ -72,9 +72,16 @@ def fetch_weather():
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         loc = get_location()
-        # 国内免 key：sojson 赣州 101240701（t.weather.sojson.com），其他城市走 wttr.in 兜底
-        CITY_CODE = {"Ganzhou": "101240701", "赣州": "101240701", "Shanghai": "101020100", "Beijing": "101010100"}
-        code = CITY_CODE.get(loc, "")
+        # 国内免 key：优先 sojson（需城市编码），编码由本地 weather.conf 的 LOCATION 决定，未配置编码则走 wttr.in 兜底（支持任意城市名）
+        # 本地编码文件 weather.conf 可追加 CITY_CODE=101240707 形式，或直接用 wttr.in 无需编码
+        code = ""
+        try:
+            with open(CONF) as f:
+                for line in f:
+                    if line.strip().startswith("CITY_CODE="):
+                        code = line.split("=",1)[1].strip()
+        except Exception:
+            pass
         if code:
             try:
                 r = requests.get(f"http://t.weather.sojson.com/api/weather/city/{code}", headers=headers, timeout=10)
