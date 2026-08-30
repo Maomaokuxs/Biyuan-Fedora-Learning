@@ -14,6 +14,7 @@ setup_base() {
         ["Tuna (Tsinghua)"]="mirrors.tuna.tsinghua.edu.cn"
         ["Aliyun"]="mirrors.aliyun.com"
         ["USTC (Zhongkeda)"]="mirrors.ustc.edu.cn"
+        ["Cernet (联合)"]="mirrors.cernet.edu.cn"
     )
 
     echo -e "${CYAN}   ID | Mirror Name         | Latency (ms)${NC}"
