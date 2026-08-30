@@ -285,6 +285,14 @@
     "tooltip": true,
     "escape": true
   },
+  "custom/power-profiles": {
+    "format": "{}",
+    "return-type": "json",
+    "interval": 5,
+    "exec": "~/.config/waybar/scripts/powerprofiles.sh",
+    "on-click": "~/.config/waybar/scripts/powerprofiles.sh toggle",
+    "tooltip": true
+  },
   "custom/inhibit": {
     "format": "{}",
     "return-type": "json",
