@@ -41,3 +41,4 @@ dotfiles/mako/.config/mako/config
 dotfiles/starship/.config/starship.toml
 dotfiles/waybar/.config/waybar/scripts/weather.conf
 dotfiles/waybar/.config/waybar/scripts/__pycache__/
+dotfiles/by-mgr/.config/by-mgr/weather.conf
