@@ -13,7 +13,7 @@ status() {
     elif [ "$INT" = off ] && [ "$EXT" = off ]; then cls=off
     elif [ "$INT" = off ]; then cls=internal
     else cls=external; fi
-    echo "{\"text\": \"󰅶\", \"class\": \"$cls\"}"
+    echo "{\"text\": \"󰅶\", \"tooltip\": \"屏幕常亮\", \"class\": \"$cls\"}"
 }
 
 menu() {

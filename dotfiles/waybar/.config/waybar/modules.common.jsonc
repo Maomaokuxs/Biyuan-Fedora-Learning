@@ -168,26 +168,29 @@
     "on-click": "kitty --hold curl wttr.in"
   },
   "custom/screenshot": {
+    "tooltip": "截图 (swappy 标注)",
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\",\"tooltip\":\"截图 (swappy 标注)\"}'; fi",
     "on-click": "bash ~/.config/waybar/scripts/screenshot.sh",
     "tooltip": false
   },
   "custom/picker": {
+    "tooltip": "取色器",
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\",\"tooltip\":\"取色器\"}'; fi",
     "on-click": "bash ~/.config/waybar/scripts/pick-color.sh",
     "tooltip": false
   },
   "custom/clipboard": {
+    "tooltip": "剪贴板",
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\",\"tooltip\":\"剪贴板\"}'; fi",
     "on-click": "copyq toggle",
     "on-click-right": "copyq eval \"clear()\" 2>/dev/null; notify-send \"剪贴板\" \"已清空\"",
     "tooltip": false
@@ -217,11 +220,12 @@
     "tooltip": false
   },
   "custom/recorder": {
+    "tooltip": "录制视频",
     "format": "{}",
     "return-type": "json",
     "interval": 1,
     "signal": 9,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; elif [ -f /tmp/recording_status ]; then echo '{\"text\":\"󰑊\",\"class\":\"recording\"}'; else echo '{\"text\":\"󰑊\",\"class\":\"stopped\"}'; fi",
+    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; elif [ -f /tmp/recording_status ]; then echo '{\"text\":\"󰑊\",\"tooltip\":\"录制视频\",\"class\":\"recording\"}'; else echo '{\"text\":\"󰑊\",\"tooltip\":\"录制视频\",\"class\":\"stopped\"}'; fi",
     "on-click": "~/.config/rofi/scripts/recorder.sh",
     "on-click-right": "pkill -INT -f gpu-screen-recorder",
     "tooltip": false
@@ -255,6 +259,7 @@
     "tooltip": false
   },
   "custom/screen-power": {
+    "tooltip": "屏幕常亮",
     "format": "{}",
     "return-type": "json",
     "interval": 1,
@@ -304,6 +309,7 @@
     "tooltip": false
   },
   "custom/gammastep": {
+    "tooltip": "护眼模式",
     "format": "{}",
     "return-type": "json",
     "interval": 1,
@@ -312,6 +318,7 @@
     "tooltip": true
   },
   "custom/theme": {
+    "tooltip": "昼夜主题",
     "format": "{}",
     "return-type": "json",
     "interval": 1,
