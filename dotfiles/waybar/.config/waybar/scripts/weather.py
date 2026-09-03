@@ -89,7 +89,7 @@ def fetch_weather():
                     j = r.json()
                     if j.get("status") == 200 and j.get("data"):
                         data = j["data"]
-                        wendu = data.get("wendu", "??")
+                        wendu = str(int(round(float(data.get("wendu", "0") or 0))))
                         city = j.get("cityInfo", {}).get("city", loc)
                         fc = data.get("forecast", [{}])[0]
                         weather = fc.get("type", "未知")
@@ -100,7 +100,7 @@ def fetch_weather():
                         elif "雨" in weather: icon = "󰖗"
                         elif "雷" in weather: icon = "󰙾"
                         elif "雪" in weather: icon = "󰼶"
-                        return {"text": f"{icon} {wendu}°C", "tooltip": f"城市: {city}\n状态: {weather}\n高温: {high}°C\n湿度: {data.get('shidu','')}", "class": "weather"}
+                        return {"text": f"{icon} {wendu}°C", "tooltip": f"城市: {city}\n状态: {weather}\n温度: {wendu}°C\n湿度: {data.get('shidu','')}", "class": "weather"}
             except Exception:
                 pass
         # 兜底 wttr.in
