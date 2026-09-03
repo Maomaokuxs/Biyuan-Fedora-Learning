@@ -29,14 +29,14 @@
     "format": "{}",
     "return-type": "json",
     "interval": 2,
-    "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else usage=$(grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {printf \"%.0f\", usage}'); printf '{\"text\":\" %s%%\"}' \"$usage\"; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else usage=$(grep 'cpu ' /proc/stat | awk '{usage=($2+$4)*100/($2+$4+$5)} END {printf \"%.0f\", usage}'); printf '{\"text\":\" %s%%\"}' \"$usage\"; fi",
     "tooltip": true
   },
   "custom/memory": {
     "format": "{}",
     "return-type": "json",
     "interval": 2,
-    "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else used=$(free -m | awk '/Mem:/{print $3}'); total=$(free -m | awk '/Mem:/{print $2}'); printf '{\"text\":\" %.1fG\",\"tooltip\":\"内存已用: %dMiB / %dMiB\"}' \"$(awk \"BEGIN{print $used/1024}\")\" \"$used\" \"$total\"; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else used=$(free -m | awk '/Mem:/{print $3}'); total=$(free -m | awk '/Mem:/{print $2}'); printf '{\"text\":\" %.1fG\",\"tooltip\":\"内存已用: %dMiB / %dMiB\"}' \"$(awk \"BEGIN{print $used/1024}\")\" \"$used\" \"$total\"; fi",
     "on-click": "kitty --title 'System Monitor' btop",
     "tooltip": true
   },
@@ -44,7 +44,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 2,
-    "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"󰤨\",\"tooltip\":\"Network\"}'; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"󰤨\",\"tooltip\":\"Network\"}'; fi",
     "on-click": "kitty -e nmtui",
     "tooltip": true
   },
@@ -52,7 +52,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 2,
-    "exec": "if [ -f /tmp/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; elif bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then echo '{\"text\":\"\"}'; else echo '{\"text\":\"󰂲\"}'; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; elif bluetoothctl show 2>/dev/null | grep -q 'Powered: yes'; then echo '{\"text\":\"\"}'; else echo '{\"text\":\"󰂲\"}'; fi",
     "on-click": "kcmshell6 kcm_bluetooth",
     "tooltip": true
   },
@@ -172,7 +172,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\",\"tooltip\":\"截图 (swappy 标注)\"}'; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\",\"tooltip\":\"截图 (swappy 标注)\"}'; fi",
     "on-click": "bash ~/.config/waybar/scripts/screenshot.sh",
     "tooltip": false
   },
@@ -181,7 +181,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\",\"tooltip\":\"取色器\"}'; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\",\"tooltip\":\"取色器\"}'; fi",
     "on-click": "bash ~/.config/waybar/scripts/pick-color.sh",
     "tooltip": false
   },
@@ -190,7 +190,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\",\"tooltip\":\"剪贴板\"}'; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\",\"tooltip\":\"剪贴板\"}'; fi",
     "on-click": "copyq toggle",
     "on-click-right": "copyq eval \"clear()\" 2>/dev/null; notify-send \"剪贴板\" \"已清空\"",
     "tooltip": false
@@ -199,7 +199,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_music_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_music_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
     "on-click": "playerctl previous",
     "tooltip": false
   },
@@ -207,7 +207,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_music_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else playerctl status 2>/dev/null | grep -q Playing && echo '{\"text\":\"\"}' || echo '{\"text\":\"\"}'; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_music_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else playerctl status 2>/dev/null | grep -q Playing && echo '{\"text\":\"\"}' || echo '{\"text\":\"\"}'; fi",
     "on-click": "playerctl play-pause",
     "tooltip": false
   },
@@ -215,7 +215,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_music_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_music_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"\"}'; fi",
     "on-click": "playerctl next",
     "tooltip": false
   },
@@ -225,7 +225,7 @@
     "return-type": "json",
     "interval": 1,
     "signal": 9,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; elif [ -f /tmp/recording_status ]; then echo '{\"text\":\"󰑊\",\"tooltip\":\"录制视频\",\"class\":\"recording\"}'; else echo '{\"text\":\"󰑊\",\"tooltip\":\"录制视频\",\"class\":\"stopped\"}'; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; elif [ -f /tmp/recording_status ]; then echo '{\"text\":\"󰑊\",\"tooltip\":\"录制视频\",\"class\":\"recording\"}'; else echo '{\"text\":\"󰑊\",\"tooltip\":\"录制视频\",\"class\":\"stopped\"}'; fi",
     "on-click": "~/.config/rofi/scripts/recorder.sh",
     "on-click-right": "pkill -INT -f gpu-screen-recorder",
     "tooltip": false
@@ -263,7 +263,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else ~/.config/waybar/scripts/screen.sh; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else ~/.config/waybar/scripts/screen.sh; fi",
     "on-click": "bash ~/.config/waybar/scripts/screen.sh menu",
     "tooltip": false
   },
@@ -322,7 +322,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 1,
-    "exec": "if [ -f /tmp/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else bash ~/.config/waybar/scripts/auto-theme.sh; fi",
+    "exec": "if [ -f ~/.cache/by-mgr/waybar_left_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else bash ~/.config/waybar/scripts/auto-theme.sh; fi",
     "signal": 12,
     "on-click": "bash ~/.config/niri/scripts/toggle-theme.sh",
     "tooltip": true
