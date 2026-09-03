@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 如果已经有脚本在运行，先杀掉它，防止多重频谱叠加
-pkill -f "cava -p /tmp/waybar_cava.conf" 2>/dev/null
+pkill -f "cava -p ~/.cache/by-mgr/waybar_cava.conf" 2>/dev/null
 
 # ==========================================
 # Cava 智能音频后端选择器 (PipeWire / Pulse)
@@ -34,7 +34,7 @@ fi
 # ==========================================
 # 生成动态配置文件
 # ==========================================
-config_file="/tmp/waybar_cava.conf"
+config_file="~/.cache/by-mgr/waybar_cava.conf"
 
 cat <<EOF > "$config_file"
 [general]
