@@ -203,16 +203,19 @@ window#waybar {
     font-weight: bold;
 }
 
-/* 更新模块三态：有更新用橄榄默认 / 内核更新反色告警 */
+/* 更新模块：>50 闪烁告警，其余不闪 */
+#custom-updates.many {
+    background-color: @accent;
+    animation: blinker 1s linear infinite;
+}
 #custom-updates.normal {
     background-color: @accent;
 }
 
 #custom-updates.kernel {
-    color: @bg;              /* 反色告警块 */
+    color: @bg;
     background-color: @fg;
     font-weight: bold;
-    animation: blinker 2s linear infinite;
 }
 
 /* 终端式闪烁动画 */
