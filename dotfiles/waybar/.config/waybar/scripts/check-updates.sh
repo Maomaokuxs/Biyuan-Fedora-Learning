@@ -11,15 +11,17 @@ COUNT=$(echo "$UPDATE_LIST" | grep -vc "^$")
 # 2. 判断内核更新
 KERNEL_UPDATE=$(echo "$UPDATE_LIST" | grep -i "kernel")
 
-# 3. 渲染逻辑
-if [ "$COUNT" -gt 0 ]; then
+# 3. 渲染逻辑：>50 才闪烁（many），其余 normal/kernel 不闪
+if [ "$COUNT" -gt 50 ]; then
+    TEXT="󰏖 $COUNT"
+    ALT="many"
+    TOOLTIP=$(printf "可用软件包更新（%s 个）：\n\n%s" "$COUNT" "$UPDATE_LIST")
+elif [ "$COUNT" -gt 0 ]; then
     if [ -n "$KERNEL_UPDATE" ]; then
-        # 【修改点】：仅保留企鹅图标 
         TEXT=" $COUNT"
         ALT="kernel"
         TOOLTIP=$(printf "⚠ 重大更新提示：检测到新内核！\n\n%s" "$UPDATE_LIST")
     else
-        # 普通更新使用 󰏖 (Package)
         TEXT="󰏖 $COUNT"
         ALT="normal"
         TOOLTIP=$(printf "可用软件包更新：\n\n%s" "$UPDATE_LIST")
