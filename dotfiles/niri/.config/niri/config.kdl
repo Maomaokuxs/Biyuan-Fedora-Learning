@@ -744,6 +744,12 @@ binds {
       match app-id="steam" title="^Steam 设置$"
       open-floating true
   }
+  window-rule {
+      match app-id=r#"steam|google-chrome|chrome"# title=r#"付款|支付|Checkout|Payment|Steam.*购买"#
+      open-floating true
+      default-column-width { fixed 800; }
+      default-window-height { fixed 600; }
+  }
 
   // waypaper — Waypaper 壁纸管理器
   window-rule {
