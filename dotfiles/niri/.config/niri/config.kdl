@@ -306,7 +306,7 @@ gestures {
 // Additionally, clients will be informed that they are tiled, removing some client-side rounded corners.
 // This option will also fix border/focus ring drawing behind some semitransparent windows.
 // After enabling or disabling this, you need to restart the apps for this to take effect.
-// prefer-no-csd
+prefer-no-csd
 
 // You can change the path where screenshots are saved.
 // A ~ at the front will be expanded to the home directory.
@@ -739,10 +739,23 @@ binds {
       open-floating true
   }
 
-  // steam — Steam 设置窗口
+  // steam — 主窗口平铺，设置/好友等二级弹窗浮动
   window-rule {
-      match app-id="steam" title="^Steam 设置$"
+      match app-id=r#"steam|com\.valvesoftware\.Steam"# 
       open-floating true
+      clip-to-geometry false
+      geometry-corner-radius 0
+  }
+  window-rule {
+      match app-id=r#"steam|com\.valvesoftware\.Steam"# title="^Steam$"
+      open-floating false
+      clip-to-geometry false
+      geometry-corner-radius 0
+  }
+  // steam — 大屏模式窗口化
+  window-rule {
+      match app-id=r#"steam|com\.valvesoftware\.Steam"# title=r#"Big Picture|大屏幕"#
+      open-floating false
   }
   window-rule {
       match app-id=r#"steam|google-chrome|chrome"# title=r#"付款|支付|Checkout|Payment|Steam.*购买"#
