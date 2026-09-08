@@ -4,7 +4,7 @@
 
 - 对于使用 Fedora 的新手朋友可以先看一下这一部分[建议](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki/%E4%BD%BF%E7%94%A8fedora%E7%9A%84%E5%BB%BA%E8%AE%AE)。
 
-- 请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki)页面查看 wiki 内容。
+- 请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki)页面查看 wiki 内容，对于我的配置文件的使用说明可以直接[跳转](docs/config-guide/README.md)。
 
 - 我至今依旧是小白，这些脚本是在 AI 的帮助下完成的，现在主要是 Opencode 配合 Deepseek 使用。
 
@@ -104,14 +104,19 @@ Biyuan-Fedora-Learning/
 │   └── bash/
 │       └── .bashrc              # 终端环境变量
 │
-└── 配色生成路径 (theme-sync.sh 输出)
-    ~/.cache/by-mgr/hellwal/
-    ├── global-palette.env       # 中央色彩数据库 (唯一数据源)
-    ├── color-niri.kdl           # Niri 边框配色
-    ├── color-waybar.css         # Waybar 颜色变量
-    ├── color-rofi.rasi          # Rofi 颜色变量
-    ├── color-kitty.conf         # Kitty 配色 (含 16 色)
-    └── color-starship.toml      # Starship palette 切片
+├──配色生成路径 (theme-sync.sh 输出)
+│   ~/.cache/by-mgr/hellwal/
+│  ├── global-palette.env       # 中央色彩数据库 (唯一数据源)
+│  ├── color-niri.kdl           # Niri 边框配色
+│  ├── color-waybar.css         # Waybar 颜色变量
+│  ├── color-rofi.rasi          # Rofi 颜色变量
+│  ├── color-kitty.conf         # Kitty 配色 (含 16 色)
+│  └── color-starship.toml      # Starship palette 切片
+│
+└── 额外配置仓库 (by-mgr)
+    ~/.config/by-mgr/
+    ├── weather.conf             # 天气位置 (LOCATION/CITY_CODE，本地持久化)
+    └── templates/               # 配置模板
 ```
 
 ## 涉及到的部分软件包
