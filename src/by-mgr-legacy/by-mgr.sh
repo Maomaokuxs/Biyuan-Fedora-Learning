@@ -1,0 +1,1296 @@
+#!/bin/bash
+# Biyuan 配置管理引擎 (by-mgr) - 路径无关与多仓库选择版
+
+# 提前定义颜色变量，确保在头部报错和交互时色彩正常渲染
+BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; PURPLE='\033[0;35m'; NC='\033[0m'; BOLD='\033[1m'
+
+# 1. 核心路径定义 (动态获取)
+SCRIPT_PATH=$(readlink -f "$0")
+REPO_DIR=$(dirname "$(dirname "$SCRIPT_PATH")")
+
+# [升级版逻辑] 如果推算路径不对，直接全家目录搜寻仓库特征
+if [ ! -d "$REPO_DIR/dotfiles" ]; then
+    echo -e "${YELLOW}>> 正在全家目录扫描仓库位置 (请稍候...)${NC}"
+    
+    # 搜索家目录下包含 dotfiles 文件夹且深度合理的目录
+    # 去掉 -quit，找出所有匹配项，并使用 mapfile 存入 found_repos 数组
+    mapfile -t found_repos < <(find "$HOME" -maxdepth 5 -type d -name "Biyuan-Fedora-Learning" -exec test -d "{}/dotfiles" \; -print 2>/dev/null)
+
+    # 获取找到的仓库总数
+    repo_count=${#found_repos[@]}
+
+    if [ "$repo_count" -eq 0 ]; then
+        # 找不到仓库：直接报错并退出
+        echo -e "${RED}❌ 错误: 在家目录下未找到包含 dotfiles 的 Biyuan-Fedora-Learning 仓库！${NC}"
+        exit 1
+    elif [ "$repo_count" -eq 1 ]; then
+        # 只找到一个：直接沿用，不打扰用户
+        REPO_DIR="${found_repos[0]}"
+        echo -e "${GREEN}✅ 自动定位到唯一仓库: $REPO_DIR${NC}"
+    else
+        # 找到多个：渲染交互式选择菜单
+        echo -e "\n${CYAN}>> 发现多个有效的仓库副本，请指定你需要操作的那一个：${NC}"
+        for i in "${!found_repos[@]}"; do
+            echo -e "  ${PURPLE}$((i+1)))${NC} ${found_repos[i]}"
+        done
+
+        while true; do
+            read -p "请输入对应的编号 (1-$repo_count): " select_idx
+            # 正则校验：输入必须是纯数字，且在有效范围内
+            if [[ "$select_idx" =~ ^[0-9]+$ ]] && [ "$select_idx" -ge 1 ] && [ "$select_idx" -le "$repo_count" ]; then
+                REPO_DIR="${found_repos[$((select_idx-1))]}"
+                echo -e "${GREEN}✅ 已锁定目标仓库: $REPO_DIR${NC}"
+                sleep 1
+                break
+            else
+                echo -e "${RED}❌ 无效的编号，请重新输入！${NC}"
+            fi
+        done
+    fi
+fi
+
+DOTFILES_DIR="$REPO_DIR/dotfiles"
+BACKUP_ROOT="$HOME/.config/by-mgr/backup"
+SELF_PATH=$(realpath "$0")
+
+# 2. 安全校验：确保能找到仓库目录
+if [ ! -d "$DOTFILES_DIR" ]; then
+    echo -e "${RED}错误: 无法根据脚本位置定位到 dotfiles 目录！${NC}"
+    echo "当前推算的仓库根目录为: $REPO_DIR"
+    exit 1
+fi
+
+# 3. 其他路径定义
+USER_CONFIG_DIR="$HOME/.config/by-mgr"
+LOCAL_REPO_LIST="$USER_CONFIG_DIR/repos.list"
+PROJECT_REPO_LIST="$REPO_DIR/config/repos.list"
+
+# --- fzf 检测 ---
+if command -v fzf &> /dev/null && [[ "$1" != "--text" ]]; then
+    USE_TUI=true
+    FZF_THEME="--color=fg:#cdd6f4,bg:#1e1e2e,hl:#cba6f7,fg+:#cdd6f4,bg+:#313244,hl+:#f5c2e7,info:#89b4fa,header:#a6adc8,prompt:#a6e3a1,pointer:#f38ba8,marker:#f9e2af,spinner:#fab387 --layout=reverse --border=rounded --no-info --no-separator --cycle --tiebreak=index"
+else
+    USE_TUI=false
+fi
+
+# --- fzf 通用菜单（返回数字，不改任何 case 语句）---
+# 数据格式: printf "1|选项|描述\\n2|选项|描述" | _fzf_menu "标题"
+_fzf_menu() {
+    local header="$1"
+    if [ "$USE_TUI" = true ]; then
+        fzf --delimiter='|' --with-nth=2 \
+            --preview='echo {3}' \
+            --preview-window='up:3:wrap,border-bottom' ${FZF_THEME} \
+            --header="$header" \
+            --prompt='选择 > ' \
+        | cut -d'|' -f1
+    else
+        echo -e "${YELLOW}>>>> ${header} <<<<${NC}" >&2
+        while IFS='|' read -r num opt desc; do
+            echo "  $num) $opt" >&2
+        done
+        read -p "请选择: " choice < /dev/tty
+        echo "$choice"
+    fi
+}
+
+# --- fzf 多选菜单（支持文本模式 'a' 全选）---
+# 用法: printf "1|mod|描述\n" | _fzf_multimenu "标题"
+_fzf_multimenu() {
+    local header="$1"
+    if [ "$USE_TUI" = true ]; then
+        cat | fzf --delimiter='|' --with-nth=2 --multi \
+            --preview='echo {3}' \
+            --preview-window='up:1:wrap' ${FZF_THEME} \
+            --header="$header" \
+            --prompt='模块 > ' \
+        | cut -d'|' -f1 | xargs
+    else
+        echo -e "${YELLOW}>>>> ${header} <<<<${NC}" >&2
+        local mod_names=()
+        while IFS='|' read -r num name desc; do
+            mod_names+=("$name")
+            echo "  $num) $name" >&2
+        done
+        echo "  a) 🌟 全选所有模块" >&2
+        echo "  0) 🔙 返回" >&2
+        read -p "编号 (如 '1 3' 或 'a'): " choice < /dev/tty
+        if [[ "$choice" == "a" ]]; then
+            seq 1 ${#mod_names[@]} | xargs
+        else
+            echo "$choice"
+        fi
+    fi
+}
+
+# --- 确认提示（fzf 风格统一）---
+_fzf_confirm() {
+    local msg="$1"
+    if [ "$USE_TUI" = true ]; then
+        printf "是|执行\n否|取消\n" | fzf --delimiter='|' --with-nth=1 \
+            --preview="echo $(echo "$msg" | head -1)" \
+            --preview-window='up:2:wrap,border-bottom' ${FZF_THEME} \
+            --header="$msg" \
+            --prompt='确认 > ' \
+        | cut -d'|' -f1
+    else
+        read -p "$msg (y/N): " choice < /dev/tty
+        [[ "$choice" =~ ^[Yy]$ ]] && echo "是" || echo "否"
+    fi
+}
+
+# --- 操作完成（TUI 不暂停，文本模式暂停）---
+_done() {
+    local msg="${1:-操作已执行完成}"
+    local header="${2:-✅ 执行完成}"
+    if [ "$USE_TUI" = true ]; then
+        echo "继续" | fzf --delimiter='|' --with-nth=1 \
+            --preview="echo $msg" \
+            --preview-window='up:2:wrap,border-bottom' ${FZF_THEME} \
+            --header="$header" \
+            --prompt='按 Enter 继续 > ' \
+        > /dev/null
+    else
+        read -s -p "按回车键继续..." < /dev/tty
+    fi
+}
+
+# --- 统一 sudo 权限管理 ---
+_sudo_guard() {
+    local desc="${1:-此操作}"
+    if ! sudo -v 2>/dev/null; then
+        echo -e "${YELLOW}>> 操作已取消（需要 sudo 权限）。${NC}"
+        return 1
+    fi
+    return 0
+}
+
+# --- 辅助函数 ---
+get_target_path() {
+    local mod="$1"
+    local base_path="$HOME/.config/$mod"
+    # 智能探测：处理单文件配置 (如 starship.toml)
+    if [ ! -d "$base_path" ] && [ -f "${base_path}.toml" ]; then echo "${base_path}.toml"
+    elif [ ! -d "$base_path" ] && [ -f "${base_path}.conf" ]; then echo "${base_path}.conf"
+    else echo "$base_path"; fi
+}
+
+clean_target() {
+    local target="$1"
+    [ -L "$target" ] && rm -f "$target"
+    [ -d "$target" ] && [ ! -L "$target" ] && rm -rf "$target"
+    [ -f "$target" ] && [ ! -L "$target" ] && rm -f "$target"
+}
+
+# ==========================================
+# [新增辅助函数] DNF5/DNF4 仓库开关兼容
+# ==========================================
+enable_repo_compat() {
+    if command -v dnf5 &>/dev/null || dnf --version | grep -q "dnf5"; then
+        sudo dnf config-manager setopt "$1.enabled=1" 2>/dev/null
+    else
+        sudo dnf config-manager --set-enabled "$1" 2>/dev/null
+    fi
+}
+
+disable_repo_compat() {
+    if command -v dnf5 &>/dev/null || dnf --version | grep -q "dnf5"; then
+        sudo dnf config-manager setopt "$1.enabled=0" 2>/dev/null
+    else
+        sudo dnf config-manager --set-disabled "$1" 2>/dev/null
+    fi
+}
+
+# --- 模块：备份与恢复管理 ---
+menu_backup_restore() {
+    # 增加 while true 循环，让它变成一个独立的常驻子菜单
+    while true; do
+        clear
+        mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort)
+        local count=${#time_list[@]}
+
+        local sub_mode=$(printf "%s|%s|%s\n"             "1" "创建快照" "备份当前系统配置文件到 ~/.config/by-mgr/backup/"             "2" "历史还原" "选择历史备份时间点，恢复配置到系统"             "3" "逆向同步" "将历史或当前系统配置覆盖回 Git 仓库"             "4" "清理快照" "按数量或日期删除旧备份"             "0" "返回"     "回到上一级菜单"         | _fzf_menu "备份与恢复管理（快照数: $count）")
+        
+        case "$sub_mode" in
+            1)
+                echo -e "${YELLOW}>> 正在创建物理快照...${NC}"
+                date_tag=$(date +%Y%m%d_%H%M%S)
+                current_backup_dir="$BACKUP_ROOT/$date_tag"
+                mkdir -p "$current_backup_dir"
+                local backed_any=false
+                for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                    src=$(get_target_path "$module")
+                    if [ -e "$src" ] || [ -L "$src" ]; then
+                        [ -d "$src" ] && [ ! -L "$src" ] && [ -z "$(ls -A "$src" 2>/dev/null)" ] && continue
+                        rel_path="${src#$HOME/}"
+                        dest="$current_backup_dir/$rel_path"
+                        mkdir -p "$(dirname "$dest")"
+                        cp -aL "$src" "$dest" 2>/dev/null && backed_any=true
+                    fi
+                done
+                
+                echo -e "\n------------------------------------------------"
+                if [ "$backed_any" = true ]; then
+                    echo -e "${GREEN}✅ 快照已保存: $date_tag${NC}"
+                else
+                    rm -rf "$current_backup_dir"
+                    echo -e "${YELLOW}>> 无需备份。${NC}"
+                fi
+                # [修改点] 将 sleep 替换为交互式暂停
+                _done
+                ;;
+            2)
+                # [状态检查] 检查是否有历史备份
+                if [ "$count" -eq 0 ]; then
+                    echo -e "${RED}❌ 无历史备份！${NC}"
+                    _done
+                    continue
+                fi
+                
+                # 1. 选择时间点
+                local t_idx=$(printf '%s\n' "${time_list[@]}" | tac | nl -w1 -s'|' | while IFS='|' read -r n t; do
+                    echo "$n|$(basename "$t")|$t"
+                done | _fzf_menu "选择历史备份点")
+                [ -z "$t_idx" ] || [ "$t_idx" = "0" ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
+                selected_time=$(printf '%s\n' "${time_list[@]}" | tac | sed -n "${t_idx}p")
+                [ -z "$selected_time" ] && { echo -e "${RED}>> 无效的快照选择。${NC}"; _done; continue; }
+
+                # 2. 识别该时间点内包含的可恢复模块
+                declare -a mod_list
+                for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                    mod_target=$(get_target_path "$mod")
+                    # 检查备份文件夹中是否存在对应的物理文件/目录
+                    if [ -e "${selected_time}/${mod_target#$HOME/}" ]; then
+                        mod_list+=("$mod")
+                    fi
+                done
+
+                # 3. 模块选择（Tab 多选）
+                local sel=$(for i in "${!mod_list[@]}"; do
+                    echo "$((i+1))|${mod_list[i]}|模块: ${mod_list[i]}"
+                done | _fzf_multimenu "选择要恢复的模块")
+                if [ -z "$sel" ]; then
+                    selected_indices=()
+                else
+                    selected_indices=($sel)
+                fi
+                [ ${#selected_indices[@]} -eq 0 ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
+
+                # 4. 选择还原模式
+                local r_type=$(printf "%s|%s|%s\n"                     "1" "物理还原" "直接复制备份文件到系统目录"                     "2" "Stow 还原" "覆盖仓库文件后重新建立软链接"                 | _fzf_menu "还原模式")
+                [[ ! "$r_type" =~ ^[12]$ ]] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
+
+                # 5. 循环执行还原操作
+                echo -e "\n${BLUE}>> 正在开始恢复任务...${NC}"
+                for idx in "${selected_indices[@]}"; do
+                    # 检查索引合法性
+                    if [ "$idx" -lt 1 ] || [ "$idx" -gt "${#mod_list[@]}" ]; then
+                        echo -e "${RED}⚠️  跳过无效编号: $idx${NC}"
+                        continue
+                    fi
+
+                    mod="${mod_list[$((idx-1))]}"
+                    target=$(get_target_path "$mod")
+                    backup_src="${selected_time}/${target#$HOME/}"
+
+                    echo -e "${CYAN}>> 正在处理模块: $mod...${NC}"
+                    
+                    # 预处理：先移除旧的 Stow 链接并清理目标位置
+                    cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
+                    clean_target "$target"
+
+                    if [ "$r_type" == "1" ]; then
+                        # --- 模式 1：直接物理还原到系统 ---
+                        if [ -d "$backup_src" ]; then
+                            mkdir -p "$target" && cp -a "$backup_src/." "$target/"
+                        else
+                            mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+                        fi
+                        echo -e "   ${GREEN}✓ 物理还原完成${NC}"
+                    else
+                        # --- 模式 2：覆盖仓库并重新 Stow ---
+                        rel_path="${target#$HOME/}"
+                        repo_dest="$DOTFILES_DIR/$mod/$rel_path"
+                        
+                        rm -rf "$repo_dest" && mkdir -p "$(dirname "$repo_dest")"
+                        if [ -d "$backup_src" ]; then
+                            cp -aL "$backup_src/." "$repo_dest/"
+                        else
+                            cp -aL "$backup_src" "$repo_dest"
+                        fi
+                        # 重新建立链接
+                        cd "$DOTFILES_DIR" && stow -t ~ "$mod"
+                        echo -e "   ${GREEN}✓ Stow链接重建立完成${NC}"
+                    fi
+                done
+
+                echo -e "\n${GREEN}✅ 所有选定模块的还原任务已结束。${NC}"
+                _done
+                ;;
+            3)
+                # 逆向同步：选择数据来源
+                local sync_src=$(printf "%s|%s|%s\n"                     "1" "历史备份" "选择历史备份点覆盖回仓库"                     "2" "当前系统" "将正在使用的配置覆盖回仓库"                     "0" "返回"     "放弃操作"                 | _fzf_menu "逆向同步：选择数据来源")
+
+                local use_live=false
+                local selected_time=""
+
+                case "$sync_src" in
+                    0) echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue ;;
+                    1)
+                        if [ "$count" -eq 0 ]; then
+                            echo -e "${RED}❌ 无历史备份！${NC}"
+                            _done
+                            continue
+                        fi
+                        mapfile -t display_list < <(printf '%s\n' "${time_list[@]}" | sort -r)
+                        local t_idx=$(printf '%s\n' "${time_list[@]}" | tac | nl -w1 -s'|' | while IFS='|' read -r n t; do
+                            echo "$n|$(basename "$t")|$t"
+                        done | _fzf_menu "选择历史备份点")
+                        [[ "$t_idx" == "0" || -z "$t_idx" ]] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
+                        selected_time="${display_list[$((t_idx-1))]}"
+                        ;;
+                    2)
+                        use_live=true
+                        echo -e "${CYAN}>> 已选择: 当前系统配置 → 仓库${NC}"
+                        ;;
+                    *) continue ;;
+                esac
+
+                # 识别可同步模块
+                declare -a mod_list
+                for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                    mod_target=$(get_target_path "$mod")
+                    if [ "$use_live" = true ]; then
+                        [ -e "$mod_target" ] || [ -L "$mod_target" ] && mod_list+=("$mod")
+                    else
+                        [ -e "${selected_time}/${mod_target#$HOME/}" ] && mod_list+=("$mod")
+                    fi
+                done
+
+                if [ ${#mod_list[@]} -eq 0 ]; then
+                    echo -e "${RED}>> 无可同步模块。${NC}"
+                    _done
+                    continue
+                fi
+
+                # 模块选择（Tab 多选）
+                local sel=$(for i in "${!mod_list[@]}"; do
+                    echo "$((i+1))|${mod_list[i]}|模块: ${mod_list[i]}"
+                done | _fzf_multimenu "选择要覆盖的模块")
+                if [ -z "$sel" ]; then
+                    selected_indices=()
+                else
+                    selected_indices=($sel)
+                fi
+                [ ${#selected_indices[@]} -eq 0 ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
+
+                # 执行逆向同步
+                echo -e "\n${BLUE}>> 正在覆盖仓库...${NC}"
+                for idx in "${selected_indices[@]}"; do
+                    if [ "$idx" -lt 1 ] || [ "$idx" -gt "${#mod_list[@]}" ]; then
+                        echo -e "${RED}⚠️  跳过无效编号: $idx${NC}"
+                        continue
+                    fi
+
+                    mod="${mod_list[$((idx-1))]}"
+                    target=$(get_target_path "$mod")
+                    
+                    if [ "$use_live" = true ]; then
+                        src_path="$target"
+                    else
+                        src_path="${selected_time}/${target#$HOME/}"
+                    fi
+                    
+                    echo -e "${CYAN}>> 正在处理模块: $mod...${NC}"
+                    
+                    # 计算源路径在仓库中的相对位置
+                    rel_path="${target#$HOME/}"
+                    repo_dest="$DOTFILES_DIR/$mod/$rel_path"
+                    
+                    rm -rf "$repo_dest" 2>/dev/null
+                    mkdir -p "$(dirname "$repo_dest")"
+                    
+                    if [ -d "$src_path" ]; then
+                        cp -aL "$src_path/." "$repo_dest/"
+                    else
+                        cp -aL "$src_path" "$repo_dest"
+                    fi
+                    echo -e "   ${GREEN}✓ 模块 [$mod] 已覆盖到仓库${NC}"
+                done
+
+                echo -e "\n${GREEN}✅ 逆向同步完成！仓库文件已更新。${NC}"
+                _done
+                ;;
+            4)
+            echo -e "\n${CYAN}>> 当前共有 [ $count ] 个快照。${NC}"
+            if [ "$count" -eq 0 ]; then
+                _done
+                return
+            fi
+            
+            local first_snap=$(basename "${time_list[0]}" | cut -d'_' -f1)
+            local last_snap=$(basename "${time_list[-1]}" | cut -d'_' -f1)
+            
+            local clean_type=$(printf "%s|%s|%s\n" "1" "按数量" "保留最近 N 个快照" "2" "按日期" "删除 N 天前的快照" | _fzf_menu "清理模式")
+            [ -z "$clean_type" ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
+            
+            if [ "$clean_type" = "1" ]; then
+                read -p "保留最近数量 (回车取消): " keep_count
+                [ -z "$keep_count" ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
+                if [[ "$keep_count" =~ ^[0-9]+$ ]] && [ "$keep_count" -lt "$count" ]; then
+                    local remove_count=$((count - keep_count))
+                    for ((i=0; i<remove_count; i++)); do rm -rf "${time_list[i]}"; done
+                    echo -e "${GREEN}✅ 已清理 $remove_count 个旧快照。${NC}"
+                else
+                    echo -e "${YELLOW}>> 输入无效或无需清理。${NC}"
+                fi
+            elif [ "$clean_type" = "2" ]; then
+                # --- 智能计算距今天数作为提示 ---
+                local now_sec=$(date +%s)
+                local oldest_sec=$(date -d "$first_snap" +%s 2>/dev/null || echo "$now_sec")
+                local newest_sec=$(date -d "$last_snap" +%s 2>/dev/null || echo "$now_sec")
+                local oldest_days=$(( (now_sec - oldest_sec) / 86400 ))
+                local newest_days=$(( (now_sec - newest_sec) / 86400 ))
+                
+                echo -e "  ${PURPLE}💡 提示: 最旧快照距今 ${oldest_days} 天，最新快照距今 ${newest_days} 天。${NC}"
+                read -p "删除多少天之前的？(回车取消): " days
+                [ -z "$days" ] && { echo -e "${YELLOW}>> 已取消。${NC}"; _done "操作已取消" "已取消"; continue; }
+                
+                if [[ "$days" =~ ^[0-9]+$ ]]; then
+                    local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
+                    local del_count=0
+                    for s in "${time_list[@]}"; do
+                        local stime=$(echo "$(basename "$s")" | tr -d '_')
+                        if [ "$stime" -lt "$threshold" ]; then rm -rf "$s" && ((del_count++)); fi
+                    done
+                    echo -e "${GREEN}✅ 已清理 $del_count 个快照。${NC}"
+                else
+                    echo -e "${RED}❌ 输入无效，请输入纯数字！${NC}"
+                fi
+            fi
+            
+            # [关键修改] 任务结束后等待用户确认，不再自动返回
+            echo -e "\n${CYAN}------------------------------------------------${NC}"
+            _done
+            ;;
+            0) 
+                # 只有选择 0 时，才真正退出当前函数，返回调用它的父级菜单
+                return 
+                ;;
+            *)
+                # 捕捉无效输入
+                echo -e "${YELLOW}>> 已取消。${NC}"
+                continue 
+                ;;
+        esac
+    done
+}
+
+# --- 模块：更新与部署管理 ---
+menu_sync_deploy() {
+    while true; do
+        clear
+        local sub_mode=$(printf "%s|%s|%s\n"             "1" "Stow 部署"   "软链接方式部署配置文件（推荐）"             "2" "物理部署"    "直接复制配置文件到系统目录"             "3" "OTA 自更新"  "从 GitHub 拉取最新版 by-mgr"             "0" "返回"        "回到上一级菜单"         | _fzf_menu "更新与部署管理")
+
+        case "$sub_mode" in
+            1|2)
+                clear
+                echo -e "\n${BLUE}>> 正在部署配置...${NC}"
+                for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+                    [[ "$module" == "bash" ]] && continue
+                    local target=$(get_target_path "$module")
+                    cd "$DOTFILES_DIR" && stow -D -t ~ "$module" 2>/dev/null
+                    clean_target "$target"
+                    if [ "$sub_mode" == "1" ]; then
+                        cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
+                        echo -e "  [🔗 Linked] $module"
+                    else
+                        if [ -d "$DOTFILES_DIR/$module/.config" ]; then
+                            cp -a "$DOTFILES_DIR/$module/.config/." "$HOME/.config/" 2>/dev/null
+                        elif [ -f "$DOTFILES_DIR/$module/.config/$module.toml" ]; then
+                            cp -a "$DOTFILES_DIR/$module/.config/$module.toml" "$HOME/.config/" 2>/dev/null
+                        else
+                            cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null
+                        fi
+                        echo -e "  [📁 Physical] $module"
+                    fi
+                done
+                # 同步 starship 模板到 by-mgr 本地模板库
+                if [ -f "$DOTFILES_DIR/starship/.config/starship_base.toml" ]; then
+                    mkdir -p "$HOME/.config/by-mgr/templates"
+                    cp -aL "$DOTFILES_DIR/starship/.config/starship_base.toml" "$HOME/.config/by-mgr/templates/"
+                    echo -e "  [📋 Template] starship_base.toml → by-mgr templates"
+                fi
+                # 同步 mako 模板到 by-mgr 本地模板库
+                if [ -f "$DOTFILES_DIR/mako/.config/mako/config_base" ]; then
+                    mkdir -p "$HOME/.config/by-mgr/templates"
+                    cp -aL "$DOTFILES_DIR/mako/.config/mako/config_base" "$HOME/.config/by-mgr/templates/"
+                    echo -e "  [📋 Template] mako/config_base → by-mgr templates"
+                fi
+                # 部署后重新生成配色
+                local WALLPAPER=$(swww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
+                [ -z "$WALLPAPER" ] && WALLPAPER=$(awww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
+                [ -n "$WALLPAPER" ] && [ -f "$HOME/.config/niri/scripts/theme-sync.sh" ] && bash "$HOME/.config/niri/scripts/theme-sync.sh" "$WALLPAPER" > /dev/null 2>&1
+                echo -e "\n${GREEN}✅ 部署完成！${NC}"
+                clear
+                _done
+                ;;
+            3)
+                echo -e "\n${YELLOW}>> 正在连接远程仓库检查 by-mgr 最新版本...${NC}"
+                
+                # 【修改预警】：请将下面这行链接替换为你自己真实的 GitHub Raw 链接！
+                # 默认格式: https://raw.githubusercontent.com/<你的用户名>/<仓库名>/<分支名>/scripts/by-mgr
+                local RAW_URL="https://raw.githubusercontent.com/Maomaokuxs/Biyuan-Fedora-Learning/main/scripts/by-mgr"
+                local TMP_FILE="/tmp/by-mgr-latest.sh"
+
+                # 使用 curl 静默下载 (-sLf 参数：静默执行，跟随重定向，遇到 404 直接报错而不是下载报错网页)
+                if curl -sLf "$RAW_URL" -o "$TMP_FILE"; then
+                    # 防呆校验：检查下载下来的文件第一行是不是真的含有 #!/bin/bash (防止下载了错误的HTML网页)
+                    if head -n 1 "$TMP_FILE" | grep -q "#!/bin/bash"; then
+                        # 校验通过，执行替换
+                        cp -f "$TMP_FILE" "$SELF_PATH" && chmod +x "$SELF_PATH"
+                        rm -f "$TMP_FILE"
+                        echo -e "${GREEN}✨ OTA 更新成功！新版本引擎即将重启...${NC}"
+                        sleep 1.5
+                        exec "$SELF_PATH"
+                    else
+                        echo -e "${RED}❌ 更新失败：远程文件格式不正确 (请检查脚本中的 RAW_URL 链接是否有效)。${NC}"
+                        rm -f "$TMP_FILE"
+                    fi
+                else
+                    echo -e "${RED}❌ 更新失败：无法连接到远程仓库或文件不存在。${NC}"
+                fi
+                _done
+                ;;
+            0) return ;;
+            *) echo -e "${YELLOW}>> 已取消。${NC}"; continue ;;
+        esac
+    done
+}
+
+# --- 辅助模块：Snapper 快照 ---
+ask_snapper_snapshot() {
+    local op="${1:-系统配置}"
+    echo -e "\n${YELLOW}>> 正在检测系统环境与 Snapper 快照支持...${NC}"
+    if command -v snapper &> /dev/null && [ "$(sudo ls -A /etc/snapper/configs/ 2>/dev/null)" ]; then
+        echo -e "${CYAN}检测到 Snapper 已就绪。${NC}"
+        local snap_confirm=""
+        [ "$(_fzf_confirm "是否在操作前创建系统快照？")" = "是" ] && snap_confirm=y
+        if [[ "$snap_confirm" =~ ^[Yy]$ ]]; then
+            _sudo_guard "Snapper 快照" || return
+            local ts=$(date "+%Y-%m-%d %H:%M:%S")
+            sudo snapper create --description "by-mgr: ${op} at $ts" && \
+                echo -e "${GREEN}✅ 系统级安全快照已成功创建。${NC}" || \
+                echo -e "${RED}❌ 执行失败: 创建 Snapper 快照${NC}"
+        fi
+    else
+        echo -e "${RED}>> 未检测到有效的 Snapper 配置，无法创建系统快照。${NC}"
+    fi
+}
+
+# --- 模块：显示管理器 (DM) 切换工具 ---
+menu_dm_switcher() {
+    echo -e "\n${YELLOW}>>>> 显示管理器 (DM) 切换工具 <<<<${NC}"
+    local current_dm=$(systemctl status display-manager.service 2>/dev/null | grep -Po '(?<=/)\w+(?=\.service)' | head -1)
+    echo -e "${CYAN}当前生效的管理器: ${PURPLE}${current_dm:-"未知"}${NC}"
+    
+    local dm_opt=$(printf "%s|%s|%s\n" \
+        "1" "Greetd"      "极简 Wayland 管理器，配合 niri 推荐" \
+        "2" "PlasmaLogin" "KDE Plasma 6 原生登录管理器" \
+        "0" "返回"        "不切换" \
+    | _fzf_menu "DM 切换")
+
+    case "$dm_opt" in
+        1) target_dm="greetd"; dm_pkg="greetd"; extra_pkg="tuigreet" ;;
+        2) target_dm="plasmalogin"; dm_pkg="plasma-login-manager"; extra_pkg="" ;;
+        3) target_dm="gdm"; dm_pkg="gdm"; extra_pkg="" ;;
+        0) echo -e "${YELLOW}>> 已取消。${NC}"; return ;;
+        *) echo -e "${YELLOW}>> 已取消。${NC}"; return ;;
+    esac
+
+    ask_snapper_snapshot "DM切换"
+
+    _sudo_guard "DM 切换" || return
+
+    echo -e "${YELLOW}>> 正在安装组件...${NC}"
+    for pkg in $dm_pkg $extra_pkg; do
+        if [ -n "$pkg" ] && ! rpm -q "$pkg" &>/dev/null; then
+            sudo dnf install -y --setopt=install_weak_deps=False "$pkg" || {
+                echo -e "${RED}❌ 执行失败: 安装 $pkg${NC}"; return 1
+            }
+        fi
+    done
+
+    # 补全 niri.desktop 入口，确保 DM 能看到 Niri
+    if [ ! -f /usr/share/wayland-sessions/niri.desktop ]; then
+        echo -e "${BLUE}>> 正在补齐 Wayland 会话描述文件...${NC}"
+        sudo mkdir -p /usr/share/wayland-sessions/
+        sudo tee /usr/share/wayland-sessions/niri.desktop > /dev/null <<EOF
+[Desktop Entry]
+Name=Niri
+Comment=A scrollable-tiling Wayland compositor
+Exec=niri-session
+Type=Application
+DesktopNames=niri
+EOF
+    fi
+
+    if [[ "$target_dm" == "greetd" && ! -f /etc/greetd/config.toml ]]; then
+        [ -f "$REPO_DIR/scripts/07_greetd_setup.sh" ] && source "$REPO_DIR/scripts/07_greetd_setup.sh" && setup_greetd_niri
+    fi
+
+    echo -e "${YELLOW}>> 切换服务链路...${NC}"
+    sudo systemctl disable gdm sddm greetd plasmalogin 2>/dev/null
+    sudo systemctl enable "$target_dm" || {
+        echo -e "${RED}❌ 执行失败: 启用 $target_dm 服务${NC}"; return 1
+    }
+    sudo systemctl set-default graphical.target || {
+        echo -e "${RED}❌ 执行失败: 设置默认运行目标${NC}"; return 1
+    }
+
+    echo -e "${GREEN}✅ 切换完成！${NC}"
+    [ "$(_fzf_confirm "是否现在重启系统？")" = "是" ] && sudo reboot
+}
+
+# ==========================================
+# 软件仓库智能管理器 (Repo Manager)
+# ==========================================
+menu_repo_manager() {
+    # 初始化配置目录
+    mkdir -p "$USER_CONFIG_DIR"
+    mkdir -p "$(dirname "$PROJECT_REPO_LIST")"
+
+    while true; do
+        clear
+        echo -e "\n${YELLOW}>>>> 📦 软件仓库智能管理器 (Repo Manager) <<<<${NC}"
+        # 智能显示：优先显示本地配置是否存在
+        if [ -f "$LOCAL_REPO_LIST" ]; then
+            echo -e "${CYAN}当前生效清单 (本地): ${LOCAL_REPO_LIST}${NC}"
+        elif [ -f "$PROJECT_REPO_LIST" ]; then
+            echo -e "${CYAN}当前生效清单 (仓库): ${PROJECT_REPO_LIST}${NC}"
+        else
+            echo -e "${RED}未检测到任何仓库清单文件${NC}"
+        fi
+
+        local repo_opt=$(printf "%s|%s|%s\n"             "1" "导出清单" "备份当前已启用的仓库列表到文件"             "2" "强力清理" "逐个探测并禁用 404/失效的仓库"             "3" "增量补齐" "根据清单添加系统中缺失的仓库"             "4" "编辑清单" "手动编辑仓库列表文件"             "0" "返回"     "回到上一级菜单"         | _fzf_menu "软件仓库管理")
+
+        case "$repo_opt" in
+            1)
+                local export_dest=$(printf "%s|%s|%s\n" \
+                    "1" "系统本地配置" "~/.config/by-mgr/ - 隐私/推荐" \
+                    "2" "Git 仓库目录"  "Documents/github/... - 同步/分享" \
+                | _fzf_menu "选择导出位置")
+                
+                local target_file=""
+                if [ "$export_dest" == "2" ]; then target_file="$PROJECT_REPO_LIST"; else target_file="$LOCAL_REPO_LIST"; fi
+                
+                echo -e "${YELLOW}>> 正在备份仓库到: $target_file ...${NC}"
+                echo "# Biyuan 自动生成的仓库备份清单" > "$target_file"
+                for repo in $(dnf repolist --enabled | tail -n +2 | awk '{print $1}'); do
+                    if [[ "$repo" == copr:copr.fedorainfracloud.org:* ]]; then
+                        local author=$(echo "$repo" | cut -d':' -f3)
+                        local project=$(echo "$repo" | cut -d':' -f4 | sed 's/-x86_64//g')
+                        echo "copr $author/$project" >> "$target_file"
+                    else
+                        echo "repo $repo" >> "$target_file"
+                    fi
+                done
+                echo -e "${GREEN}✅ 导出成功！${NC}"
+                sleep 1.2
+                ;;
+            2)
+                echo -e "${YELLOW}>> 正在逐个验证已启用的仓库 (严格探测模式)...${NC}"
+                ask_snapper_snapshot "仓库清理"
+                _sudo_guard "仓库清理" || continue
+                for repo in $(dnf repolist --enabled | tail -n +2 | awk '{print $1}'); do
+                    echo -n -e "  🔍 探测: ${PURPLE}$repo${NC} ... "
+                    local check_out
+                    check_out=$(sudo dnf makecache --repo="$repo" --refresh --setopt="${repo}.skip_if_unavailable=False" 2>&1)
+                    if [ $? -ne 0 ] || echo "$check_out" | grep -qiE "status code: 404|failed to download|error:|no valid source"; then
+                        echo -e "${RED}[失效 - 正在隔离]${NC}"
+                        disable_repo_compat "$repo"
+                    else
+                        echo -e "${GREEN}[正常]${NC}"
+                    fi
+                done
+                echo -e "${GREEN}✅ 清理完成！${NC}"
+                _done
+                ;;
+            3)
+                # 智能寻找清单：优先本地，其次项目
+                local list_to_use=""
+                if [ -f "$LOCAL_REPO_LIST" ]; then list_to_use="$LOCAL_REPO_LIST"
+                elif [ -f "$PROJECT_REPO_LIST" ]; then list_to_use="$PROJECT_REPO_LIST"
+                fi
+
+                if [ -z "$list_to_use" ]; then
+                    echo -e "${RED}>> 找不到任何清单文件，请先执行导出！${NC}"
+                    sleep 1; continue
+                fi
+                
+                echo -e "${BLUE}>> 正在根据 [$list_to_use] 补齐缺失仓库...${NC}"
+                _sudo_guard "补齐仓库" || continue
+                local added_count=0
+                while read -r line || [[ -n "$line" ]]; do
+                    [[ -z "$line" || "$line" == \#* ]] && continue
+                    local r_type=$(echo "$line" | awk '{print $1}')
+                    local r_val=$(echo "$line" | awk '{print $2}')
+                    
+                    if [ "$r_type" == "copr" ]; then
+                        local author=$(echo "$r_val" | cut -d'/' -f1)
+                        local project=$(echo "$r_val" | cut -d'/' -f2)
+                        local search_id="copr:copr.fedorainfracloud.org:${author}:${project}"
+                        if ! dnf repolist --enabled | grep -q "$search_id"; then
+                            echo -e "  ${YELLOW}>> 添加 Copr: $r_val${NC}"
+                            sudo dnf copr enable -y "$r_val" && ((added_count++))
+                        fi
+                    elif [ "$r_type" == "repo" ]; then
+                        if ! dnf repolist --enabled | grep -q "^${r_val}"; then
+                            echo -e "  ${YELLOW}>> 启用仓库: $r_val${NC}"
+                            enable_repo_compat "$r_val" && ((added_count++))
+                        fi
+                    fi
+                done < "$list_to_use"
+                echo -e "${GREEN}✅ 补齐完成！共计添加 $added_count 个仓库。${NC}"
+                sleep 2
+                ;;
+            4)
+                echo -e "\n${BLUE}>> 正在打开仓库清单文件...${NC}"
+                local target_file=""
+                if [ -f "$LOCAL_REPO_LIST" ]; then
+                    target_file="$LOCAL_REPO_LIST"
+                elif [ -f "$PROJECT_REPO_LIST" ]; then
+                    target_file="$PROJECT_REPO_LIST"
+                fi
+
+                if [ -z "$target_file" ]; then
+                    echo -e "${YELLOW}>> 尚未创建仓库清单文件，请先执行导出 (选项 1)。${NC}"
+                    _done
+                    continue
+                fi
+
+                echo -e "${CYAN}>> 编辑文件: $target_file${NC}"
+                echo -e "${YELLOW}>> 格式说明：每行一个仓库，copr 开头为 Copr 仓库，repo 开头为系统仓库。${NC}"
+                sleep 1
+                ${EDITOR:-vim} "$target_file"
+                echo -e "${GREEN}✅ 编辑完成。${NC}"
+                _done
+                ;;
+            0) return ;;
+            *) echo -e "${YELLOW}>> 已取消。${NC}"; continue ;;
+        esac
+    done
+}
+
+# ==========================================
+# [新增模块] 系统默认文本编辑器设置
+# ==========================================
+menu_default_editor() {
+    while true; do
+        clear
+        local current_editor=${EDITOR:-"未设置"}
+        local sys_editor=$(readlink -f /usr/bin/editor 2>/dev/null || echo "未配置")
+        
+        local editor_opt=$(printf "%s|%s|%s\n" \
+            "1" "Neovim" "现代 Vim，内置 LSP 支持（推荐）" \
+            "2" "Vim"    "经典终端编辑器" \
+            "3" "Nano"   "简单易用，适合新手" \
+            "4" "Helix"  "类似 Kakoune，开箱即用" \
+            "0" "返回"   "保持当前设置" \
+        | _fzf_menu "默认编辑器（当前: ${current_editor}）")
+
+        local target_cmd=""
+        case "$editor_opt" in
+            1) target_cmd="nvim" ;;
+            2) target_cmd="vim" ;;
+            3) target_cmd="nano" ;;
+            4) target_cmd="hx" ;;
+            0) return ;;
+            *) echo -e "${RED}无效选项${NC}"; sleep 1; continue ;;
+        esac
+
+        # 1. 检查并安装
+        if ! command -v "$target_cmd" &> /dev/null; then
+            echo -e "${YELLOW}>> 未检测到 $target_cmd，正在自动安装...${NC}"
+            _sudo_guard "编辑器安装" || continue
+            sudo dnf install -y "$target_cmd" || {
+                echo -e "${RED}❌ 执行失败: 安装 $target_cmd${NC}"; continue
+            }
+        fi
+
+        # 2. 配置用户环境变量 (~/.bashrc)
+        echo -e "${BLUE}>> 正在配置用户环境变量 (~/.bashrc)...${NC}"
+        sed -i '/export EDITOR=/d' ~/.bashrc
+        sed -i '/export VISUAL=/d' ~/.bashrc
+        echo "export EDITOR=\"$target_cmd\"" >> ~/.bashrc
+        echo "export VISUAL=\"$target_cmd\"" >> ~/.bashrc
+        
+        # 3. 配置系统级 alternatives
+        echo -e "${BLUE}>> 正在配置系统级映射 (update-alternatives)...${NC}"
+        local editor_path=$(which "$target_cmd" 2>/dev/null)
+        if command -v update-alternatives &> /dev/null && [ -n "$editor_path" ]; then
+            _sudo_guard "系统编辑器映射" 2>/dev/null
+            sudo update-alternatives --install /usr/bin/editor editor "$editor_path" 100 2>/dev/null
+            sudo update-alternatives --set editor "$editor_path" 2>/dev/null
+        fi
+
+        echo -e "${GREEN}✅ 默认编辑器已成功切换为: $target_cmd${NC}"
+        echo -e "${CYAN}提示: 当前会话需要执行 'source ~/.bashrc' 或重新打开终端才能完全生效。${NC}"
+        _done
+    done
+}
+
+# --- 模块：系统配置菜单 ---
+menu_system_config() {
+    while true; do
+        clear
+        local sys_opt=$(printf "%s|%s|%s\n" \
+            "1" "NVIDIA 电源修复" "启用休眠/挂起服务，注入内核参数" \
+            "2" "仓库管理"       "DNF 软件源维护" \
+            "3" "编辑器设置"     "设置系统默认终端编辑器" \
+            "4" "Plymouth 动画"  "配置图形化启动画面" \
+            "0" "返回"           "回到主菜单" \
+        | _fzf_menu "系统配置")
+
+        case "$sys_opt" in
+            1)
+                ask_snapper_snapshot "NVIDIA电源修复"
+                _sudo_guard "NVIDIA 电源修复" || continue
+                echo -e "${BLUE}>> 正在修复 NVIDIA 电源管理...${NC}"
+                sudo systemctl enable nvidia-suspend.service nvidia-hibernate.service nvidia-resume.service && \
+                sudo grubby --update-kernel=ALL --args="nvidia.NVreg_PreserveVideoMemoryAllocations=1" && \
+                sudo dracut -f && \
+                echo -e "${GREEN}✅ 修复完毕，建议重启生效。${NC}" || \
+                echo -e "${RED}❌ 执行失败: NVIDIA 电源修复${NC}"
+                _done ;;
+            2) menu_repo_manager ;;
+            3) menu_default_editor ;;
+            4) task_setup_plymouth ;;
+            0) return ;;
+            *) echo -e "${YELLOW}>> 已取消。${NC}"; continue ;;
+        esac
+    done
+}
+
+# --- 系统任务：配置开机动画 ---
+task_setup_plymouth() {
+    echo -e "\n${BLUE}>> 正在开启图形化引导配置 (Plymouth + NVIDIA Early Loading)...${NC}"
+    _sudo_guard "Plymouth 配置" || return
+
+    # 安装必要的包
+    echo -e "${YELLOW}>> [1/4] 安装 Plymouth 组件及主题...${NC}"
+    sudo dnf install -y plymouth plymouth-scripts fedora-logos plymouth-theme-spinner || {
+        echo -e "${RED}❌ 执行失败: 安装 Plymouth 组件${NC}"; return 1
+    }
+
+    # 设置主题并强制 NVIDIA 驱动早加载
+    echo -e "${YELLOW}>> [2/4] 设置主题并强制加载显卡驱动...${NC}"
+    sudo plymouth-set-default-theme bgrt -R || {
+        echo -e "${RED}❌ 执行失败: 设置 Plymouth 主题${NC}"; return 1
+    }
+    sudo mkdir -p /etc/dracut.conf.d
+    echo 'force_drivers+=" nvidia nvidia_modeset nvidia_uvm nvidia_drm "' | sudo tee /etc/dracut.conf.d/nvidia.conf > /dev/null
+
+    # 修改 GRUB 参数
+    echo -e "${YELLOW}>> [3/4] 更新 GRUB 内核参数 (rhgb quiet)...${NC}"
+    if grep -q "GRUB_CMDLINE_LINUX" /etc/default/grub; then
+        [[ ! $(grep "rhgb" /etc/default/grub) ]] && sudo sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="rhgb /' /etc/default/grub
+        [[ ! $(grep "quiet" /etc/default/grub) ]] && sudo sed -i 's/GRUB_CMDLINE_LINUX="/GRUB_CMDLINE_LINUX="quiet /' /etc/default/grub
+    fi
+
+    # 生成最终镜像
+    echo -e "${YELLOW}>> [4/4] 重新生成 initramfs 并刷新 GRUB 配置...${NC}"
+    sudo dracut --force || {
+        echo -e "${RED}❌ 执行失败: 重新生成 initramfs${NC}"; return 1
+    }
+    sudo grub2-mkconfig -o /boot/grub2/grub.cfg || {
+        echo -e "${RED}❌ 执行失败: 刷新 GRUB 配置${NC}"; return 1
+    }
+
+    echo -e "\n${GREEN}✅ Plymouth 配置完成！重启后将看到 Fedora Logo 动画。${NC}"
+    _done
+}
+
+# --- 系统任务：配置休眠文件 ---
+
+task_setup_hibernate() {
+    clear
+    echo -e "\n${RED}============================================================="
+    echo -e " ⚠️  高风险操作警告 (HIGH RISK WARNING) ⚠️ "
+    echo -e "=============================================================${NC}"
+    echo "此功能将执行以下底层操作："
+    echo "  1. 修改 Btrfs 顶层子卷结构 (@swap)"
+    echo "  2. 覆写 /etc/fstab"
+    echo "  3. 修改 SELinux 安全上下文"
+    echo "  4. 重写内核启动参数 (Grubby) 并重新生成 initramfs (Dracut)"
+    echo -e "\n${YELLOW}极度建议：在没有备份数据时，请立即退出！操作失败可能导致系统 Kernel Panic。${NC}"
+
+    [ "$(_fzf_confirm "接受高风险并继续配置 Btrfs 休眠？")" != "是" ] && { echo "已取消"; sleep 1; return; }
+
+    echo -e "\n${BLUE}>> 正在开启 Btrfs 系统休眠配置...${NC}"
+    _sudo_guard "休眠配置" || return
+
+    # [1/7] 环境与现有交换检查 (防止破坏)
+    echo -e "${YELLOW}>> [1/7] 正在检测现有交换设备与文件系统...${NC}"
+    
+    # 检测是否已有物理 Swap (排除 zram)
+    EXISTING_SWAP=$(swapon --show --noheadings --bytes | grep -v "zram")
+    if [ -n "$EXISTING_SWAP" ]; then
+        echo -e "${RED}❌ 冲突检测: 系统已存在活跃的物理 Swap 分区或文件！${NC}"
+        echo "当前活跃交换空间信息："
+        swapon --show
+        echo -e "${YELLOW}建议：请先手动清理现有 Swap 布局后再运行此脚本，以防破坏文件系统。${NC}"
+        _done && return
+    fi
+
+    if mokutil --sb-state 2>/dev/null | grep -q "enabled"; then
+        echo -e "${RED}❌ 错误: 检测到安全启动已开启，Fedora 内核不支持休眠。请先在 BIOS 中关闭。${NC}"
+        _done && return
+    fi
+
+    ROOT_FSTYPE=$(findmnt -nvo FSTYPE /)
+    if [ "$ROOT_FSTYPE" != "btrfs" ]; then
+        echo -e "${RED}❌ 错误: 仅支持 Btrfs，当前为 $ROOT_FSTYPE。${NC}"
+        _done && return
+    fi
+
+    # [2/7] 参数配置
+    echo -e "\n${YELLOW}>> [2/7] 配置休眠参数...${NC}"
+    read -p "请输入 Swap 子卷挂载点 [默认: /swap]: " INPUT_SWAP_DIR
+    SWAP_DIR=${INPUT_SWAP_DIR:-/swap}
+
+    read -p "请输入休眠文件大小 [默认: 8G]: " INPUT_SWAP_SIZE
+    SWAP_SIZE=${INPUT_SWAP_SIZE:-8G}
+
+    SWAP_FILE="$SWAP_DIR/swapfile"
+    SUBVOL_NAME=$(basename "$SWAP_DIR")
+    ROOT_DEV=$(findmnt -nvo SOURCE /)
+    ROOT_UUID=$(lsblk -no UUID "$ROOT_DEV" | head -n1)
+
+    # 检查目标文件是否已在磁盘上存在
+    if [ -f "$SWAP_FILE" ] || grep -q "$SWAP_DIR" /etc/fstab; then
+        echo -e "${RED}❌ 错误: 检测到路径 $SWAP_DIR 或配置文件中已存在 Swap 相关条目。${NC}"
+        echo "为了系统安全，脚本拒绝在已有的路径上重复操作。"
+        _done && return
+    fi
+
+    # [3/7] 创建独立子卷
+    echo -e "\n${YELLOW}>> [3/7] 在顶层设备创建独立子卷 @${SUBVOL_NAME}...${NC}"
+    sudo mkdir -p /mnt/tmp_root
+    sudo mount -t btrfs -o subvolid=5 "$ROOT_DEV" /mnt/tmp_root
+    
+    if [ ! -d "/mnt/tmp_root/$SUBVOL_NAME" ]; then
+        sudo btrfs subvolume create "/mnt/tmp_root/$SUBVOL_NAME"
+    fi
+    
+    sudo mkdir -p "$SWAP_DIR"
+    sudo umount /mnt/tmp_root && sudo rmdir /mnt/tmp_root
+
+    # [4/7] 配置 fstab 
+    echo -e "\n${YELLOW}>> [4/7] 写入 /etc/fstab 挂载信息...${NC}"
+    sudo cp /etc/fstab /etc/fstab.bak
+    echo "UUID=$ROOT_UUID  $SWAP_DIR  btrfs  subvol=$SUBVOL_NAME,compress=no,noatime 0 0" | sudo tee -a /etc/fstab > /dev/null
+    echo "$SWAP_FILE none swap defaults,pri=-1 0 0" | sudo tee -a /etc/fstab > /dev/null
+    sudo mount "$SWAP_DIR"
+
+    # [5/7] 创建交换文件
+    echo -e "\n${YELLOW}>> [5/7] 正在创建 Btrfs 专用 Swapfile ($SWAP_SIZE)...${NC}"
+    sudo btrfs filesystem mkswapfile --size "$SWAP_SIZE" "$SWAP_FILE"
+    sudo swapon "$SWAP_FILE"
+
+    # [6/7] SELinux 与权限对齐
+    echo -e "\n${YELLOW}>> [6/7] 修复 SELinux 上下文权限...${NC}"
+    sudo semanage fcontext -a -t mnt_t "$SWAP_DIR" 2>/dev/null
+    sudo semanage fcontext -a -t swapfile_t "$SWAP_FILE" 2>/dev/null
+    sudo restorecon -v "$SWAP_FILE"
+
+    # [7/7] 内核参数注入与 Dracut
+    echo -e "\n${YELLOW}>> [7/7] 计算偏移量并重新生成 initramfs (耗时操作)...${NC}"
+    OFFSET=$(sudo btrfs inspect-internal map-swapfile -r "$SWAP_FILE")
+    sudo grubby --update-kernel=ALL --args="resume=UUID=$ROOT_UUID resume_offset=$OFFSET"
+
+    if [ ! -f /etc/dracut.conf.d/resume.conf ]; then
+        echo 'add_dracutmodules+=" resume "' | sudo tee /etc/dracut.conf.d/resume.conf > /dev/null
+    fi
+    sudo dracut -f
+
+    echo -e "\n${GREEN}✅ 极致休眠配置完成！${NC}"
+    echo "建议先重启电脑，然后执行 'sudo systemctl hibernate' 进行测试。"
+    _done
+}
+# --- 显示器管理 ---
+menu_display_manager() {
+    local OUTPUTS=$(niri msg outputs 2>/dev/null)
+    if [ -z "$OUTPUTS" ]; then
+        echo -e "${RED}❌ 请在 niri 中运行此功能。${NC}"
+        _done; return
+    fi
+
+    while true; do
+        clear
+        local opt=$(printf "1|查看当前状态|显示所有已连接显示器的信息\n2|编辑输出配置|\$EDITOR 打开 niri 输出配置文件\n0|返回|回到上级菜单" | _fzf_menu "显示器管理")
+        case "$opt" in
+            1)
+                local view=$(echo "$OUTPUTS" | while IFS= read -r line; do
+                    [ -n "$(echo "$line" | tr -d ' ')" ] && echo ".|$line"
+                done)
+                echo "$view" | _fzf_menu "显示器状态（按 Esc 返回）" > /dev/null
+                ;;
+            2)
+                local FILE="$HOME/.cache/by-mgr/niri-outputs.kdl"
+                [ ! -f "$FILE" ] && { 
+                    echo -e "// 由 by-mgr 显示器管理生成\n// 示例: output \"eDP-1\" { mode \"1920x1080@60\"; scale 1; }" > "$FILE"
+                }
+                ${EDITOR:-vim} "$FILE"
+                echo -e "${YELLOW}>> 编辑完成。输出配置需退出 niri 重新登录生效。${NC}"
+                _done; return
+                ;;
+            *) return ;;
+        esac
+    done
+}
+# --- 主循环 ---
+# --- CLI 分发（有参数 → 直接执行命令，无参数 → 交互菜单）---
+if [ $# -gt 0 ] && [[ "$1" != "--text" ]]; then
+    USE_TUI=false
+    cmd="$1"; shift
+
+    show_help() {
+        echo -e "${BOLD}Biyuan 配置管理引擎 (by-mgr)${NC}"
+        echo ""
+        echo "用法: by-mgr [命令] [选项]"
+        echo ""
+        echo "备份命令:"
+        echo "  snapshot, -s          创建当前系统配置快照"
+        echo "  restore, -r [编号|last] 从历史快照还原配置（编号1=最新）"
+        echo "  list, -l              列出所有快照（编号 + 时间）"
+        echo "  reverse-sync, -rs     逆向同步当前配置覆盖到仓库"
+        echo "  clean, -c -k <N>      保留最近 N 个快照，删除其余"
+        echo "  clean, -c -d <天数>   删除 N 天前的旧快照"
+        echo ""
+        echo "部署命令:"
+        echo "  deploy, -d [stow|phy] Stow/物理部署配置（默认 stow）"
+        echo "  ota, update, -u        从 GitHub 拉取最新版 by-mgr"
+        echo ""
+        echo "常用:"
+        echo "  --help, -h            显示此帮助"
+        echo "  --text                强制文本模式（无 fzf）"
+        exit 0
+    }
+
+    _cmd_snapshot() {
+        date_tag=$(date +%Y%m%d_%H%M%S)
+        current_backup_dir="$BACKUP_ROOT/$date_tag"
+        mkdir -p "$current_backup_dir"
+        local backed_any=false
+        for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            src=$(get_target_path "$module")
+            if [ -e "$src" ] || [ -L "$src" ]; then
+                [ -d "$src" ] && [ ! -L "$src" ] && [ -z "$(ls -A "$src" 2>/dev/null)" ] && continue
+                rel_path="${src#$HOME/}"
+                dest="$current_backup_dir/$rel_path"
+                mkdir -p "$(dirname "$dest")"
+                cp -aL "$src" "$dest" 2>/dev/null && backed_any=true
+            fi
+        done
+        if [ "$backed_any" = true ]; then
+            echo -e "${GREEN}✅ 快照已保存: $date_tag${NC}"
+        else
+            rm -rf "$current_backup_dir"
+            echo -e "${YELLOW}>> 无需备份。${NC}"
+        fi
+    }
+
+    _cmd_restore() {
+        mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort -r)
+        if [ ${#time_list[@]} -eq 0 ]; then
+            echo -e "${RED}❌ 无历史备份！${NC}"
+            exit 1
+        fi
+        local selected_time=""
+        local arg="${1:-}"
+        if [[ "$arg" == "last" || "$arg" == "-1" ]]; then
+            # 直接选最新的
+            selected_time="${time_list[0]}"
+        elif [[ "$arg" =~ ^[0-9]+$ ]] && [ "$arg" -ge 1 ] && [ "$arg" -le ${#time_list[@]} ]; then
+            # 按编号选择（1 = 最新）
+            selected_time="${time_list[$((arg-1))]}"
+        elif [ -n "$arg" ]; then
+            # 按时间戳精确匹配
+            for t in "${time_list[@]}"; do
+                if [[ "$(basename "$t")" == "$arg" ]]; then
+                    selected_time="$t"; break
+                fi
+            done
+            [ -z "$selected_time" ] && { echo -e "${RED}❌ 未找到快照: $arg${NC}"; echo "可用快照:"; printf '  %2d) %s\n' $(i=1; for t in "${time_list[@]}"; do echo "$((i++)) ${t##*/}"; done); exit 1; }
+        else
+            # 无参数 → 交互选择
+            echo "可用快照:"
+            for i in "${!time_list[@]}"; do echo "  $((i+1))) $(basename "${time_list[i]}")"; done
+            read -p "选择快照编号 (1-${#time_list[@]}，0 取消): " choice < /dev/tty
+            [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#time_list[@]} ] || { echo "已取消"; exit 0; }
+            selected_time="${time_list[$((choice-1))]}"
+        fi
+        echo -e "${BLUE}>> 正在从 $(basename "$selected_time") 还原...${NC}"
+        for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            mod_target=$(get_target_path "$mod")
+            backup_src="${selected_time}/${mod_target#$HOME/}"
+            [ -e "$backup_src" ] || continue
+            echo -e "  ${CYAN}还原: $mod${NC}"
+            target=$(get_target_path "$mod")
+            cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null
+            clean_target "$target"
+            if [ -d "$backup_src" ]; then
+                mkdir -p "$target" && cp -a "$backup_src/." "$target/"
+            else
+                mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+            fi
+        done
+        echo -e "${GREEN}✅ 还原完成！${NC}"
+    }
+
+    _cmd_reverse_sync() {
+        echo -e "${BLUE}>> 正在将当前系统配置覆盖回仓库...${NC}"
+        for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            target=$(get_target_path "$mod")
+            [ -e "$target" ] || [ -L "$target" ] || continue
+            rel_path="${target#$HOME/}"
+            repo_dest="$DOTFILES_DIR/$mod/$rel_path"
+            rm -rf "$repo_dest" 2>/dev/null
+            mkdir -p "$(dirname "$repo_dest")"
+            if [ -d "$target" ] && [ ! -L "$target" ]; then
+                cp -aL "$target/." "$repo_dest/"
+            else
+                cp -aL "$target" "$repo_dest"
+            fi
+            echo -e "  ${GREEN}✓ $mod${NC}"
+        done
+        echo -e "${GREEN}✅ 逆向同步完成！${NC}"
+    }
+
+    _cmd_clean() {
+        mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort)
+        local count=${#time_list[@]}
+        [ "$count" -eq 0 ] && { echo "无快照可清理。"; exit 0; }
+        case "$1" in
+            -k)
+                local keep="$2"
+                [[ "$keep" =~ ^[0-9]+$ ]] && [ "$keep" -lt "$count" ] || { echo "无效数量"; exit 1; }
+                local remove_count=$((count - keep))
+                for ((i=0; i<remove_count; i++)); do rm -rf "${time_list[i]}"; done
+                echo -e "${GREEN}✅ 已清理 $remove_count 个旧快照，保留 $keep 个。${NC}"
+                ;;
+            -d)
+                local days="$2"
+                [[ "$days" =~ ^[0-9]+$ ]] || { echo "无效天数"; exit 1; }
+                local threshold=$(date -d "$days days ago" +%Y%m%d%H%M%S)
+                local del_count=0
+                for s in "${time_list[@]}"; do
+                    local stime=$(echo "$(basename "$s")" | tr -d '_')
+                    [ "$stime" -lt "$threshold" ] && rm -rf "$s" && ((del_count++))
+                done
+                echo -e "${GREEN}✅ 已清理 $del_count 个 $days 天前的快照。${NC}"
+                ;;
+            *) echo "用法: by-mgr clean -k <N>  或  by-mgr clean -d <天数>"; exit 1 ;;
+        esac
+    }
+
+    _cmd_deploy() {
+        local mode="${1:-stow}"
+        echo -e "\n${BLUE}>> 正在部署配置 (${mode})...${NC}"
+        for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
+            [[ "$module" == "bash" ]] && continue
+            local target=$(get_target_path "$module")
+            cd "$DOTFILES_DIR" && stow -D -t ~ "$module" 2>/dev/null
+            clean_target "$target"
+            if [ "$mode" == "stow" ]; then
+                cd "$DOTFILES_DIR" && stow -t ~ "$module" 2>/dev/null
+                echo -e "  [🔗 Linked] $module"
+            else
+                if [ -d "$DOTFILES_DIR/$module/.config" ]; then
+                    cp -a "$DOTFILES_DIR/$module/.config/." "$HOME/.config/" 2>/dev/null
+                elif [ -f "$DOTFILES_DIR/$module/.config/$module.toml" ]; then
+                    cp -a "$DOTFILES_DIR/$module/.config/$module.toml" "$HOME/.config/" 2>/dev/null
+                else
+                    cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null
+                fi
+                echo -e "  [📁 Physical] $module"
+            fi
+        done
+        if [ -f "$DOTFILES_DIR/starship/.config/starship_base.toml" ]; then
+            mkdir -p "$HOME/.config/by-mgr/templates"
+            cp -aL "$DOTFILES_DIR/starship/.config/starship_base.toml" "$HOME/.config/by-mgr/templates/"
+        fi
+        if [ -f "$DOTFILES_DIR/mako/.config/mako/config_base" ]; then
+            mkdir -p "$HOME/.config/by-mgr/templates"
+            cp -aL "$DOTFILES_DIR/mako/.config/mako/config_base" "$HOME/.config/by-mgr/templates/"
+        fi
+        local WALLPAPER=$(swww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
+        [ -z "$WALLPAPER" ] && WALLPAPER=$(awww query 2>/dev/null | grep -oP 'image: \K.*' | head -1)
+        [ -n "$WALLPAPER" ] && [ -f "$HOME/.config/niri/scripts/theme-sync.sh" ] && bash "$HOME/.config/niri/scripts/theme-sync.sh" "$WALLPAPER"
+        echo -e "${GREEN}✅ 部署完成！${NC}"
+    }
+
+    _cmd_list() {
+        mapfile -t time_list < <(ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort -r)
+        if [ ${#time_list[@]} -eq 0 ]; then
+            echo "（无快照）"
+            exit 0
+        fi
+        printf " %-4s %s\n" "编号" "时间"
+        echo   " ---- ----"
+        for i in "${!time_list[@]}"; do
+            printf " %-4s %s\n" "$((i+1))" "$(basename "${time_list[i]}")"
+        done
+    }
+
+    _cmd_ota() {
+        echo -e "${YELLOW}>> 正在连接远程仓库检查 by-mgr 最新版本...${NC}"
+        local RAW_URL="https://raw.githubusercontent.com/Maomaokuxs/Biyuan-Fedora-Learning/main/scripts/by-mgr"
+        local TMP_FILE="/tmp/by-mgr-latest.sh"
+        if curl -sLf "$RAW_URL" -o "$TMP_FILE"; then
+            if head -n 1 "$TMP_FILE" | grep -q "#!/bin/bash"; then
+                cp -f "$TMP_FILE" "$SELF_PATH" && chmod +x "$SELF_PATH"
+                rm -f "$TMP_FILE"
+                echo -e "${GREEN}✨ OTA 更新成功！${NC}"
+            else
+                echo -e "${RED}❌ 更新失败：远程文件格式不正确。${NC}"
+                rm -f "$TMP_FILE"; exit 1
+            fi
+        else
+            echo -e "${RED}❌ 更新失败：无法连接到远程仓库。${NC}"
+            exit 1
+        fi
+    }
+
+    case "$cmd" in
+        snapshot|-s)      _cmd_snapshot ;;
+        restore|-r)       _cmd_restore "$@" ;;
+        reverse-sync|-rs) _cmd_reverse_sync ;;
+        clean|-c)         _cmd_clean "$@" ;;
+        deploy|-d)        _cmd_deploy "$@" ;;
+        list|-l)           _cmd_list ;;
+        ota|update|-u)    _cmd_ota ;;
+        --help|-h|help)   show_help ;;
+        *) echo -e "${RED}未知命令: $cmd${NC}"; echo "运行 by-mgr --help 查看用法"; exit 1 ;;
+    esac
+    exit 0
+fi
+
+while true; do
+    clear
+    main_opt=$(printf "%s|%s|%s\n" \
+        "1" "备份与恢复" "备份、还原、清理系统配置" \
+        "2" "更新与部署" "Stow/物理部署、OTA 自更新" \
+        "3" "系统配置"   "NVIDIA、DM、仓库、休眠等维护" \
+        "0" "退出"       "退出 by-mgr" \
+    | _fzf_menu "Biyuan 配置管理引擎")
+
+    case "$main_opt" in
+        1) menu_backup_restore ;;
+        2) menu_sync_deploy ;;
+        3) menu_system_config ;;
+        0) echo -e "\n${GREEN}再见, ${USER}!${NC}\n"; exit 0 ;;
+        *) echo -e "\n${GREEN}再见, ${USER}!${NC}\n"; exit 0 ;; 
+    esac
+done
