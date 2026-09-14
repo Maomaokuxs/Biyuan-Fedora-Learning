@@ -46,4 +46,3 @@ src/by-mgr-rs/target/
 src/by-mgr-rs/Cargo.lock
 dotfiles/by-mgr/
 dotfiles/waybar/.config/waybar/color-waybar.css
-src/by-mgr-legacy/lib/
