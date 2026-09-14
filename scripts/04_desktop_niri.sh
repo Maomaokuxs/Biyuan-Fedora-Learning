@@ -189,6 +189,10 @@ install_desktop_niri() {
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
 
     # --- 7. 注册全局维护命令 by-mgr 与 Shell 环境初始化 ---
+    # 同步 by-mgr Rust 依赖的 legacy lib 至本地（删仓库后仍可用）
+    mkdir -p "$HOME/.local/share/by-mgr"
+    [ -d "$REPO_DIR/src/by-mgr-legacy/lib" ] && cp -r "$REPO_DIR/src/by-mgr-legacy/lib" "$HOME/.local/share/by-mgr/" 2>/dev/null && echo -e "${GREEN}✅ by-mgr lib deployed to ~/.local/share/by-mgr/lib${NC}"
+
     echo -e "${BLUE}>> Registering global commands and initializing shell...${NC}"
     local BIN_DIR="$HOME/.local/bin"
     mkdir -p "$BIN_DIR"
