@@ -52,10 +52,10 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
             let area = f.area();
             // Outer block
             let title = match page {
-                Page::Main => " by-mgr  — Biyuan 配置管理引擎 ",
-                Page::Backup => " 备份与恢复 ",
-                Page::Deploy => " 更新与部署 ",
-                Page::System => " 系统配置 ",
+                Page::Main => " by-mgr  — Biyuan 配置管理 ",
+                Page::Backup => " by-mgr  — Biyuan 配置管理 ",
+                Page::Deploy => " by-mgr  — Biyuan 配置管理 ",
+                Page::System => " by-mgr  — Biyuan 配置管理 ",
             };
             let block = Block::default()
                 .title(title)
@@ -169,6 +169,7 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
             if let event::Event::Key(k) = event::read()? {
                 match k.code {
                     KeyCode::Char('q') => {
+                        status = String::from("q 退出  ↑↓/j k 移动  Enter 进入");
                         if page == Page::Main {
                             break;
                         } else {
@@ -494,7 +495,7 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
                                                         f.render_widget(block, area);
                                                         let inner = Rect { x: area.x+1, y: area.y+1, width: area.width-2, height: area.height-2 };
                                                         let chunks = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Min(1), Constraint::Length(1)]).split(inner);
-                                                        let gauge = Gauge::default().block(Block::default().title(" 进度 ").borders(Borders::ALL).border_type(BorderType::Rounded)).gauge_style(theme::selected_style()).percent(pct).label(label.clone());
+                                                        let gauge = Gauge::default().block(Block::default().title(" 进度 ").borders(Borders::ALL).border_type(BorderType::Rounded)).gauge_style(theme::selected_style()).percent(pct).label(format!("{}/{}", cur, total));
                                                         f.render_widget(gauge, chunks[0]);
                                                         let info = if is_final {
                                                             Paragraph::new(last_id.clone()).style(theme::selected_style()).alignment(Alignment::Center)
