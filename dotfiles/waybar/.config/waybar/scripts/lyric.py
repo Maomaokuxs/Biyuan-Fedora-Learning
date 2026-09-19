@@ -70,7 +70,7 @@ def current_line(parsed, pos):
     return cur
 
 def main():
-    if os.path.exists("/tmp/lyric_off"):
+    if os.path.exists(os.path.expanduser("~/.cache/by-mgr/lyric_off")):
         print(json.dumps({"text": "", "class": "hidden", "tooltip": "歌词已关闭（cava 右键开启）"}))
         return
     title = playerctl(["metadata", "xesam:title"])
