@@ -245,6 +245,8 @@ echo "   Niri 配色 -> $TARGET_DIR/color-niri.kdl"
 # 若两者不一致（配置目录为软链接部署，如 stow），运行时在真实路径侧
 # 自动维护一个指向真实配色目录的桥接软链接，使两种解析汇聚于同一文件。
 # 直写 stow 链接的 waybar 真实目录，style.css 同目录即热重载
+# 模板重写（仿 starship）：style_base.css（仓库模板）+ 配色 -> style.css
+# 优先 stow 链接的真实目录，否则 ~/.config/waybar
 WAYBAR_DIR="$(dirname "$(realpath "$HOME/.config/waybar/style.css" 2>/dev/null)")"
 [ -z "$WAYBAR_DIR" ] && WAYBAR_DIR="$HOME/.config/waybar"
 cat <<EOF > "$WAYBAR_DIR/color-waybar.css"
@@ -253,7 +255,12 @@ cat <<EOF > "$WAYBAR_DIR/color-waybar.css"
 @define-color accent $ACCENT;
 @define-color muted $MUTED;
 EOF
-touch "$HOME/.config/waybar/style.css" 2>/dev/null || true
+# 用模板重写 style.css 实体（写入即 CLOSE_WRITE，waybar reload_style_on_change 原生热重载）
+STYLE_BASE="$WAYBAR_DIR/style_base.css"
+if [ -f "$STYLE_BASE" ]; then
+    cat "$STYLE_BASE" > "$HOME/.config/waybar/style.css"
+    echo "   Waybar style.css 已由模板重写 -> $HOME/.config/waybar/style.css"
+fi
 echo "   Waybar 配色 -> $WAYBAR_DIR/color-waybar.css"
 
 # --- C. Rofi (color-rofi.rasi) ---
@@ -461,8 +468,9 @@ if [ -n "$WAYLAND_DISPLAY" ]; then
     _debug "waybar pid: $(pgrep -x waybar 2>/dev/null || echo none)"
     # 3.5 重载 mako 通知配色
     makoctl reload >/dev/null 2>&1 && echo "   ✔ Mako 配置已重载"
-    # waybar 配置已启用 reload_style_on_change，css 变化自动热重载，无需 SIGUSR2
-    _debug "waybar reload signal sent"
+    # waybar reload_style_on_change 监听 style.css 与 @import 链，color-waybar.css 直写同目录 + touch 即自动重载
+    touch "$HOME/.config/waybar/style.css" 2>/dev/null || true
+    _debug "waybar reload via style reload_style_on_change"
     
     echo -e "\033[0;32m桌面组件已刷新！\033[0m"
     [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色更新完成" -t 3000 2>/dev/null &
