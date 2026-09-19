@@ -90,6 +90,10 @@ replenish() {
 }
 edit_list() {
     local path="$USER_CONFIG_DIR/repos.list"
+    mkdir -p "$(dirname "$path")"
+    if [ ! -f "$path" ]; then
+        printf '# Biyuan 仓库清单\n# 每行一个：repo <repoid> 或 copr <author>/<project>\n' > "$path"
+    fi
     local editor="${EDITOR:-nano}"
     $editor "$path" || true
 }

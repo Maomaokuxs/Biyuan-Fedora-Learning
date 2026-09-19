@@ -49,6 +49,9 @@ for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
     fi
     target=$(get_target_path "$mod")
     (cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null || true)
+    # 判断部署方式：快照中若该模块为软链则用 stow 还原，物理则本地还原
+    local use_stow=false
+    if [ -L "$target" ]; then use_stow=true; fi
     if [ "$mod" = "by-mgr" ]; then
         # by-mgr 特殊：保留 backup 目录，避免自删除
         mkdir -p "$target"
@@ -65,6 +68,13 @@ for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             [ "$bn" = "backup" ] && continue
             [ -e "$backup_src/$bn" ] || rm -rf "$f"
         done
+    elif [ "$use_stow" = true ]; then
+        # stow 还原：覆盖仓库文件后重新 stow 链接
+        clean_target "$target"
+        if [ -d "$backup_src" ]; then
+            cp -a "$backup_src/." "$DOTFILES_DIR/$mod/.config/" 2>/dev/null || true
+        fi
+        (cd "$DOTFILES_DIR" && stow -t ~ "$mod" 2>/dev/null || true)
     else
         clean_target "$target"
         if [ -d "$backup_src" ]; then
