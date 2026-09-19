@@ -1,0 +1,13 @@
+[package]
+name = "by-mgr"
+version = "0.1.0"
+edition = "2021"
+[dependencies]
+ratatui = "0.29"
+crossterm = "0.28"
+atty = "0.2.14"
+dirs = "7.0.0"
+chrono = "0.4.45"
+clap = { version = "4.5", features = ["derive"] }
+anyhow = "1.0"
+walkdir = "2.5"
