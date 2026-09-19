@@ -8,6 +8,7 @@
 // https://niri-wm.github.io/niri/Configuration:-Input
 
 include "~/.cache/by-mgr/hellwal/color-niri.kdl"
+include "niri-outputs.kdl"
 
 input {
     keyboard {
