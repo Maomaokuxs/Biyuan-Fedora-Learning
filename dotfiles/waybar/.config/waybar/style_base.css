@@ -1,0 +1,348 @@
+/* * Waybar 等宽终端 HUD 风 · 圆角色块版
+ * 适配 Niri 桌面环境 & Hellwal 动态配色
+ * 维护者: Biyuan
+ */
+
+/* --- 1. 引入 Hellwal 生成的颜色变量 --- */
+@import url("color-waybar.css");
+
+/* --- 2. 全局基础设置：等宽字体，适配色块比例 --- */
+/* 与 kitty 终端保持同源：图标由 JetBrainsMono Nerd Font 渲染 */
+* {
+    font-family: "JetBrainsMono Nerd Font", "Iosevka Nerd Font";
+    font-size: 13px;
+    min-height: 0;
+}
+
+window#waybar {
+    background-color: @bg;
+    color: @fg;
+}
+
+/* --- 3. 通用色块样式 (核心)：内缩圆角矩形、按组配色 --- */
+/* 几何：32px 色块悬浮于 45px 栏内，上下留 5px 呼吸位 */
+#cpu,
+#custom-power-profiles,
+#custom-cpu,
+#memory,
+#custom-memory,
+#bluetooth,
+#custom-bluetooth,
+#custom-bluetooth,
+#pulseaudio,
+#network,
+#custom-network,
+#clock,
+#battery,
+#tray,
+#custom-backlight,
+#custom-brightness,
+#custom-screen-power,
+#custom-gammastep,
+#custom-gammastep,
+#custom-theme,
+#custom-fcitx,
+#custom-updates,
+#custom-weather,
+#custom-cava,
+#custom-launcher,
+#custom-music,
+#custom-recorder,
+#custom-lyric,
+#custom-screenshot,
+#custom-picker,
+#custom-clipboard,
+#custom-mprev,
+#custom-mplay,
+#custom-mnext,
+#custom-inhibit,
+#custom-power {
+    padding: 0 10px;
+    margin: 5px 1px;
+    min-height: 28px;
+    border-radius: 9px;
+    border: none;
+    background-color: @accent; /* 默认：橄榄色（信息组） */
+    color: @fg;
+    transition: all 0.15s ease-out;
+}
+
+/* --- 4. 分组配色：让功能分区一目了然 --- */
+
+/* 几何校正：时钟/启动器为大字符标签，固定高度下基线易偏移，
+   改为对称内边距自居中，总高仍与 32px 色块带对齐 */
+#clock {
+    padding: 0 10px;
+}
+
+#custom-launcher {
+    font-size: 16px;
+    padding: 0 10px;
+}
+
+
+/* 系统监控组：亮一档的橄榄 */
+#cpu,
+#custom-power-profiles,
+#custom-cpu,
+#memory,
+#custom-memory,
+#battery {
+    background-color: mix(@accent, @fg, 0.14);
+}
+
+/* 连接与设备组：暖砖红 */
+#network,
+#custom-network,
+#bluetooth,
+#custom-bluetooth,
+#pulseaudio,
+#custom-brightness,
+#custom-backlight {
+    background-color: shade(@muted, 1.15);
+}
+
+/* 媒体组：橄榄与砖红的中间土色 */
+#custom-cava,
+#custom-music.playing {
+    background-color: mix(@accent, @muted, 0.5);
+}
+
+/* 时间锚点：全栏最亮的反色块 */
+#clock {
+    color: @bg;
+    background-color: @fg;
+    font-weight: bold;
+}
+
+/* 框架按钮：半透明暗块，衬托中间的实色模块 */
+#custom-launcher,
+#custom-power {
+    background-color: alpha(@muted, 0.75);
+}
+
+/* 空闲态：低饱和暗淡块 */
+#custom-updates.uptodate,
+#custom-music.paused {
+    background-color: alpha(@muted, 0.8);
+    color: alpha(@fg, 0.75);
+}
+
+/* --- 5. 左侧启动器：Rofi 入口 --- */
+#custom-launcher {
+    margin-left: 4px;
+}
+
+/* --- 6. 弹性工作区指示器 (Workspace) --- */
+#workspaces {
+    background: transparent;
+    margin: 0 4px;
+    padding: 0;
+}
+
+#workspaces button {
+    /* 基础状态：暗色小方块，居中于 42px 栏 */
+    padding: 0px;
+    margin: 12px 1px;
+    min-width: 16px;
+    min-height: 18px;
+    background-color: alpha(@fg, 0.35);
+    border: none;
+    border-radius: 4px;
+    transition: all 0.2s ease-in-out;
+}
+
+#workspaces button.active,
+#workspaces button.focused {
+    background-color: @fg;
+    min-width: 42px;
+    min-height: 22px;       /* 比非激活 (14px) 略高，避免失衡 */
+    margin-top: 10px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+}
+
+#workspaces button:hover {
+    background-color: alpha(@fg, 0.7);
+    min-width: 25px;
+}
+
+/* 屏蔽内部文字 Label */
+#workspaces button label {
+    color: transparent;
+    font-size: 0px;
+}
+
+/* --- 7. 系统状态细节 --- */
+
+/* 托盘区：min-height 对纯图标盒不生效，用对称内边距撑高；
+   注意 min-height 不含内边距，需覆盖通用值防止叠加超高 (18+7*2=32) */
+#tray {
+    padding: 0 6px;
+}
+
+#tray > widget {
+    margin: 0 1px;           /* 缩小图标间距 */
+    transition: all 0.15s ease-out;
+}
+
+#tray > widget:hover {
+    background-color: alpha(@fg, 0.3);
+    border-radius: 5px;
+}
+
+/* Cava 频谱分析仪：等宽字符波形 */
+#custom-cava {
+    font-family: "JetBrainsMono Nerd Font";
+    font-size: 14px;
+    padding: 0 10px;
+}
+
+/* 天气模块 */
+#custom-weather {
+    font-weight: bold;
+}
+
+/* 更新模块：>50 闪烁告警，其余不闪 */
+#custom-updates.many {
+    background-color: @accent;
+    animation: blinker 1s linear infinite;
+}
+#custom-updates.normal {
+    background-color: @accent;
+}
+
+#custom-updates.kernel {
+    color: @bg;
+    background-color: @fg;
+    font-weight: bold;
+}
+
+/* 终端式闪烁动画 */
+@keyframes blinker {
+    50% { opacity: 0.3; }
+}
+
+/* --- Fcitx5 输入法状态 --- */
+#custom-fcitx {
+    font-weight: bold;
+    padding: 0 10px;
+}
+
+/* --- 右侧电源按钮 --- */
+#custom-power {
+    font-size: 15px;
+    padding-right: 10px;
+    margin-right: 4px;
+}
+
+/* --- 8. 交互反馈：反色悬停 (经典终端选中效果) --- */
+#cpu:hover,
+#custom-power-profiles:hover,
+#custom-cpu:hover,
+#memory:hover,
+#custom-memory:hover,
+#pulseaudio:hover,
+#network:hover,
+#custom-network:hover,
+#bluetooth:hover,
+#custom-bluetooth:hover,
+#battery:hover,
+#tray:hover,
+#custom-fcitx:hover,
+#custom-updates:hover,
+#custom-updates.normal:hover,
+#custom-updates.uptodate:hover,
+#custom-updates.kernel:hover,
+#custom-cava:hover,
+#custom-gammastep:hover,
+#custom-recorder:hover,
+#custom-lyric:hover,
+#custom-screenshot:hover,
+#custom-picker:hover,
+#custom-clipboard:hover,
+#custom-mprev:hover,
+#custom-mplay:hover,
+#custom-mnext:hover,
+#custom-weather:hover,
+#custom-backlight:hover,
+#custom-brightness:hover,
+#custom-screen-power:hover,
+#custom-theme:hover,
+#custom-music:hover,
+#custom-launcher:hover,
+#custom-inhibit:hover,
+#custom-power:hover {
+    background-color: @fg;
+    color: @bg;
+}
+
+/* 时钟本身已是亮块：悬停反转回底色并描边示意可点 */
+#clock:hover {
+    background-color: @bg;
+    color: @fg;
+    box-shadow: inset 0 0 0 1px @fg;
+}
+
+/* --- 视频录制提示模块 --- */
+
+/* 状态：录制中 (反色告警块 + 闪烁) */
+#custom-recorder.recording {
+    color: @bg;
+    background-color: @fg;
+    animation: blinker 2s linear infinite;
+}
+
+/* 屏幕电源模块 off 态：熄灭暗淡 */
+#custom-screen-power.off {
+    color: @muted;
+    background-color: alpha(@muted, 0.5);
+}
+
+/* 部分屏幕关闭：保持色块但用 accent 描边提示状态 */
+#custom-screen-power.internal,
+#custom-screen-power.external {
+    color: @fg;
+    box-shadow: inset 0 0 0 2px @muted;
+}
+
+/* 歌词关闭态：彻底隐藏 */
+#custom-lyric.hidden {
+    opacity: 0;
+}
+
+/* 音乐控件隐藏态（由 cava 左键切换） */
+#custom-mprev.hidden,
+#custom-mplay.hidden,
+#custom-mnext.hidden {
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    border: none;
+}
+
+/* 左侧三功能隐藏态（由 Fedora 徽标右键切换） */
+#custom-cpu.hidden,
+#custom-memory.hidden,
+#custom-network.hidden,
+#custom-bluetooth.hidden,
+#custom-recorder.hidden,
+#custom-screenshot.hidden,
+#custom-picker.hidden,
+#custom-clipboard.hidden {
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+    border: none;
+}
+
+/* 阻止熄屏状态 */
+#custom-inhibit.inhibited {
+    color: @bg;
+    background-color: @accent;
+}
+#custom-inhibit.idle {
+    color: @fg;
+}
