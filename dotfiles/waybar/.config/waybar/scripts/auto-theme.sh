@@ -53,12 +53,14 @@ if [ -f "$MANUAL_FLAG" ]; then
     fi
 fi
 
-# 自动纠正：仅当目标与当前不一致时切换
+# 自动纠正：仅当目标与当前不一致时切换，并重跑取色联动配色
 if [ "$TARGET" = "day" ] && [ "$CURRENT" = "'prefer-dark'" ]; then
     apply_day
+    bash ~/.config/niri/scripts/theme-sync.sh &>/dev/null &
     CURRENT="'default'"
 elif [ "$TARGET" = "night" ] && [ "$CURRENT" != "'prefer-dark'" ]; then
     apply_night
+    bash ~/.config/niri/scripts/theme-sync.sh &>/dev/null &
     CURRENT="'prefer-dark'"
 fi
 

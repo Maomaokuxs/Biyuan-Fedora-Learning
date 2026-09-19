@@ -1,6 +1,8 @@
 #!/bin/bash
 # toggle-theme.sh — 手动昼夜切换（与 auto-theme.sh 保持一致）
 
+# 先标记手动覆盖（放最前，避免与 auto-theme 每秒轮询竞态），2 小时内不被自动改回
+touch /tmp/theme_manual_override
 CURRENT=$(gsettings get org.gnome.desktop.interface color-scheme)
 
 if [ "$CURRENT" == "'prefer-dark'" ]; then
@@ -25,7 +27,7 @@ else
         plasma-apply-colorscheme BreezeDark 2>/dev/null &
     fi
 fi
-# 标记手动覆盖，2 小时内 auto-theme 不自动改回
-touch /tmp/theme_manual_override
+# 昼夜联动：重跑取色，按新昼夜模式再生配色
+bash ~/.config/niri/scripts/theme-sync.sh &>/dev/null &
 # 刷新 waybar 主题模块
 pkill -RTMIN+12 waybar 2>/dev/null
