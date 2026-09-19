@@ -12,6 +12,8 @@ current_backup_dir="$BACKUP_ROOT/$date_tag"
 mkdir -p "$current_backup_dir"
 backed_any=false
 # 仅输出 文件 -> 目录 精简信息，供 TUI 状态栏显示
+# 清理历史遗留的 waybar 桥接软链（防 stow absolute symlink 冲突）
+[ -d "$DOTFILES_DIR/waybar/.cache" ] && rm -rf "$DOTFILES_DIR/waybar/.cache" 2>/dev/null || true
 for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
     src=$(get_target_path "$module")
     if [ -e "$src" ] || [ -L "$src" ]; then

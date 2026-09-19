@@ -89,13 +89,15 @@ pub fn init_local_share(cfg: &AppConfig) -> Result<()> {
             crate::core::utils::copy_recursive(&src, &dst_path)?;
         }
     }
-    // 仅保留 by-mgr 自身 dotfiles，非全量；清理旧全量
-    let _ = std::fs::remove_dir_all(dst.join("dotfiles"));
-    let src = cfg.repo_dir.join("dotfiles/by-mgr");
-    let dst_path = dst.join("dotfiles/by-mgr");
-    if src.is_dir() {
-        std::fs::create_dir_all(dst_path.parent().unwrap())?;
-        crate::core::utils::copy_recursive(&src, &dst_path)?;
+    // by-mgr 独立目录：~/.config/by-mgr 实目录，不再 stow 链接
+    let _ = std::fs::remove_file(home.join(".config/by-mgr"));
+    let _ = std::fs::create_dir_all(home.join(".config/by-mgr"))?;
+    let _ = std::fs::create_dir_all(home.join(".config/by-mgr/templates"))?;
+    let src_tpl = cfg.repo_dir.join("dotfiles/by-mgr/.config/by-mgr/templates");
+    if src_tpl.is_dir() {
+        for entry in std::fs::read_dir(&src_tpl).unwrap().filter_map(|e| e.ok()) {
+            let _ = std::fs::copy(entry.path(), home.join(".config/by-mgr/templates").join(entry.file_name()));
+        }
     }
     // 同步当前二进制为实体文件（非软链，删仓后仍可用）
     let bin_dst = home.join(".local/bin/by-mgr");

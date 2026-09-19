@@ -42,7 +42,7 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
             Page::Main => 3,
             Page::Backup => 3,
             Page::Deploy => 3,
-            Page::System => 2,
+            Page::System => 3,
         };
         if selected >= count {
             selected = count - 1;
@@ -453,22 +453,25 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
                                     }
                                 } else if page == Page::System {
                                     if selected == 0 {
-                                        if let Some(choice) = tui_pick_repo(&mut terminal) {
+                                        // 仓库管理子菜单：执行后停留，可连续操作；Esc 返回上一级
+                                        loop {
+                                            let choice = match tui_pick_repo(&mut terminal) {
+                                                Some(c) => c,
+                                                None => {
+                                                    status = "已取消".to_string();
+                                                    break;
+                                                }
+                                            };
                                             if choice == 1 {
-                                                // 清理失效仓库：图形进度条 + sudo 可视化，避免“卡住”
-                                                let sudo_msg = "⏳ 正在请求 sudo 授权...";
+                                                // 清理失效仓库：简洁单行提示 + 进度条
+                                                status = "⏳ 正在请求 sudo 授权...".to_string();
                                                 terminal.draw(|f| {
                                                     let area = f.area();
                                                     let block = Block::default().title(" 清理失效仓库 ").borders(Borders::ALL).border_type(BorderType::Rounded).border_style(theme::border_style());
                                                     f.render_widget(block, area);
                                                     let inner = Rect { x: area.x+1, y: area.y+1, width: area.width-2, height: area.height-2 };
-                                                    let chunks = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Min(1), Constraint::Length(1)]).split(inner);
-                                                    let gauge = Gauge::default().block(Block::default().title(" 进度 ").borders(Borders::ALL).border_type(BorderType::Rounded)).gauge_style(theme::selected_style()).percent(0).label("0%");
-                                                    f.render_widget(gauge, chunks[0]);
-                                                    let info = Paragraph::new(sudo_msg).style(theme::muted_style()).alignment(Alignment::Center);
-                                                    f.render_widget(info, chunks[1]);
-                                                    let footer = Paragraph::new("请输入 sudo 密码后回车（如已授权则直接继续）").style(theme::normal_style()).alignment(Alignment::Center);
-                                                    f.render_widget(footer, chunks[2]);
+                                                    let footer = Paragraph::new(status.clone()).style(theme::muted_style()).alignment(Alignment::Center);
+                                                    f.render_widget(footer, inner);
                                                 }).ok();
                                                 // 确保 sudo 已授权，离屏 raw 以显示密码提示
                                                 disable_raw_mode().ok();
@@ -488,25 +491,18 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
                                                     cur = c; total = t; last_id = id.clone();
                                                     let is_final = last_id.starts_with("✅") || last_id.starts_with("❌");
                                                     let pct = if total == 0 { 100 } else { (cur * 100 / total).min(100) as u16 };
-                                                    let label = if is_final { last_id.clone() } else { format!("{}/{} {}", cur, total, last_id) };
                                                     terminal.draw(|f| {
                                                         let area = f.area();
                                                         let block = Block::default().title(" 清理失效仓库 ").borders(Borders::ALL).border_type(BorderType::Rounded).border_style(theme::border_style());
                                                         f.render_widget(block, area);
                                                         let inner = Rect { x: area.x+1, y: area.y+1, width: area.width-2, height: area.height-2 };
-                                                        let chunks = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Min(1), Constraint::Length(1)]).split(inner);
-                                                        let gauge = Gauge::default().block(Block::default().title(" 进度 ").borders(Borders::ALL).border_type(BorderType::Rounded)).gauge_style(theme::selected_style()).percent(pct).label(format!("{}/{}", cur, total));
-                                                        f.render_widget(gauge, chunks[0]);
-                                                        let info = if is_final {
+                                                        let chunks = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(0), Constraint::Length(3), Constraint::Length(1), Constraint::Min(0)]).split(inner);
+                                                        let gauge = Gauge::default().block(Block::default().title(" 进度 ").borders(Borders::ALL).border_type(BorderType::Rounded)).gauge_style(theme::selected_style()).percent(pct).label(format!("{}/{} {}", cur, total, last_id));
+                                                        f.render_widget(gauge, chunks[1]);
+                                                        let footer = if is_final {
                                                             Paragraph::new(last_id.clone()).style(theme::selected_style()).alignment(Alignment::Center)
                                                         } else {
-                                                            Paragraph::new(format!("正在检查: {}", last_id)).style(theme::muted_style()).alignment(Alignment::Center)
-                                                        };
-                                                        f.render_widget(info, chunks[1]);
-                                                        let footer = if is_final {
-                                                            Paragraph::new(last_id.clone()).style(theme::normal_style()).alignment(Alignment::Center)
-                                                        } else {
-                                                            Paragraph::new("请稍候，正在逐个校验仓库...").style(theme::normal_style()).alignment(Alignment::Center)
+                                                            Paragraph::new("正在逐个校验…").style(theme::muted_style()).alignment(Alignment::Center)
                                                         };
                                                         f.render_widget(footer, chunks[2]);
                                                     }).ok();
@@ -529,19 +525,29 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
                                                     let chunks = Layout::default().direction(Direction::Vertical).constraints([Constraint::Min(5), Constraint::Length(1)]).split(inner);
                                                     f.render_widget(footer, chunks[1]);
                                                 }).ok();
-                                                let res = match choice {
-                                                    0 => core::repo::repo_export_quiet(&cfg),
-                                                    2 => core::repo::repo_replenish_quiet(&cfg),
-                                                    _ => Ok("已取消".to_string()),
-                                                };
-                                                status = match res {
-                                                    Ok(msg) => msg,
-                                                    Err(e) => format!("❌ {}", e),
-                                                };
-                                            }
-                                        } else {
-                                            status = "已取消".to_string();
-                                        }
+                                                 let res = match choice {
+                                                     0 => core::repo::repo_export_quiet(&cfg),
+                                                     2 => core::repo::repo_replenish_quiet(&cfg),
+                                                     3 => {
+                                                         // 编辑清单：离屏调用 repo.sh edit（编辑器打开 ~/.config/by-mgr/repos.list），退出后直接返回 ratatui
+                                                         disable_raw_mode().ok();
+                                                         execute!(terminal.backend_mut(), LeaveAlternateScreen).ok();
+                                                         terminal.show_cursor().ok();
+                                                         let r = core::repo::repo_edit(&cfg).map(|_| "✅ 清单已保存".to_string());
+                                                         enable_raw_mode().ok();
+                                                         execute!(terminal.backend_mut(), EnterAlternateScreen).ok();
+                                                         terminal.hide_cursor().ok();
+                                                         terminal.clear().ok();
+                                                         r
+                                                     }
+                                                     _ => Ok("已取消".to_string()),
+                                                 };
+                                                 status = match res {
+                                                     Ok(msg) => msg,
+                                                     Err(e) => format!("❌ {}", e),
+                                                 };
+                                             }
+                                         }
                                         terminal.draw(|f| {
                                             let area = f.area();
                                             let block = Block::default().title(" 系统配置 ").borders(Borders::ALL).border_type(BorderType::Rounded).border_style(theme::border_style());
@@ -596,6 +602,20 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
                                             let footer = Paragraph::new(status.clone()).style(theme::normal_style()).alignment(Alignment::Center);
                                             f.render_widget(footer, chunks[1]);
                                         }).ok();
+                                    } else if selected == 2 {
+                                        // 显示器管理：离屏调用 display.sh（编辑器打开 niri-outputs.kdl），退出后直接返回 ratatui
+                                        disable_raw_mode().ok();
+                                        execute!(terminal.backend_mut(), LeaveAlternateScreen).ok();
+                                        terminal.show_cursor().ok();
+                                        let res = core::display::display_manager(&cfg);
+                                        status = match res {
+                                            Ok(msg) => msg,
+                                            Err(e) => format!("❌ {}", e),
+                                        };
+                                        enable_raw_mode().ok();
+                                        execute!(terminal.backend_mut(), EnterAlternateScreen).ok();
+                                        terminal.hide_cursor().ok();
+                                        terminal.clear().ok();
                                     } else {
                                         status = "已取消".to_string();
                                     }
@@ -841,29 +861,30 @@ fn tui_pick_editor<W: Backend>(terminal: &mut Terminal<W>) -> Option<String> whe
 
 fn main_items() -> Vec<MenuItem> {
     vec![
-        MenuItem { title: "备份与恢复", desc: "快照创建 · 历史还原(本地/Stow) · 清理\n快照路径: ~/.config/by-mgr/backup/YYYYMMDD_HHMMSS" },
-        MenuItem { title: "更新与部署", desc: "Stow 链接部署 · 本地复制部署 · OTA 自更新\n含 starship/mako 模板同步与 theme-sync 触发" },
-        MenuItem { title: "系统配置", desc: "仓库管理(导出/清理/补齐/编辑) · 编辑器设置\n（已移除: NVIDIA/DM/Plymouth/休眠）" },
+        MenuItem { title: "备份与恢复", desc: "创建快照 · 历史还原 · 清理快照\n存到 ~/.config/by-mgr/backup/日期时间戳\n还原时自动识别本地/Stow，顺带恢复配色和壁纸" },
+        MenuItem { title: "更新与部署", desc: "Stow 部署 · 本地部署 · OTA 自更新\nStow 用软链接（改仓库即生效，推荐）\n本地是直接复制过去\n同步 starship/mako 模板，分发 hellwal 配色" },
+        MenuItem { title: "系统配置", desc: "仓库管理 · 编辑器设置 · 显示器管理\n仓库：导出清单/清理失效/增量补齐/编辑清单\n显示器：调分辨率刷新率（niri-outputs.kdl）" },
     ]
 }
 fn backup_items() -> Vec<MenuItem> {
     vec![
-        MenuItem { title: "创建快照", desc: "备份当前系统配置到 ~/.config/by-mgr/backup/" },
-        MenuItem { title: "历史还原", desc: "选择历史备份点，按模块还原（本地/Stow）" },
-        MenuItem { title: "清理快照", desc: "按数量或日期删除旧备份" },
+        MenuItem { title: "创建快照", desc: "把当前配置备份到 ~/.config/by-mgr/backup/" },
+        MenuItem { title: "历史还原", desc: "挑一个历史备份，按模块还原（本地/Stow 都行）" },
+        MenuItem { title: "清理快照", desc: "按保留数量或按天数清掉旧备份" },
     ]
 }
 fn deploy_items() -> Vec<MenuItem> {
     vec![
-        MenuItem { title: "Stow 部署", desc: "软链接方式部署（推荐）" },
-        MenuItem { title: "本地部署", desc: "直接复制配置文件到系统目录" },
-        MenuItem { title: "OTA 自更新", desc: "从 GitHub 拉取最新版 by-mgr" },
+        MenuItem { title: "Stow 部署", desc: "软链接部署，改仓库即生效（推荐）" },
+        MenuItem { title: "本地部署", desc: "把配置文件直接复制到系统目录" },
+        MenuItem { title: "OTA 自更新", desc: "从 GitHub 拉最新版 by-mgr" },
     ]
 }
 fn system_items() -> Vec<MenuItem> {
     vec![
-        MenuItem { title: "仓库管理", desc: "导出清单 · 清理失效仓库 · 增量补齐 · 编辑清单" },
-        MenuItem { title: "编辑器设置", desc: "设置系统默认编辑器 (nvim/vim/nano/kate)" },
+        MenuItem { title: "仓库管理", desc: "导出清单 · 清理失效 · 增量补齐 · 编辑清单" },
+        MenuItem { title: "编辑器设置", desc: "切换系统默认编辑器（nvim/vim/nano/kate）" },
+        MenuItem { title: "显示器管理", desc: "调分辨率与刷新率（niri-outputs.kdl）" },
     ]
 }
 
@@ -900,6 +921,10 @@ fn execute_action(cfg: &AppConfig, page: Page, idx: usize) -> Result<String> {
         (Page::System, 1) => {
             core::editor::editor_settings(cfg)?;
             Ok("✅ 编辑器设置完成".to_string())
+        }
+        (Page::System, 2) => {
+            core::display::display_manager(cfg)?;
+            Ok("✅ 显示器管理完成".to_string())
         }
         _ => Ok("未实现".to_string()),
     }

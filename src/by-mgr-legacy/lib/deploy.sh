@@ -24,8 +24,11 @@ if [ -z "${BY_MGR_QUIET:-}" ]; then
 else
     echo ">> 正在部署配置 ($mode)..." >> "$LOG_FILE"
 fi
+# 清理历史遗留的 waybar 桥接软链（防 stow absolute symlink 冲突）
+[ -d "$DOTFILES_DIR/waybar/.cache" ] && rm -rf "$DOTFILES_DIR/waybar/.cache" 2>/dev/null || true
 for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
     [[ "$module" == "bash" ]] && continue
+    [[ "$module" == "by-mgr" ]] && continue  # by-mgr 独立目录，不 stow
     target=$(get_target_path "$module")
     if [ "$mode" = "stow" ]; then
         # 兼容处理：starship 的 starship_base.toml 为模板，physical 残留的实体会阻塞 stow
@@ -47,22 +50,16 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
         fi
         # 先尝试回收旧链接，失败不隐藏错误（便于排查）
         (cd "$DOTFILES_DIR" && stow -D -t "$HOME" "$module" 2>&1 | tee -a "$LOG_FILE" || true)
+        # stow 前彻底清理本地实文件残留（fastfetch 等单文件冲突）
+        if [ -e "$target" ] || [ -L "$target" ]; then
+            rm -rf "$target" 2>/dev/null || true
+        fi
         clean_target "$target"
         if (cd "$DOTFILES_DIR" && stow -v -t "$HOME" "$module" 2>&1 | tee -a "$LOG_FILE"; test ${PIPESTATUS[0]} -eq 0); then
             if [ -z "${BY_MGR_QUIET:-}" ]; then
                 echo -e "  [🔗 Linked] $module" | tee -a "$LOG_FILE"
             else
                 echo "  [🔗 Linked] $module" >> "$LOG_FILE"
-            fi
-            # 特殊处理：waybar 配色文件单独链接至 ~/.cache 生成物，style.css 已改为 @import "color-waybar.css"
-            if [ "$module" = "waybar" ]; then
-                mkdir -p "$HOME/.config/waybar"
-                ln -sfn "$HOME/.cache/by-mgr/hellwal/color-waybar.css" "$HOME/.config/waybar/color-waybar.css"
-                if [ -z "${BY_MGR_QUIET:-}" ]; then
-                    echo -e "  ${CYAN}[特殊] waybar 配色 -> ~/.config/waybar/color-waybar.css${NC}" | tee -a "$LOG_FILE"
-                else
-                    echo "  [特殊] waybar 配色 -> ~/.config/waybar/color-waybar.css" >> "$LOG_FILE"
-                fi
             fi
         else
             failed=$((failed+1))
@@ -104,15 +101,6 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
         else
             echo "  [📁 Physical] $module" >> "$LOG_FILE"
         fi
-        if [ "$module" = "waybar" ]; then
-            mkdir -p "$HOME/.config/waybar" "$HOME/.cache/by-mgr/hellwal"
-            ln -sfn "$HOME/.cache/by-mgr/hellwal/color-waybar.css" "$HOME/.config/waybar/color-waybar.css"
-            if [ -z "${BY_MGR_QUIET:-}" ]; then
-                echo -e "  ${CYAN}[特殊] waybar 配色 -> ~/.config/waybar/color-waybar.css${NC}" | tee -a "$LOG_FILE"
-            else
-                echo "  [特殊] waybar 配色 -> ~/.config/waybar/color-waybar.css" >> "$LOG_FILE"
-            fi
-        fi
     fi
 done
 
@@ -146,9 +134,8 @@ if [ "$failed" -gt 0 ]; then
     fi
     exit 1
 else
-    if [ -z "${BY_MGR_QUIET:-}" ]; then
-        echo -e "${GREEN}✅ 部署完成！${NC}" | tee -a "$LOG_FILE"
-    else
-        echo "✅ 部署完成 ($mode)" | tee -a "$LOG_FILE"
-    fi
+    echo "✅ 部署完成 ($mode)" | tee -a "$LOG_FILE"
 fi
+# 部署重建文件后 waybar 需重读配置重建 inotify
+pkill -SIGUSR2 waybar 2>/dev/null || true
+echo "[$(date +%H:%M:%S)] SIGUSR2 sent to waybar" >> "$LOG_FILE"
