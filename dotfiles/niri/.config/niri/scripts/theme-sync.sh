@@ -89,6 +89,42 @@ if [ -z "$WALLPAPER" ] || [ ! -f "$WALLPAPER" ]; then
     exit 1
 fi
 
+# 高分辨率优化：只解一次原图生成工作小图（最长边 1024），后续 hellwal/亮度/KDE 全用它
+# 同一壁纸直接复用缓存，避免每次 ffmpeg 重解 9K 原图
+mkdir -p "$HOME/.cache/by-mgr"
+WORK_CACHE="$HOME/.cache/by-mgr/work-small.png"
+WORK_CACHE_ID="$HOME/.cache/by-mgr/work-small.id"
+WORK_ID=$(stat -c '%d-%i-%s-%Y' "$WALLPAPER" 2>/dev/null)
+if [ -f "$WORK_CACHE" ] && [ "$(cat "$WORK_CACHE_ID" 2>/dev/null)" = "$WORK_ID" ]; then
+    WORK_SMALL="$WORK_CACHE"
+    _debug "work image cache hit"
+else
+    WORK_SMALL=$(mktemp /tmp/by-mgr-work-XXXXXX.png)
+    trap 'rm -f "$WORK_SMALL"' EXIT
+    if command -v ffmpeg &>/dev/null; then
+        timeout 15 ffmpeg -y -loglevel error -i "$WALLPAPER" -vf "scale=1024:-1" "$WORK_SMALL" 2>/dev/null
+    fi
+    if [ ! -s "$WORK_SMALL" ]; then
+        python3 - "$WALLPAPER" "$WORK_SMALL" <<'PY' 2>/dev/null
+import sys
+try:
+    from PIL import Image
+    img = Image.open(sys.argv[1]).convert('RGB')
+    img.thumbnail((1024, 1024))
+    img.save(sys.argv[2])
+except Exception:
+    pass
+PY
+    fi
+    if [ -s "$WORK_SMALL" ]; then
+        cp -f "$WORK_SMALL" "$WORK_CACHE" 2>/dev/null
+        echo "$WORK_ID" > "$WORK_CACHE_ID" 2>/dev/null
+    else
+        WORK_SMALL="$WALLPAPER"
+    fi
+    _debug "work image: $WORK_SMALL"
+fi
+
 # 缓存壁纸路径，检测是否真正变更
 mkdir -p "$HOME/.cache/by-mgr"
 last_wp=$(cat "$HOME/.cache/by-mgr/last-wallpaper" 2>/dev/null)
@@ -107,10 +143,15 @@ if pgrep -x plasmashell >/dev/null 2>&1; then
 fi
 
 # Wayland 壁纸渲染：仅在非 KDE 环境且调用方未自行渲染时执行
+# 壁纸未变化时跳过重渲染（9K 图一次 2.7 秒），只做配色同步
 if [ -n "$WAYLAND_DISPLAY" ] && ! $IN_KDE && ! $NO_RENDER; then
     if command -v awww &> /dev/null; then
         awww query &>/dev/null || awww init &>/dev/null
-        awww img "$WALLPAPER" --transition-type random --transition-pos center --transition-duration 2
+        if [ "$WALLPAPER_CHANGED" = true ]; then
+            awww img "$WALLPAPER" --transition-type random --transition-pos center --transition-duration 2
+        else
+            _debug "wallpaper unchanged, skip awww re-render"
+        fi
     fi
 elif $NO_RENDER; then
     echo ">> 调用方已渲染壁纸，跳过切换动画（仅同步配色）"
@@ -130,7 +171,11 @@ convert_to_png() {
     command -v ffmpeg &>/dev/null && timeout 30 ffmpeg -y -loglevel error -i "$src" -frames:v 1 "$dst" 2>/dev/null && [ -s "$dst" ]
 }
 
-JSON_DATA=$(hellwal -i "$WALLPAPER" -j 2>/dev/null)
+JSON_DATA=$(hellwal -i "$WORK_SMALL" -j 2>/dev/null)
+if [ -z "$JSON_DATA" ] && [ "$WORK_SMALL" != "$WALLPAPER" ]; then
+    _debug "small image decode failed, retry original"
+    JSON_DATA=$(hellwal -i "$WALLPAPER" -j 2>/dev/null)
+fi
 if [ -z "$JSON_DATA" ]; then
     _debug "direct decode failed, converting via ffmpeg"
     TMP_PNG=$(mktemp /tmp/by-mgr-XXXXXX.png)
@@ -155,14 +200,54 @@ MUTED=$(echo "$JSON_DATA" | jq -r '.colors.color8 // .colors.color0 // "#45475a"
 [[ "$MUTED" == "#000000" || "$MUTED" == "#111111" ]] && MUTED="#2a2b3c"
 [[ "$BG" == "#000000" || "$BG" == "#111111" ]] && BG="#1e1e2e"
 
+# 昼夜联动：夜间用原始深色取色；日间无条件翻为浅色主题（不设亮度阈值）
+THEME_NIGHT=false
+[ "$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null)" = "'prefer-dark'" ] && THEME_NIGHT=true
+_debug "theme mode night=$THEME_NIGHT"
+if ! $THEME_NIGHT; then
+    # 日间浅色：底近白但带壁纸主色，强调直接用粉色系 color5，辅色由强调向底调和
+    read AVGHEX < <(python3 - "$WORK_SMALL" <<'PY'
+import sys
+try:
+    from PIL import Image
+    img = Image.open(sys.argv[1]).convert('RGB').resize((32, 32))
+    px = list(img.getdata())
+    n = len(px)
+    r = sum(p[0] for p in px) // n; g = sum(p[1] for p in px) // n; b = sum(p[2] for p in px) // n
+    print(f'{r:02x}{g:02x}{b:02x}')
+except Exception:
+    print('808080')
+PY
+)
+    ACCENT5=$(echo "$JSON_DATA" | jq -r '.colors.color5 // .colors.color4 // "#d8979f"')
+    read BG FG ACCENT MUTED < <(python3 - "$AVGHEX" "$ACCENT5" <<'PY'
+import sys, colorsys
+h = sys.argv[1]
+r, g, b = (int(h[i:i+2], 16) for i in (0, 2, 4))
+bg = tuple(round(c*0.15 + 255*0.85) for c in (r, g, b))
+# 文字：取壁纸同色相、明度 0.3 的深灰，绝不用纯黑/近黑；冲突时只调模块色
+ah, _, as_ = colorsys.rgb_to_hls(r/255, g/255, b/255)
+fr, fg_, fb = colorsys.hls_to_rgb(ah, 0.3, min(as_, 0.5))
+fg = (round(fr*255), round(fg_*255), round(fb*255))
+acc = sys.argv[2] if sys.argv[2].startswith('#') else '#d8979f'
+ah = acc.lstrip('#')
+acc = tuple(int(ah[i:i+2], 16) for i in (0, 2, 4))
+mut = tuple(round(ac*0.5 + bc*0.5) for ac, bc in zip(acc, bg))
+f = lambda t: '#%02x%02x%02x' % t
+print(f(bg), f(fg), f(acc), f(mut))
+PY
+)
+    _debug "day light theme: BG=$BG FG=$FG ACCENT=$ACCENT MUTED=$MUTED"
+fi
+
 if [[ ! "$BG" =~ ^# ]] || [[ ! "$ACCENT" =~ ^# ]]; then
     echo -e "\033[0;31m提取颜色失败。\033[0m"
     exit 1
 fi
 
-# 对比度守卫：暗色壁纸常抽出近黑的 accent/muted，与背景无法区分。
-# 用 WCAG 对比度公式检测，不足时向前景色调和，直到达到最低区分度。
-ADJ=$(python3 - "$BG" "$FG" "$ACCENT" "$MUTED" <<'PY'
+# 对比度守卫：accent/muted 既要与背景区分，也要与文字区分
+# （uptodate 等模块用色块底配文字色）；不足时分别向另一侧调和。
+ADJ=$(python3 - "$BG" "$FG" "$ACCENT" "$MUTED" "$THEME_NIGHT" <<'PY'
 import sys
 
 def lum(h):
@@ -180,9 +265,13 @@ def mix(c1, c2, t):
     return '#' + ''.join(f'{round(int(c1[i:i+2],16)*(1-t)+int(c2[i:i+2],16)*t):02x}' for i in (0, 2, 4))
 
 bg, fg, acc, mut = sys.argv[1:5]
+night = sys.argv[5] == 'true' if len(sys.argv) > 5 else True
 for _ in range(6):
     if ratio(bg, acc) < 1.8: acc = mix(acc, fg, 0.3)
     if ratio(bg, mut) < 1.5: mut = mix(mut, fg, 0.3)
+    if not night:
+        if ratio(fg, acc) < 1.8: acc = mix(acc, bg, 0.3)
+        if ratio(fg, mut) < 1.8: mut = mix(mut, bg, 0.3)
 print(acc, mut)
 PY
 )
@@ -194,16 +283,32 @@ echo -e "\033[0;32m调色板生成成功！\033[0m"
 _debug "colors: BG=$BG FG=$FG ACCENT=$ACCENT MUTED=$MUTED"
 echo "   背景: $BG | 文字: $FG | 强调色: $ACCENT | 辅色: $MUTED"
 
-# 生成 KDE 配色方案
+# 生成 KDE 配色方案（跟随昼夜模式显式指定明暗，使 Plasma 与 GNOME 一致，避免 kded 回写 color-scheme）
+# 注意：原图可达 9K，直接喂会拖慢 20 秒+甚至 OOM，先缩到 512px 再喂，并加 20 秒超时
+KDE_MODE="--light"
+$THEME_NIGHT && KDE_MODE="--dark"
+KDE_SMALL=$(mktemp /tmp/by-mgr-kde-XXXXXX.png)
+python3 - "$WORK_SMALL" "$KDE_SMALL" <<'PY' 2>/dev/null
+import sys
+try:
+    from PIL import Image
+    img = Image.open(sys.argv[1]).convert('RGB')
+    img.thumbnail((512, 512))
+    img.save(sys.argv[2])
+except Exception:
+    pass
+PY
+[ -s "$KDE_SMALL" ] || KDE_SMALL="$WALLPAPER"
 if $IN_KDE && command -v kde-material-you-colors &>/dev/null; then
     echo "正在应用 KDE Plasma Material You 配色..."
-    kde-material-you-colors -f "$WALLPAPER" >/dev/null 2>&1 &
-    _debug "kde-material-you-colors called"
+    (setsid timeout -k 5 20 kde-material-you-colors -f "$KDE_SMALL" $KDE_MODE >/dev/null 2>&1 &)
+    _debug "kde-material-you-colors called ($KDE_MODE)"
 elif command -v kde-material-you-colors &>/dev/null; then
     echo "正在生成 KDE 配色方案..."
-    kde-material-you-colors -f "$WALLPAPER" >/dev/null 2>&1 &
-    _debug "kde-material-you-colors (niri) called"
+    (setsid timeout -k 5 20 kde-material-you-colors -f "$KDE_SMALL" $KDE_MODE >/dev/null 2>&1 &)
+    _debug "kde-material-you-colors (niri) called ($KDE_MODE)"
 fi
+[ "$KDE_SMALL" != "$WALLPAPER" ] && (sleep 60; rm -f "$KDE_SMALL") &>/dev/null &
 
 # ==========================================
 # 2. 核心：生成全系统唯一的中央色彩数据库
@@ -473,9 +578,12 @@ if [ -n "$WAYLAND_DISPLAY" ]; then
     _debug "waybar reload via style reload_style_on_change"
     
     echo -e "\033[0;32m桌面组件已刷新！\033[0m"
-    [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色更新完成" -t 3000 2>/dev/null &
+    [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色更新完成" -t 3000 2>/dev/null & true
     _debug "notify-send: 配色更新完成"
 else
     echo -e "\033[0;33m当前处于 TTY 环境，跳过进程热重载。\033[0m"
-    [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色文件已生成" -t 3000 2>/dev/null &
+    [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色文件已生成" -t 3000 2>/dev/null & true
 fi
+
+# 正常完成（_debug 在 DEBUG=false 时返回非零，不代表失败）
+exit 0
