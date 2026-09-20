@@ -9,7 +9,7 @@
 /* --- 2. 全局基础设置：等宽字体，适配色块比例 --- */
 /* 与 kitty 终端保持同源：图标由 JetBrainsMono Nerd Font 渲染 */
 * {
-    font-family: "JetBrainsMono Nerd Font", "Iosevka Nerd Font";
+    font-family: "JetBrainsMono Nerd Font", "Iosevka Nerd Font", "Noto Sans Yi", "Noto Sans CJK SC";
     font-size: 13px;
     font-weight: bold;
     min-height: 0;

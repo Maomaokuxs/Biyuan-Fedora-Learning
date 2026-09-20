@@ -240,7 +240,8 @@
     "on-scroll-up": "playerctl volume 0.05+",
     "on-scroll-down": "playerctl volume 0.05-",
     "max-length": 15,
-    "tooltip": true
+    "tooltip": true,
+    "escape": true
   },
   "custom/brightness": {
     "format": "{icon} {percentage}%",
