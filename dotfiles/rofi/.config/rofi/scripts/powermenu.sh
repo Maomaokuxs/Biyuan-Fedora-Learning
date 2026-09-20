@@ -36,8 +36,15 @@ case "$SELECTED" in
         loginctl lock-session
         # 2. 强制等待 1 秒，确保锁屏界面已经在显卡中渲染完成
         sleep 1
-        # 3. 执行物理休眠（写入 32G 交换空间并断电）
-        systemctl hibernate
+        # 3. 无休眠配置的机器直接 hibernate 会失败且无兜底，走 sleep-safe.sh：
+        # 有物理 swap + resume= 才休眠，否则降级挂起，再不行保底熄屏
+        if swapon --show --noheadings 2>/dev/null | grep -v "zram" | grep -q . \
+            && grep -q "resume=" /proc/cmdline 2>/dev/null; then
+            systemctl hibernate
+        else
+            notify-send -i dialog-warning "休眠不可用" "未检测到物理 swap / resume= 参数，已降级挂起" -t 4000 2>/dev/null &
+            bash ~/.config/hypr/scripts/sleep-safe.sh
+        fi
         ;;
     "$LOGOUT")
         # niri 登出：优先 niri quit，失败回退 loginctl
