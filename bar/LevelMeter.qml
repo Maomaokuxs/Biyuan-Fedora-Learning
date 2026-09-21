@@ -53,10 +53,10 @@ Comp.Pill {
     }
 
     onLeftClicked: {
-        Comp.Exec.sh("bash " + Comp.Exec.vendorDir + "/toggle-music.sh");
+        Comp.Exec.sh("bash " + Comp.Exec.commonDir + "/toggle-music.sh");
     }
     onRightClicked: {
-        Comp.Exec.sh("bash " + Comp.Exec.vendorDir + "/toggle-lyric.sh");
+        Comp.Exec.sh("bash " + Comp.Exec.commonDir + "/toggle-lyric.sh");
     }
     onMiddleClicked: Comp.UiState.toggleViz(root.screenName)
 

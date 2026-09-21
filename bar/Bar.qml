@@ -30,7 +30,7 @@ RowLayout {
         normalBg: theme.frameBg; normalFg: theme.fg
         pillText: Comp.Icons.launcher; textSize: 18
         clickLeft: "rofi -show drun"
-        clickRight: "bash " + Comp.Exec.vendorDir + "/toggle-left.sh"
+        clickRight: "bash " + Comp.Exec.commonDir + "/toggle-left.sh"
     }
     BarMod.Workspaces { theme: root.theme; screenName: root.screenName }
 
@@ -49,13 +49,13 @@ RowLayout {
         normalBg: theme.accent; normalFg: theme.fg
         forceHidden: Comp.BarState.flagL
         pillText: Comp.BarState.shotT
-        clickLeft: "bash " + Comp.Exec.vendorDir + "/screenshot.sh"
+        clickLeft: "bash " + Comp.Exec.commonDir + "/screenshot.sh"
     }
     Comp.Pill {
         normalBg: theme.accent; normalFg: theme.fg
         forceHidden: Comp.BarState.flagL
         pillText: Comp.BarState.pickT
-        clickLeft: "bash " + Comp.Exec.vendorDir + "/pick-color.sh"
+        clickLeft: "bash " + Comp.Exec.commonDir + "/pick-color.sh"
     }
     Comp.Pill {
         normalBg: theme.accent; normalFg: theme.fg
@@ -92,7 +92,7 @@ RowLayout {
         normalBg: theme.deviceBg; normalFg: theme.fg
         forceHidden: Comp.BarState.flagL
         pillText: Comp.BarState.screenT
-        clickLeft: "bash " + Comp.Exec.vendorDir + "/screen.sh menu"
+        clickLeft: "bash " + Comp.Exec.commonDir + "/screen.sh menu"
         onLeftClicked: Comp.BarState.refresh()
     }
 
@@ -147,14 +147,14 @@ RowLayout {
     // ---------- 右组 ----------
     Comp.ScriptPill {
         baseBg: theme.accent; baseFg: theme.fg; hiBg: theme.clockBg; hiFg: theme.clockFg
-        execCmd: Comp.Exec.vendorDir + "/check-updates.sh"
+        execCmd: Comp.Exec.commonDir + "/check-updates.sh"
         pollInterval: 3600000
         clickLeft: "kitty --hold sh -c 'sudo dnf upgrade'"
         clickRight: "pkill -RTMIN+8 waybar"
     }
     Comp.ScriptPill {
         baseBg: theme.accent; baseFg: theme.fg
-        execCmd: Comp.Exec.vendorDir + "/weather.py"
+        execCmd: Comp.Exec.commonDir + "/weather.py"
         pollInterval: 1800000
         clickLeft: "kitty --hold curl wttr.in"
     }
@@ -199,7 +199,7 @@ RowLayout {
         normalFg: (Comp.BarState.ppC === "recording" || Comp.BarState.ppC === "kernel" || Comp.BarState.ppC === "many" || Comp.BarState.ppC === "inhibited") ? theme.clockFg : theme.fg
         normalBg: (Comp.BarState.ppC === "recording" || Comp.BarState.ppC === "kernel" || Comp.BarState.ppC === "many" || Comp.BarState.ppC === "inhibited") ? theme.clockBg : theme.sysmonBg
         pillText: Comp.BarState.ppT
-        clickLeft: Comp.Exec.vendorDir + "/powerprofiles.sh toggle"
+        clickLeft: Comp.Exec.commonDir + "/powerprofiles.sh toggle"
         onLeftClicked: Comp.BarState.refresh()
     }
     Comp.Pill {
@@ -307,7 +307,7 @@ RowLayout {
     }
     Comp.ScriptPill {
         baseBg: theme.accent; baseFg: theme.fg
-        execCmd: Comp.Exec.vendorDir + "/fcitx_status.sh"
+        execCmd: Comp.Exec.commonDir + "/fcitx_status.sh"
         pollInterval: 1000
         clickLeft: "fcitx5-remote -s"
         clickRight: "fcitx5-configtool"
@@ -316,14 +316,14 @@ RowLayout {
         normalBg: (Comp.BarState.inhibitC === "recording" || Comp.BarState.inhibitC === "kernel" || Comp.BarState.inhibitC === "many" || Comp.BarState.inhibitC === "inhibited") ? theme.clockBg : theme.accent
         normalFg: (Comp.BarState.inhibitC === "recording" || Comp.BarState.inhibitC === "kernel" || Comp.BarState.inhibitC === "many" || Comp.BarState.inhibitC === "inhibited") ? theme.clockFg : theme.fg
         pillText: Comp.BarState.inhibitT
-        clickLeft: "bash " + Comp.Exec.vendorDir + "/inhibit.sh toggle"
+        clickLeft: "bash " + Comp.Exec.commonDir + "/inhibit.sh toggle"
         onLeftClicked: Comp.BarState.refresh()
     }
     Comp.Pill {
         normalBg: theme.frameBg; normalFg: theme.fg
         pillText: Comp.Icons.power
         clickLeft: "~/.config/rofi/scripts/powermenu.sh"
-        clickRight: "bash " + Comp.Exec.vendorDir + "/toggle-system.sh"
+        clickRight: "bash " + Comp.Exec.commonDir + "/toggle-system.sh"
         onRightClicked: Comp.BarState.refresh()
     }
 }

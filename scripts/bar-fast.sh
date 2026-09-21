@@ -4,9 +4,9 @@
 # （之前各 pill 独立计时，显隐逐个冒出来；现在同起同落）。
 # 输出：{"rec":{...},"shot":{...},...}，每个值都是 {text,class} 结构。
 # fcitx(1s)、外屏亮度(30s,ddc 慢)、weather/updates(慢) 不在内，各自保留。
-# 本文件位置即基址（readlink 跟随 niri spawn 的工作目录变化），vendor 为同级 vendor/。
+# 本文件位置即基址（readlink 跟随 niri spawn 的工作目录变化），common 为同级 common/。
 D="$(dirname "$(readlink -f "$0")")"
-W="$D/vendor"
+W="$D/common"
 
 get() { local out; out=$("$@" 2>/dev/null); [ -z "$out" ] && out='{}'; printf '%s' "$out"; }
 valid() { printf '%s' "$1" | jq -c . 2>/dev/null || echo '{}'; }
