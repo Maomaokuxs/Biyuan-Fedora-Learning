@@ -73,19 +73,32 @@ Rectangle {
     Layout.preferredHeight: 32
     radius: 10
     clip: true
-    // 中心开花：换色按离父容器中心距离错峰（0.12ms/px，半屏约 115ms），
-    // 新色从中间向两边漫开；hover 切换会附带同等延迟，边缘最大约 0.1s，可接受
+    // 依次点亮：wave 按离中心距离排队从中间漫开，wipe 从左往右扫，
+    // outside 从两边往中间收，twinkle 按位置哈希随机闪；
+    // fade 均匀淡入；off 硬切。排队只在波形窗口期内生效，平时 hover 零延迟
+    property string transStyle: UiState.transitionStyle
+    property string transEff: transStyle === "random" ? UiState.transitionPick : transStyle
+    property int transDur: transEff === "off" ? 0 : (transEff === "fade" ? 400 : 120)
     property int transDelay: {
+        if (transEff === "fade" || transEff === "off" || Date.now() > UiState.waveUntil)
+            return 0;
         var pw = parent ? parent.width : 0;
         if (pw <= 0)
             return 0;
-        return Math.round(Math.abs((x + width / 2) - pw / 2) * 0.3);
+        var cx = x + width / 2;
+        if (transEff === "wipe")
+            return Math.round(x * 0.5);
+        if (transEff === "outside")
+            return Math.round((pw / 2 - Math.abs(cx - pw / 2)) * 1.2);
+        if (transEff === "twinkle")
+            return Math.abs(Math.round((x * 2654435761) % 800));
+        return Math.round(Math.abs(cx - pw / 2) * 1.2);
     }
     color: mouse.containsMouse ? normalFg : normalBg
     Behavior on color {
         SequentialAnimation {
             PauseAnimation { duration: transDelay }
-            ColorAnimation { duration: 900; easing.type: Easing.InOutQuad }
+            ColorAnimation { duration: transDur; easing.type: Easing.InOutQuad }
         }
     }
 
@@ -100,7 +113,7 @@ Rectangle {
         Behavior on color {
             SequentialAnimation {
                 PauseAnimation { duration: root.transDelay }
-                ColorAnimation { duration: 900; easing.type: Easing.InOutQuad }
+                ColorAnimation { duration: root.transDur; easing.type: Easing.InOutQuad }
             }
         }
     }

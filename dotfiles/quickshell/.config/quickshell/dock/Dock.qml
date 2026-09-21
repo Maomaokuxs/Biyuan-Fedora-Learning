@@ -333,17 +333,29 @@ Row {
             ]
             // 高亮 = 壁纸主题色 accent 本色；平时是压暗的壁纸色；悬停加亮。
             // 字/点一律 fg，保证昼夜都有对比（夜间 fg 白字落在深色按钮上）。
-            // 换色同样中心开花（与 Pill 同节奏）
+            // 换色同样依次点亮（与 Pill 同节奏，波形窗口外零延迟）
+            property string transStyle: Comp.UiState.transitionStyle
+            property string transEff: transStyle === "random" ? Comp.UiState.transitionPick : transStyle
+            property int transDur: transEff === "off" ? 0 : (transEff === "fade" ? 400 : 120)
             property int transDelay: {
+                if (transEff === "fade" || transEff === "off" || Date.now() > Comp.UiState.waveUntil)
+                    return 0;
                 var pw = parent ? parent.width : 0;
                 if (pw <= 0)
                     return 0;
-                return Math.round(Math.abs((x + width / 2) - pw / 2) * 0.3);
+                var cx = x + width / 2;
+                if (transEff === "wipe")
+                    return Math.round(x * 0.5);
+                if (transEff === "outside")
+                    return Math.round((pw / 2 - Math.abs(cx - pw / 2)) * 1.2);
+                if (transEff === "twinkle")
+                    return Math.abs(Math.round((x * 2654435761) % 800));
+                return Math.round(Math.abs(cx - pw / 2) * 1.2);
             }
             Behavior on color {
                 SequentialAnimation {
                     PauseAnimation { duration: transDelay }
-                    ColorAnimation { duration: 900; easing.type: Easing.InOutQuad }
+                    ColorAnimation { duration: transDur; easing.type: Easing.InOutQuad }
                 }
             }
             color: urgent ? "#c0392b" : (focused ? root.theme.dockHi : (hovered ? Qt.lighter(root.theme.dockHi, 1.2) : root.theme.dockBtn))

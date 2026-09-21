@@ -53,6 +53,14 @@ QtObject {
     // 若逐个播动画会稀稀拉拉）；true 后整栏淡入一次，此后交互动画正常播。
     // anomshell 等成品同样是整栏级过渡而非逐 pill 入场。
     property bool animReady: false
+    // 换色波窗口：PaletteState 每次取到新配色就后延，波形期内色块按距离依次点亮，
+    // 过期后 hover 等日常换色零延迟
+    property double waveUntil: 0
+    // 过渡风格：wave 追逐波 / fade 均匀淡入 / off 硬切 / random 随机抽取，
+    // wipe 横扫 / outside 反波 / twinkle 闪烁（壁纸卡下拉框切换，落盘记忆）
+    property string transitionStyle: "wave"
+    // random 落点：每次新配色抽一次，非 random 模式不用它（读端自行判断）
+    property string transitionPick: "wave"
 
 
     // 通知文本消毒：剥掉 ANSI/OSC 转义序列与控制字符。
