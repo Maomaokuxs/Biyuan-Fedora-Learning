@@ -30,9 +30,40 @@ Item {
     function refreshCurrent() {
         curProc.running = true;
     }
+    function styleName(id: string) {
+        if (id === "fade")
+            return "淡入";
+        if (id === "off")
+            return "关闭";
+        if (id === "random")
+            return "随机";
+        if (id === "wipe")
+            return "横扫";
+        if (id === "outside")
+            return "反波";
+        if (id === "twinkle")
+            return "闪烁";
+        return "追逐波";
+    }
+    function styleValid(id: string) {
+        return id === "wave" || id === "fade" || id === "off" || id === "random" || id === "wipe" || id === "outside" || id === "twinkle";
+    }
     function refreshAll() {
         root.reloadWalls();
         root.refreshCurrent();
+        transProc.running = true;
+    }
+    // 过渡风格落盘（~/.cache/by-mgr/qs-transition），打开卡即读回
+    Process {
+        id: transProc
+        command: ["bash", "-c", "cat ~/.cache/by-mgr/qs-transition 2>/dev/null"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var t = this.text.trim();
+                if (root.styleValid(t))
+                    UiState.transitionStyle = t;
+            }
+        }
     }
     onVisibleChanged: { if (visible) root.refreshAll(); }
     Component.onCompleted: root.refreshAll()
@@ -148,6 +179,94 @@ Item {
                         anchors.fill: parent
                         anchors.margins: -6
                         onClicked: root.requestClose()
+                    }
+                }
+            }
+
+            // 过渡动画下拉框：当前追逐波/淡入/关闭三档保留，选择落盘
+            // z 必须设在与网格同一层（本 Row），写在浮层自己身上盖不住网格
+            Row {
+                id: transRow
+                width: parent.width
+                spacing: 8
+                z: transBox.dropOpen ? 100 : 0
+                Text {
+                    text: "过渡"
+                    font.family: root.theme.fontFamily
+                    font.pixelSize: 12
+                    color: root.theme.muted
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Item {
+                    id: transBox
+                    width: 110
+                    height: 28
+                    property bool dropOpen: false
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 8
+                        color: "transparent"
+                        border.color: root.theme.muted
+                        border.width: 1
+                        Text {
+                            anchors.centerIn: parent
+                            text: root.styleName(UiState.transitionStyle) + " ▾"
+                            font.family: root.theme.fontFamily
+                            font.pixelSize: 12
+                            color: root.theme.fg
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: transBox.dropOpen = !transBox.dropOpen
+                        }
+                    }
+                    // 零占位浮层：不参与 Row 排布，盖在网格上
+                    Item {
+                        width: 0
+                        height: 0
+                        Rectangle {
+                            visible: transBox.dropOpen
+                            x: 0
+                            y: 32
+                            z: 100
+                            width: 110
+                            height: 7 * 30 + 12
+                            radius: 8
+                            color: root.theme.bg
+                            border.color: root.theme.muted
+                            border.width: 1
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                spacing: 0
+                                Repeater {
+                                    // 前两位固定：关闭、随机；后面再加新的往后排
+                                    model: [{ id: "off", name: "关闭" }, { id: "random", name: "随机" }, { id: "wave", name: "追逐波" }, { id: "fade", name: "淡入" }, { id: "wipe", name: "横扫" }, { id: "outside", name: "反波" }, { id: "twinkle", name: "闪烁" }]
+                                    Rectangle {
+                                        required property var modelData
+                                        width: 98
+                                        height: 30
+                                        radius: 6
+                                        color: UiState.transitionStyle === modelData.id ? root.theme.accent : "transparent"
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: modelData.name
+                                            font.family: root.theme.fontFamily
+                                            font.pixelSize: 12
+                                            color: UiState.transitionStyle === modelData.id ? root.theme.clockFg : root.theme.fg
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            onClicked: {
+                                                UiState.transitionStyle = modelData.id;
+                                                Exec.sh("printf '" + modelData.id + "' > ~/.cache/by-mgr/qs-transition");
+                                                transBox.dropOpen = false;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

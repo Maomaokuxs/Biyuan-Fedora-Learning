@@ -10,6 +10,15 @@ Item {
     id: root
     visible: false
     property string blob: ""
+    // 取到新配色就开波形窗口（色块依次点亮用，见 Pill transDelay）；
+    // random 模式在这里抽签，读端只认 transitionEff
+    onBlobChanged: {
+        if (blob === "")
+            return;
+        var pool = ["wave", "fade", "wipe", "outside", "twinkle"];
+        UiState.transitionPick = UiState.transitionStyle === "random" ? pool[Math.floor(Math.random() * pool.length)] : UiState.transitionStyle;
+        UiState.waveUntil = Date.now() + 1800;
+    }
 
     Timer {
         interval: 1000
