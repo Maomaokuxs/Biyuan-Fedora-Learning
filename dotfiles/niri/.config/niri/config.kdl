@@ -284,7 +284,9 @@ layout {
 // See the binds section below for more spawn examples.
 
 // This line starts waybar, a commonly used bar for Wayland compositors.
-spawn-at-startup "waybar"
+// 已切换到 quickshell（waybar 保留，需要时取消注释切回）：
+// spawn-at-startup "waybar"
+//spawn-at-startup "quickshell" "-p" "/home/biyuan/Documents/quickshell" "-d" "-n"
 
 // To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
@@ -612,10 +614,14 @@ binds {
     Mod+Shift+P { power-off-monitors; }
 
     // 自定义快捷键
-    // 刷新waybar,cava
+    // 刷新当前顶栏：quickshell 在跑就重启它，waybar 在跑就重载它（不会 cross-spawn）
     Ctrl+Alt+R hotkey-overlay-title="Refresh System UI" { 
-        spawn-sh "pkill waybar; pkill cava; pkill sed; waybar & disown" 
+        spawn "~/.config/niri/scripts/toggle-bar.sh" "refresh"
     }
+    // 顶栏切换：waybar <-> quickshell（二者只跑一个，配色重载自动找正主）
+    Ctrl+Alt+B hotkey-overlay-title="Toggle Bar waybar/quickshell" { spawn "~/.config/niri/scripts/toggle-bar.sh"; }
+    // 重启 quickshell（dock/bar 异常时一键恢复）
+    Ctrl+Alt+S hotkey-overlay-title="Restart Quickshell" { spawn-sh "pkill -f 'quickshell.*Documents/quickshell'; sleep 0.5; quickshell -p /home/biyuan/Documents/quickshell -d -n & disown"; }
     // 昼夜模式切换
     Ctrl+Alt+C hotkey-overlay-title="Toggle Day/Night Theme" { spawn "~/.config/niri/scripts/toggle-theme.sh"; }
     // Super+Alt+W 已取消（原随机壁纸），wallpaper-picker.sh 文件保留
@@ -654,8 +660,8 @@ binds {
   // kitty 标题栏（仅 niri 隐藏，退出即恢复）
   spawn-at-startup "~/.config/niri/scripts/niri-kitty-decor.sh"
   
-  // 通知
-  spawn-at-startup "mako"
+  // 通知：quickshell 自带中心接管，mako 停用（需要时取消注释切回）
+  // spawn-at-startup "mako"
 
   // 剪贴板历史 — CopyQ（已装，未装时静默跳过）
   spawn-at-startup "sh" "-c" "command -v copyq >/dev/null && copyq & sleep 1 && copyq enable &"
