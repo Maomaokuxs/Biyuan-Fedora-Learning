@@ -47,7 +47,6 @@ QtObject {
         vol: { anchor: "volAnchorX", w: 280 },
         bri: { anchor: "briAnchorX", w: 280 },
         wall: { anchor: "wallAnchorX", w: 560 },
-        toast: { anchor: "notifAnchorX", w: 380 },
         notif: { w: 420 }
     })
     // 启动动画门：false 时所有 Pill 显隐直接到位（加载期数据陆续到达，

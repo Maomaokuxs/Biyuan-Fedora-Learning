@@ -64,7 +64,7 @@ Item {
     }
     Process {
         id: runner
-        command: ["bash", "/home/biyuan/Documents/quickshell/scripts/bar-fast.sh"]
+        command: ["bash", Exec.scriptDir + "/bar-fast.sh"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {

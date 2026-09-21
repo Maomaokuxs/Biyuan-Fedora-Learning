@@ -50,7 +50,7 @@ Row {
     }
     Process {
         id: stateProc
-        command: ["bash", "/home/biyuan/Documents/quickshell/scripts/dock-state.sh"]
+        command: ["bash", Comp.Exec.scriptDir + "/dock-state.sh"]
         stdout: StdioCollector {
             onStreamFinished: {
                 // 拖拽中不重建 delegate（否则按住丢失），落地再补一次
@@ -141,14 +141,13 @@ Row {
         root.groups = g;
     }
 
-    // ---------- 最小化 / 还原（走 scripts） ----------
-    property string scriptDir: "/home/biyuan/Documents/quickshell/scripts"
+    // ---------- 最小化 / 还原（走 scripts，路径经 Comp.Exec 可移植基址） ----------
     function minimizeWindow(w) {
         var rec = {};
         for (var k in root.origWs) rec[k] = root.origWs[k];
         rec[w.id] = { idx: w.wsIdx, wsId: w.workspace_id };
         root.origWs = rec;
-        Comp.Exec.sh("bash " + root.scriptDir + "/dock-minimize.sh " + w.id);
+        Comp.Exec.sh("bash " + Comp.Exec.scriptDir + "/dock-minimize.sh " + w.id);
         refreshSoon.restart();
     }
     function restoreWindow(w) {
@@ -157,7 +156,7 @@ Row {
         var rec = {};
         for (var k in root.origWs) { if (String(k) !== String(w.id)) rec[k] = root.origWs[k]; }
         root.origWs = rec;
-        Comp.Exec.sh("bash " + root.scriptDir + "/dock-restore.sh " + w.id + " " + target);
+        Comp.Exec.sh("bash " + Comp.Exec.scriptDir + "/dock-restore.sh " + w.id + " " + target);
         refreshSoon.restart();
     }
     function focusWindow(id) {

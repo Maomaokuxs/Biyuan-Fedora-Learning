@@ -42,7 +42,7 @@ Item {
         // wallthumbs.sh list：逐行 {name,url,thumb}，缩略图走
         // ~/.cache/by-mgr/wallthumbs/<stat-id>.jpg（stat 口径与 theme-sync 一致，
         // 存在即最新）；边生成边吐，网格渐进加载。命中缓存时 32 张约 0.16s。
-        command: ["bash", "-c", "bash ~/Documents/quickshell/scripts/wallthumbs.sh list"]
+        command: ["bash", "-c", "bash " + Exec.scriptDir + "/wallthumbs.sh list"]
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: data => {

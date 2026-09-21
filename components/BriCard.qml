@@ -27,8 +27,8 @@ Item {
         id: poller
         // 经 bash -c 中转，~ 由 shell 展开（command 数组直传不展开）
         command: ["bash", "-c", root.isExternal
-            ? "~/Documents/quickshell/scripts/brightness-external.sh"
-            : "~/Documents/quickshell/scripts/brightness.sh"]
+            ? Exec.scriptDir + "/brightness-external.sh"
+            : Exec.scriptDir + "/brightness.sh"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
@@ -44,7 +44,7 @@ Item {
     function commit(v) {
         root.busy = true;
         setter.command = ["bash", "-c",
-            "~/Documents/quickshell/scripts/brightness-set.sh "
+            Exec.scriptDir + "/brightness-set.sh "
             + (root.isExternal ? "external " : "internal ") + String(v)];
         setter.running = true;
     }
