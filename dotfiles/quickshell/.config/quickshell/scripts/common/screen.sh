@@ -9,11 +9,11 @@ status() {
     INT=on; EXT=on
     [ -f "$DIR/internal" ] && INT=off
     [ -f "$DIR/external" ] && EXT=off
-    if [ "$INT" = on ] && [ "$EXT" = on ]; then cls=on
-    elif [ "$INT" = off ] && [ "$EXT" = off ]; then cls=off
-    elif [ "$INT" = off ]; then cls=internal
-    else cls=external; fi
-    echo "{\"text\": \"󰅶\", \"tooltip\": \"屏幕常亮\", \"class\": \"$cls\"}"
+    if [ "$INT" = on ] && [ "$EXT" = on ]; then cls=on; icon="󰍹"
+    elif [ "$INT" = off ] && [ "$EXT" = off ]; then cls=off; icon="󰍹"
+    elif [ "$INT" = off ]; then cls=external; icon="󰔂"
+    else cls=internal; icon="󰌢"; fi
+    echo "{\"text\": \"$icon\", \"tooltip\": \"屏幕常亮\", \"class\": \"$cls\"}"
 }
 
 menu() {
