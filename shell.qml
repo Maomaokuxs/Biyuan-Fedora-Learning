@@ -7,8 +7,8 @@ import "./dock" as DockMod
 import "./components" as Comp
 
 // 入口：双屏顶栏 + 底部居中浮动 dock
-// 运行：quickshell -c ~/Documents/quickshell
-// 需先：sudo dnf install -y quickshell
+// 运行：quickshell -p <本目录>（如 ~/.config/quickshell）
+// 脚本路径全部经 Exec.scriptDir（= Quickshell.configDir）拼接，不写死个人路径。
 ShellRoot {
     // 注意：Variants delegate 是隔离作用域，外层 id 直接引用会 undefined，
     // 故每个 PanelWindow 内各自实例化 Theme。
@@ -126,7 +126,8 @@ ShellRoot {
         }
     }
 
-    // 通知 toast 栈（右上，主屏）：server 过期自动收，点击手动 dismiss
+    // 通知 toast 栈（右上，主屏）：右缘对齐，不依赖铃铛锚点；
+    // server 过期自动收，点击手动 dismiss
     Variants {
         model: Quickshell.screens
         PanelWindow {
@@ -136,8 +137,8 @@ ShellRoot {
 
             Theme { id: toastTheme }
 
-            anchors { top: true; left: true }
-            margins { top: 52; left: ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.toast.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.toast.w / 2 }
+            anchors { top: true; right: true }
+            margins { top: 52; right: 12 }
             implicitWidth: 380
             implicitHeight: toastStack.implicitHeight
             color: "transparent"
