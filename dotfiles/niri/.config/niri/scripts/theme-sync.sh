@@ -358,6 +358,8 @@ fi
 # 锁只罩住落盘区（2段→J段），慢任务在锁外，不互相掐
 mkdir -p "$HOME/.cache/by-mgr"
 exec 9>"$HOME/.cache/by-mgr/theme-sync.lock"
+# 防 fd 泄漏说明：FD_CLOEXEC 是各进程自有属性，子进程设了也管不到 bash 手里的 fd，
+# 故不在此处设；真正的唯一长驻 spawn 点（J 段 fcitx5 重启）在调用处用 9>&- 断继承。
 # 世代号：快速连点（壁纸卡连击）时只让最后一次落地。
 # 慢任务（ffmpeg/hellwal）在锁外并发、耗时不一，若直接串行写盘，
 # 先点的可能后写完覆盖——表现为“点了蓝色最后停在粉色”。
@@ -374,7 +376,9 @@ if ! flock -n 9; then
             kill "$_pid" 2>/dev/null
         fi
     done
-    flock 9
+    # 最多等 120s：正常只剩可杀的 theme-sync 持有者，超时说明有外部进程占锁，
+    # 大声失败而不是静默排队（之前静默排队攒了 20+ 进程还没人知道）。
+    flock -w 120 9 || { echo "等待串行锁超时，放弃本次同步"; notify-send -i dialog-error "主题同步失败" "串行锁被外部占用" -t 5000 2>/dev/null & exit 1; }
 fi
 if [ "$(cat "$HOME/.cache/by-mgr/theme-sync.latest" 2>/dev/null)" != "$RUN_ID" ]; then
     echo "已有更新的同步请求，本次结果丢弃"
@@ -670,7 +674,9 @@ echo "   Kitty 配色 -> $TARGET_DIR/color-kitty.conf"
 # --- J. Fcitx5 (waybar-hud 浅+深两套皮肤：读中央库 global-palette.env 重生成) ---
 FCITX_SYNC="${FCITX_SYNC:-$HOME/Documents/fcitx5/sync-waybar.sh}"
 if [ -x "$FCITX_SYNC" ]; then
-    WAYBAR_CSS="$WAYBAR_DIR/color-waybar.css" bash "$FCITX_SYNC" --install \
+    # 9>&-：断掉锁 fd 的继承。setsid 起的 fcitx5 是长驻进程，
+    # 不带走 fd 9 就永久占锁（2026-09-21 实测堵死 20+ 实例）。
+    WAYBAR_CSS="$WAYBAR_DIR/color-waybar.css" 9>&- bash "$FCITX_SYNC" --install \
         && echo "   Fcitx5 皮肤已跟随配色" \
         || echo "   ( Fcitx5 皮肤同步跳过)"
 else
