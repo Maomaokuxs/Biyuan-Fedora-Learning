@@ -2,9 +2,9 @@
 
 - 主仓库中的是我使用的 niri 配置文件，通常适用于最小化安装的 Fedora GNU/Linux 操作系统，主要是 Niri 和 KDE 桌面环境，如果有其他桌面环境也可以尝试使用，我使用了极简的登录管理器，如果在安装前有其他登录管理器可以跳过安装。
 
-- 对于使用 Fedora 的新手朋友可以先看一下这一部分[建议](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki/%E4%BD%BF%E7%94%A8fedora%E7%9A%84%E5%BB%BA%E8%AE%AE)。
+- 对于使用 Fedora 的新手朋友可以先看一下这一部分[建议](https://github.com/Maomaokuxs/Biyuan-Fedora-Wiki/blob/main/01-%E5%BF%AB%E9%80%9F%E5%BC%80%E5%A7%8B/%E4%BD%BF%E7%94%A8Fedora%E7%9A%84%E5%BB%BA%E8%AE%AE.md)。
 
-- 请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Learning/wiki)页面查看 wiki 内容，对于我的配置文件的使用说明可以直接[跳转](docs/config-guide/README.md)。
+- 请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Wiki)页面查看 wiki 内容，对于我的配置文件的使用说明可以直接[跳转](docs/config-guide/README.md)。
 
 - 我至今依旧是小白，这些脚本是在 AI 的帮助下完成的，现在主要是 Opencode 配合 Deepseek 使用。
 
