@@ -75,8 +75,23 @@ start_record() {
         if [[ "$geom" == *","* ]]; then
             geom=$(echo "$geom" | awk '{split($1,a,","); print $2"+"a[1]"+"a[2]}')
         fi
+        # 偶数化：H.264(yuv420p)色度采样要求宽高偏移全偶数，
+        # 奇数会被编码器四舍五入并垫黑边（GIF 上下黑条即此而来）
+        if [[ "$geom" =~ ^([0-9]+)x([0-9]+)\+([0-9]+)\+([0-9]+)$ ]]; then
+            local w=$((BASH_REMATCH[1] / 2 * 2)) h=$((BASH_REMATCH[2] / 2 * 2))
+            local x=$((BASH_REMATCH[3] / 2 * 2)) y=$((BASH_REMATCH[4] / 2 * 2))
+            geom="${w}x${h}+${x}+${y}"
+        fi
         gsr_args=(-w "$geom" "${gsr_args[@]}")
         notify_msg="区域 $geom"
+        # gsr 会把过矮区域按对齐高度居中垫黑（46px 选区录成 128px 高），
+        # GIF 按选中比例居中裁回：期望高 = sel_h*1280/sel_w 取偶
+        if [[ "$geom" =~ ^([0-9]+)x([0-9]+)\+ ]]; then
+            gif_crop_h=$(( BASH_REMATCH[2] * 1280 / BASH_REMATCH[1] / 2 * 2 ))
+            [ "$gif_crop_h" -lt 2 ] && gif_crop_h=2
+        else
+            gif_crop_h=0
+        fi
     else
         gsr_args=(-w screen "${gsr_args[@]}")
         notify_msg="全屏"
@@ -106,7 +121,12 @@ start_record() {
         # 🔴 额外保障：GIF 转换完成后再次清理并刷新一次信号
         if [ "$fmt" == "gif" ]; then
             notify-send "正在转换 GIF" "请稍候，正在优化画质..." -a "Recorder"
-            ffmpeg -i "$out" -vf "fps=15,scale=1280:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" "$target_out" -y
+            gif_vf="fps=15,scale=1280:-2:flags=lanczos"
+            # 区域模式裁掉 gsr 的居中垫黑；全屏模式源尺寸即准，不裁
+            if [ "${gif_crop_h:-0}" -gt 0 ]; then
+                gif_vf="$gif_vf,crop=1280:${gif_crop_h}:0:(in_h-${gif_crop_h})/2"
+            fi
+            ffmpeg -i "$out" -vf "$gif_vf,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse" "$target_out" -y
             rm "$out"
             notify-send "GIF 转换完成" "已保存至: $target_out" -i video-x-generic -a "Recorder"
         fi
