@@ -29,7 +29,8 @@ chmod +x install.sh
       bar 我使用了两款，功能大致是相同的，分别是 waybar 和 quickshell，想要启用哪款只要在 niri 配置文件中取消注释，记得只启用一款，以下针对的是我的配置文件说明非软件本身的拉踩。
 
       waybar：优点是资源占用小，启动速度快，缺点就是动画简单没有那么华丽。
-      ![waybar](waybar.png)
+
+      ![waybar](docs/config-guide/waybar.png)
 
       quickshell：优点是扩展丰富，并且本身就支持弹窗，非常的方便，动画更加优雅，缺点是占用比waybar高。
 
@@ -42,14 +43,6 @@ chmod +x install.sh
         右键点击左侧 Fedora 徽标，或电源开关
 
         ![HideTools](HideTools.gif)
-
-
-
-
-
-
-
-
 
 ## 4. waybar天气模块配置
 
