@@ -153,10 +153,18 @@ RowLayout {
         clickRight: "pkill -RTMIN+8 waybar"
     }
     Comp.ScriptPill {
+        id: weatherPill
         baseBg: theme.accent; baseFg: theme.fg
         execCmd: Comp.Exec.commonDir + "/weather.py"
         pollInterval: 1800000
         clickLeft: "kitty --hold curl wttr.in"
+    }
+    // 天气缓存（--fetch/唤醒预热）一落地就补刷，不等 30 分钟轮询；
+    // 前台 exec 从不写盘，不会自激循环
+    FileView {
+        path: Quickshell.env("HOME") + "/.cache/by-mgr/weather.json"
+        watchChanges: true
+        onFileChanged: weatherPill.refresh()
     }
     Comp.AudioPill {
         normalBg: theme.deviceBg; normalFg: theme.fg

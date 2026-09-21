@@ -12,6 +12,8 @@ for k in ("http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY",
 
 CACHE = os.path.expanduser("~/.cache/by-mgr/weather.json")
 FRESH_SECONDS = 1800  # 30 分钟内视为新鲜
+FAIL_MARK = "/tmp/waybar_weather_fail"
+FAIL_COOLDOWN = 600  # 拉取失败后 10 分钟内不再 fork 重试（退避，避免睡醒断网时刷屏）
 SIGNAL = "RTMIN+10"   # 后台刷新完成后通知 waybar 重新执行本脚本
 
 CONF = os.path.expanduser("~/.config/by-mgr/weather.conf")
@@ -162,14 +164,29 @@ def spawn_background_fetch():
     except Exception:
         pass
 
+def failed_recently():
+    """10 分钟内刚失败过 → 不再 fork，由 interval 下一轮再试"""
+    try:
+        return time.time() - os.path.getmtime(FAIL_MARK) < FAIL_COOLDOWN
+    except Exception:
+        return False
+
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--fetch":
-        # 后台模式：拉取 → 写缓存 → 通知 waybar
+        # 后台模式：成功才写缓存；失败不覆盖上次好数据，只记失败时间退避
         result = fetch_weather()
-        os.makedirs(os.path.dirname(CACHE), exist_ok=True)
-        with open(CACHE, "w") as f:
-            f.write(json.dumps(result))
-        subprocess.run(["pkill", "-RTMIN+10", "waybar"], stderr=subprocess.DEVNULL)
+        if result.get("class") == "weather":
+            os.makedirs(os.path.dirname(CACHE), exist_ok=True)
+            with open(CACHE, "w") as f:
+                f.write(json.dumps(result))
+            try:
+                os.remove(FAIL_MARK)
+            except Exception:
+                pass
+            subprocess.run(["pkill", "-RTMIN+10", "waybar"], stderr=subprocess.DEVNULL)
+        else:
+            with open(FAIL_MARK, "w") as f:
+                f.write(str(int(time.time())))
         sys.exit(0)
 
     # 前台模式（waybar exec 调用）：
@@ -177,10 +194,13 @@ if __name__ == "__main__":
         # 1. 有新鲜缓存 → 立即显示，零等待
         print(read_cache())
     elif read_cache():
-        # 2. 有过期缓存 → 先显示旧值，后台刷新
+        # 2. 有过期缓存 → 先显示旧值，后台刷新（失败退避期内不 fork）
         print(read_cache())
-        spawn_background_fetch()
-    else:
+        if not failed_recently():
+            spawn_background_fetch()
+    elif not failed_recently():
         # 3. 无缓存（首次启动）→ 占位符 + 后台拉取
         print(json.dumps({"text": "󰖪 ", "tooltip": "正在获取天气..."}))
         spawn_background_fetch()
+    else:
+        print(json.dumps({"text": "󰖪 ", "tooltip": "网络未就绪，稍后重试"}))
