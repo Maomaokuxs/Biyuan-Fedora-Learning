@@ -286,7 +286,7 @@ layout {
 // This line starts waybar, a commonly used bar for Wayland compositors.
 // 已切换到 quickshell（waybar 保留，需要时取消注释切回）：
 // spawn-at-startup "waybar"
-//spawn-at-startup "quickshell" "-p" "/home/biyuan/Documents/quickshell" "-d" "-n"
+spawn-at-startup "sh" "-c" "quickshell -p ~/.config/quickshell -d -n"
 
 // To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
@@ -361,8 +361,8 @@ binds {
     // The allow-when-locked=true property makes them work even when the session is locked.
     // Using spawn-sh allows to pass multiple arguments together with the command.
     // "-l 1.0" limits the volume to 100%.
-    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1+ -l 1.0"; }
-    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-"; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05+ -l 1.0"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.05-"; }
     XF86AudioMute        allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
     XF86AudioMicMute     allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
 
@@ -376,8 +376,8 @@ binds {
     // Example brightness key mappings for brightnessctl.
     // You can use regular spawn with multiple arguments too (to avoid going through "sh"),
     // but you need to manually put each argument in separate "" quotes.
-    XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+5%"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "5%-"; }
 
     // Open/close the Overview: a zoomed-out view of workspaces and windows.
     // You can also move the mouse into the top-left hot corner,
@@ -621,7 +621,7 @@ binds {
     // 顶栏切换：waybar <-> quickshell（二者只跑一个，配色重载自动找正主）
     Ctrl+Alt+B hotkey-overlay-title="Toggle Bar waybar/quickshell" { spawn "~/.config/niri/scripts/toggle-bar.sh"; }
     // 重启 quickshell（dock/bar 异常时一键恢复）
-    Ctrl+Alt+S hotkey-overlay-title="Restart Quickshell" { spawn-sh "pkill -f 'quickshell.*Documents/quickshell'; sleep 0.5; quickshell -p /home/biyuan/Documents/quickshell -d -n & disown"; }
+    Ctrl+Alt+S hotkey-overlay-title="Restart Quickshell" { spawn-sh "pkill -x quickshell; sleep 0.5; quickshell -p ~/.config/quickshell -d -n & disown"; }
     // 昼夜模式切换
     Ctrl+Alt+C hotkey-overlay-title="Toggle Day/Night Theme" { spawn "~/.config/niri/scripts/toggle-theme.sh"; }
     // Super+Alt+W 已取消（原随机壁纸），wallpaper-picker.sh 文件保留
