@@ -73,7 +73,21 @@ Rectangle {
     Layout.preferredHeight: 32
     radius: 10
     clip: true
+    // 中心开花：换色按离父容器中心距离错峰（0.12ms/px，半屏约 115ms），
+    // 新色从中间向两边漫开；hover 切换会附带同等延迟，边缘最大约 0.1s，可接受
+    property int transDelay: {
+        var pw = parent ? parent.width : 0;
+        if (pw <= 0)
+            return 0;
+        return Math.round(Math.abs((x + width / 2) - pw / 2) * 0.3);
+    }
     color: mouse.containsMouse ? normalFg : normalBg
+    Behavior on color {
+        SequentialAnimation {
+            PauseAnimation { duration: transDelay }
+            ColorAnimation { duration: 900; easing.type: Easing.InOutQuad }
+        }
+    }
 
     Text {
         id: label
@@ -83,6 +97,12 @@ Rectangle {
         font.pixelSize: root.textSize
         font.bold: root.bold
         color: mouse.containsMouse ? root.normalBg : root.normalFg
+        Behavior on color {
+            SequentialAnimation {
+                PauseAnimation { duration: root.transDelay }
+                ColorAnimation { duration: 900; easing.type: Easing.InOutQuad }
+            }
+        }
     }
 
     MouseArea {

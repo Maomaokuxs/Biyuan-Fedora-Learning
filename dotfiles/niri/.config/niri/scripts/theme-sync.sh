@@ -671,18 +671,6 @@ PYEOF
 fi
 echo "   Kitty 配色 -> $TARGET_DIR/color-kitty.conf"
 
-# --- J. Fcitx5 (waybar-hud 浅+深两套皮肤：读中央库 global-palette.env 重生成) ---
-FCITX_SYNC="${FCITX_SYNC:-$HOME/Documents/fcitx5/sync-waybar.sh}"
-if [ -x "$FCITX_SYNC" ]; then
-    # 9>&-：断掉锁 fd 的继承。setsid 起的 fcitx5 是长驻进程，
-    # 不带走 fd 9 就永久占锁（2026-09-21 实测堵死 20+ 实例）。
-    WAYBAR_CSS="$WAYBAR_DIR/color-waybar.css" 9>&- bash "$FCITX_SYNC" --install \
-        && echo "   Fcitx5 皮肤已跟随配色" \
-        || echo "   ( Fcitx5 皮肤同步跳过)"
-else
-    echo "   未找到 fcitx5 皮肤生成器 ($FCITX_SYNC)，跳过 Fcitx5 配色"
-fi
-
 # 收尾：中央库与 waybar 落盘一致性校验 + 释放串行锁
 PB=$(grep -oP '^BG="\K[^"]+' "$PALETTE_FILE" 2>/dev/null); WB=$(grep -oP '@define-color bg \K[^;]+' "$WAYBAR_DIR/color-waybar.css" 2>/dev/null)
 [ -n "$PB" ] && [ "$PB" = "$WB" ] && echo "   中央库校验一致 ($PB)" || echo -e "   \033[0;33m中央库与 waybar 待对齐，见上文各段输出\033[0m"
@@ -694,8 +682,9 @@ exec 9>&-
 if [ -n "$WAYLAND_DISPLAY" ]; then
     echo ">> 检测到 Wayland 环境，正在热重载桌面组件..."
     
-    # 1. 刷新 Niri 自身边框颜色
-    niri msg action load-config-file >/dev/null 2>&1 || true
+    # 1. 刷新 Niri 自身边框颜色：曾实测阻塞 3.7s，扔后台不等，
+    # 边框晚两秒跟上没人盯着看
+    (timeout 10 niri msg action load-config-file >/dev/null 2>&1 &) || true
     
     # 2. 重载 Kitty（如果正在运行）
     if command -v kitty &> /dev/null && pgrep -x kitty > /dev/null; then
@@ -727,6 +716,20 @@ else
     echo -e "\033[0;33m当前处于 TTY 环境，跳过进程热重载。\033[0m"
     [ "$WALLPAPER_CHANGED" = true ] && notify-send -i dialog-ok "主题同步" "配色文件已生成" -t 3000 2>/dev/null & true
 fi
+
+# 慢任务后置：fcitx 皮肤+重启又慢又闪输入法，等前端信号全发完再做
+# --- J. Fcitx5 (waybar-hud 浅+深两套皮肤：读中央库 global-palette.env 重生成) ---
+FCITX_SYNC="${FCITX_SYNC:-$HOME/Documents/fcitx5/sync-waybar.sh}"
+if [ -x "$FCITX_SYNC" ]; then
+    # 9>&-：断掉锁 fd 的继承。setsid 起的 fcitx5 是长驻进程，
+    # 不带走 fd 9 就永久占锁（2026-09-21 实测堵死 20+ 实例）。
+    WAYBAR_CSS="$WAYBAR_DIR/color-waybar.css" 9>&- bash "$FCITX_SYNC" --install \
+        && echo "   Fcitx5 皮肤已跟随配色" \
+        || echo "   ( Fcitx5 皮肤同步跳过)"
+else
+    echo "   未找到 fcitx5 皮肤生成器 ($FCITX_SYNC)，跳过 Fcitx5 配色"
+fi
+
 
 # 正常完成（_debug 在 DEBUG=false 时返回非零，不代表失败）
 exit 0
