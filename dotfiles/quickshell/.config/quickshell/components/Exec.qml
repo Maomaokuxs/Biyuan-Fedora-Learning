@@ -8,7 +8,8 @@ import Quickshell
 QtObject {
     // 可移植基址：跟随 quickshell 配置目录（-p 指定哪就是哪），
     // 全仓脚本引用一律经此拼接，禁止写死 $HOME/Documents 等个人路径。
-    property string scriptDir: Quickshell.configDir + "/scripts"
+    // 注：configDir 已废弃，用 shellDir（同语义：shell.qml 所在目录）。
+    property string scriptDir: Quickshell.shellDir + "/scripts"
     property string commonDir: scriptDir + "/common"
     function sh(cmd: string) {
         Quickshell.execDetached(["bash", "-c", cmd]);

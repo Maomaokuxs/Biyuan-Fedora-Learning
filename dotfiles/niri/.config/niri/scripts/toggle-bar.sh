@@ -3,7 +3,7 @@
 # 配套 theme-sync.sh 的 detect_bar()：切完后配色重载信号自动找对正主。
 # 用法：toggle-bar.sh [refresh] — refresh 按当前在跑的栏做刷新
 #   （quickshell 在跑就重启它，waybar 在跑就重载它；都没跑则起 quickshell）。
-QS_PAT="quickshell.*Documents/quickshell"
+QS_PAT="quickshell -p"
 
 detect_bar() {
     if pgrep -f "$QS_PAT" >/dev/null 2>&1; then echo quickshell;
@@ -30,9 +30,9 @@ refresh_bar() {
             # 先清 mako（否则它占着通知总线，quickshell 接管不回来）
             systemctl --user stop mako 2>/dev/null
             pkill -x mako 2>/dev/null
-            pkill -f "$QS_PAT" 2>/dev/null
+            pkill -x quickshell 2>/dev/null
             wait_gone "$QS_PAT"
-            quickshell -p /home/biyuan/Documents/quickshell -d -n & disown ;;
+            quickshell -p ~/.config/quickshell -d -n & disown ;;
     esac
 }
 
@@ -42,7 +42,7 @@ if [ "$1" = "refresh" ]; then
 fi
 
 if [ "$(detect_bar)" = "quickshell" ]; then
-    pkill -f "$QS_PAT"
+    pkill -x quickshell
     wait_gone "$QS_PAT"
     pkill waybar 2>/dev/null; pkill cava 2>/dev/null; pkill sed 2>/dev/null
     waybar & disown
@@ -50,6 +50,6 @@ else
     pkill waybar 2>/dev/null; pkill cava 2>/dev/null; pkill sed 2>/dev/null
     systemctl --user stop mako 2>/dev/null
     pkill -x mako 2>/dev/null
-    quickshell -p /home/biyuan/Documents/quickshell -d -n & disown
+    quickshell -p ~/.config/quickshell -d -n & disown
     notify-send "顶栏" "已切换到 quickshell" -t 2000 2>/dev/null &
 fi
