@@ -1,6 +1,6 @@
 # 配置文件使用说明（从零开始）
 
-## 1. 克隆与预览
+## 1. 准备
 
 ```bash
 git clone https://github.com/Maomaokuxs/Biyuan-Fedora-Learning.git
@@ -30,7 +30,7 @@ chmod +x install.sh
 
       waybar：优点是资源占用小，启动速度快，缺点就是动画简单没有那么华丽。
 
-      ![waybar](docs/config-guide/waybar.png)
+      ![waybar](waybar.png)
 
       quickshell：优点是扩展丰富，并且本身就支持弹窗，非常的方便，动画更加优雅，缺点是占用比waybar高。
 
@@ -40,9 +40,9 @@ chmod +x install.sh
 
       - 隐藏工具栏
 
-        右键点击左侧 Fedora 徽标，或电源开关
+      右键点击左侧 Fedora 徽标，或电源开关
 
-        ![HideTools](HideTools.gif)
+      ![HideTools](HideTools.gif)
 
 ## 4. waybar天气模块配置
 
