@@ -66,7 +66,6 @@ chmod +x install.sh
         echo "LOCATION=Shanghai" > ~/.config/by-mgr/weather.conf
         ```
 
-
 2. niri
 
     - 介绍
