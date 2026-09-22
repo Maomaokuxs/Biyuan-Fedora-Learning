@@ -69,7 +69,7 @@ RowLayout {
         forceHidden: Comp.BarState.flagL
         pillText: Comp.BarState.gammaT
         clickLeft: "bash -c 'pkill gammastep && notify-send 护眼 已关闭 || (gammastep -O 4500 & notify-send 护眼 已开启)'"
-        onLeftClicked: Comp.BarState.refresh()
+        onLeftClicked: Comp.BarState.refreshOne("gamma", "bash " + Comp.Exec.commonDir + "/gammastep.sh")
     }
     Comp.Pill {
         normalBg: theme.deviceBg; normalFg: theme.fg
@@ -181,10 +181,10 @@ RowLayout {
         scrollUpCmd: Comp.Exec.scriptDir + "/brightness.sh up"
         scrollDownCmd: Comp.Exec.scriptDir + "/brightness.sh down"
         clickRight: Comp.Exec.scriptDir + "/brightness.sh mid"
-        onLeftClicked: { Comp.UiState.toggleBri(root.screenName, root.isExternal); Comp.BarState.refresh(); }
-        onRightClicked: Comp.BarState.refresh()
-        onScrollUp: Comp.BarState.refresh()
-        onScrollDown: Comp.BarState.refresh()
+        onLeftClicked: { Comp.UiState.toggleBri(root.screenName, root.isExternal); Comp.BarState.refreshOne("bri", "bash " + Comp.Exec.scriptDir + "/brightness.sh"); }
+        onRightClicked: Comp.BarState.refreshOne("bri", "bash " + Comp.Exec.scriptDir + "/brightness.sh")
+        onScrollUp: Comp.BarState.refreshOne("bri", "bash " + Comp.Exec.scriptDir + "/brightness.sh")
+        onScrollDown: Comp.BarState.refreshOne("bri", "bash " + Comp.Exec.scriptDir + "/brightness.sh")
     }
     Comp.ScriptPill {
         baseBg: theme.deviceBg; baseFg: theme.fg
@@ -208,7 +208,7 @@ RowLayout {
         normalBg: (Comp.BarState.ppC === "recording" || Comp.BarState.ppC === "kernel" || Comp.BarState.ppC === "many" || Comp.BarState.ppC === "inhibited") ? theme.clockBg : theme.sysmonBg
         pillText: Comp.BarState.ppT
         clickLeft: Comp.Exec.commonDir + "/powerprofiles.sh toggle"
-        onLeftClicked: Comp.BarState.refresh()
+        onLeftClicked: Comp.BarState.refreshOne("pp", Comp.Exec.commonDir + "/powerprofiles.sh")
     }
     Comp.Pill {
         normalBg: theme.sysmonBg; normalFg: theme.fg
@@ -325,7 +325,7 @@ RowLayout {
         normalFg: (Comp.BarState.inhibitC === "recording" || Comp.BarState.inhibitC === "kernel" || Comp.BarState.inhibitC === "many" || Comp.BarState.inhibitC === "inhibited") ? theme.clockFg : theme.fg
         pillText: Comp.BarState.inhibitT
         clickLeft: "bash " + Comp.Exec.commonDir + "/inhibit.sh toggle"
-        onLeftClicked: Comp.BarState.refresh()
+        onLeftClicked: Comp.BarState.refreshOne("inhibit", "bash " + Comp.Exec.scriptDir + "/inhibit.sh")
     }
     Comp.Pill {
         normalBg: theme.frameBg; normalFg: theme.fg
