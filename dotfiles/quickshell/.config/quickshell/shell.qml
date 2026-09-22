@@ -84,14 +84,16 @@ ShellRoot {
 
             anchors { top: true; left: true }
             margins { top: 52; left: ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.viz.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.viz.w / 2 }
-            implicitWidth: 400
-            implicitHeight: 200
+            implicitWidth: 480
+            // 卡片高度跟内容走（dance 模式多一排编排选项）
+            implicitHeight: vizCard.implicitHeight
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
             Comp.VizCard {
+                id: vizCard
                 anchors.fill: parent
                 theme: vizTheme
                 onRequestClose: Comp.UiState.vizOpen = false
