@@ -39,7 +39,7 @@ Rectangle {
     }
     onXChanged: updateAnchor()
     onWidthChanged: updateAnchor()
-    Component.onCompleted: updateAnchor()
+    Component.onCompleted: { updateAnchor(); root.armReveal(); }
     // 静态 pill（铃铛这种宽度常年不变的）事件钩子只在启动瞬间触发，
     // 那时窗口未就绪，锚点恒为 0，卡片飞左缘。1 秒刷一次兜底，
     // mapToItem 纯坐标换算，开销忽略不计。
@@ -52,27 +52,63 @@ Rectangle {
 
     // 显隐走宽度+透明度动画，避免 visible 硬切换的生硬感。
     // animW 是真实可动画属性，Layout 取它做布局宽度；直接 width 保留给非布局场景。
-    // forceHidden：外部开关（显隐 flag）直控显隐，不等轮询回执，
-    // 使一组模块同起同落、单段动画。
+    // forceHidden：外部开关（显隐 flag）直控显隐，不等轮询回执。
     property bool shown: pillText !== "" && !forceHidden
     property bool forceHidden: false
+    // 依次出场：按兄弟顺序排号，一格 90ms，从左往右一个一个冒出来。
+    // 用序号不用 x——收起时全挤在左边，x 全约等于 0 排不出顺位。
+    // 首格约 0.1s 即现（跟手），整栏约 2 秒走完；数据没到的 shown 为 false
+    // 自然排后面。出场只走一次，文本更新不重排。
+    property bool revealed: false
+    function siblingIndex() {
+        try {
+            var kids = parent ? parent.children : null;
+            if (!kids)
+                return 0;
+            for (var i = 0; i < kids.length; i++) {
+                if (kids[i] === root)
+                    return i;
+            }
+        } catch (e) {}
+        return 0;
+    }
+    function armReveal() {
+        if (root.revealed || !root.shown)
+            return;
+        revealTimer.interval = root.siblingIndex() * 55;
+        revealTimer.restart();
+    }
+    Timer {
+        id: revealTimer
+        repeat: false
+        onTriggered: root.revealed = true
+    }
+    onShownChanged: {
+        if (root.shown)
+            root.armReveal();
+        else
+            root.revealed = false;
+    }
     // 固定宽度（>0 生效）：内容变化不改尺寸，锚定它的浮窗就不会跳。
     // 给铃铛这种计数忽有忽无的用。
     property real fixedWidth: 0
     property real contentW: fixedWidth > 0 ? fixedWidth : label.implicitWidth + 20
-    property real animW: shown ? contentW : 0
-    // 启动门控：加载期直接到位，门开后才播动画（见 UiState.animReady）
-    Behavior on animW { enabled: UiState.animReady; NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
-    Behavior on opacity { enabled: UiState.animReady; NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
+    property real animW: (shown && revealed) ? contentW : 0
+    // 启动门控：加载期直接到位，门开后才播动画（见 UiState.animReady）。
+    // 收展跟手：OutCubic 起步快落地柔，宽 300ms + 透明 200ms，
+    // 全组同一起点同节奏，自然齐出齐收
+    Behavior on animW { enabled: UiState.animReady; NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+    Behavior on opacity { enabled: UiState.animReady; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
     visible: opacity > 0.01
-    opacity: shown ? 1 : 0
+    opacity: (shown && revealed) ? 1 : 0
     height: 32
     width: contentW
     Layout.preferredWidth: animW
     Layout.preferredHeight: 32
     radius: 10
     clip: true
+    Behavior on scale { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
     // 依次点亮：wave 按离中心距离排队从中间漫开，wipe 从左往右扫，
     // outside 从两边往中间收，twinkle 按位置哈希随机闪；
     // fade 均匀淡入；off 硬切。排队只在波形窗口期内生效，平时 hover 零延迟
@@ -123,6 +159,11 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        // 即时按压反馈：状态落地要 0.5 秒（补刷+聚合），先缩一下证明点到了；
+        // scale 不触发布局，无抖动；常开（含加载期）
+        onPressed: root.scale = 0.93
+        onReleased: root.scale = 1
+        onCanceled: root.scale = 1
         onClicked: mouseEvent => {
             if (mouseEvent.button === Qt.LeftButton) {
                 root.leftClicked();
