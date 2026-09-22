@@ -282,7 +282,7 @@ if [[ "${1:-}" == "--install" ]]; then
   # 重启输入法除了闪一下面板、偶发卡死丢空白窗之外毫无收益（2026-09 实测）。
   # 对两套主题目录整体哈希，与上次比对。
   HASH_FILE="$HOME/.cache/fcitx5-theme.hash"
-  NEWHASH=$(find "$SCRIPT_DIR/hud-paper" "$SCRIPT_DIR/hud-paper-dark" -type f -exec md5sum {} + 2>/dev/null | md5sum | cut -d' ' -f1)
+  NEWHASH=$(find "$SCRIPT_DIR/hud-paper" "$SCRIPT_DIR/hud-paper-dark" -type f -exec md5sum {} + 2>/dev/null | sort -k 2 | md5sum | cut -d' ' -f1)
   if [ -n "$NEWHASH" ] && [ -f "$HASH_FILE" ] && [ "$(cat "$HASH_FILE" 2>/dev/null)" = "$NEWHASH" ]; then
     echo "   Fcitx5 皮肤无变化，跳过安装与重启"
     exit 0
