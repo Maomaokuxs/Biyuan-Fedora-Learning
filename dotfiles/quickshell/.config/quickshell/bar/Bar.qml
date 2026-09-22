@@ -256,6 +256,10 @@ RowLayout {
     Rectangle {
         id: trayBox
         property real animW: SystemTray.items.values.length > 0 ? trayRow.implicitWidth + 12 : 0
+        // shell 单引号转义（歌名里什么引号都有）
+        function shQ(s) {
+            return "'" + String(s || "").replace(/'/g, "'\\''") + "'";
+        }
         Behavior on animW { enabled: Comp.UiState.animReady; NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
         Behavior on opacity { enabled: Comp.UiState.animReady; NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
 
@@ -279,12 +283,16 @@ RowLayout {
                     id: trayMouse
                     width: 24; height: 32
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    // 左键通用链（零应用名）：onlyMenu 出菜单，否则走 tray-open.py——
+                    // 模糊找窗聚焦（已聚焦跳过）→ 调 Activate（缺失则报错）→
+                    // 触发菜单显示项 → SecondaryActivate。右键一律菜单优先。
                     onClicked: e => {
                         if (e.button === Qt.LeftButton) {
-                            if (modelData.onlyMenu && modelData.hasMenu)
+                            if (modelData.onlyMenu && modelData.hasMenu) {
                                 trayMenu.open();
-                            else
-                                modelData.activate();
+                            } else {
+                                Comp.Exec.sh("python3 " + Comp.Exec.commonDir + "/tray-open.py " + trayBox.shQ(modelData.id) + " " + trayBox.shQ(modelData.title) + " " + trayBox.shQ(modelData.tooltipTitle));
+                            }
                         } else {
                             if (modelData.hasMenu)
                                 trayMenu.open();
