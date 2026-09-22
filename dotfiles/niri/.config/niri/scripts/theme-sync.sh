@@ -719,7 +719,7 @@ fi
 
 # 慢任务后置：fcitx 皮肤+重启又慢又闪输入法，等前端信号全发完再做
 # --- J. Fcitx5 (waybar-hud 浅+深两套皮肤：读中央库 global-palette.env 重生成) ---
-FCITX_SYNC="${FCITX_SYNC:-$HOME/Documents/fcitx5/sync-waybar.sh}"
+FCITX_SYNC="${FCITX_SYNC:-$HOME/.config/quickshell/scripts/fcitx5/sync-waybar.sh}"
 if [ -x "$FCITX_SYNC" ]; then
     # 9>&-：断掉锁 fd 的继承。setsid 起的 fcitx5 是长驻进程，
     # 不带走 fd 9 就永久占锁（2026-09-21 实测堵死 20+ 实例）。
