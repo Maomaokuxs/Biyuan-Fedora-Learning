@@ -2,23 +2,42 @@ pragma Singleton
 
 import QtQuick
 import Quickshell.Io
+import Quickshell.Services.Mpris
 
-// 真频谱服务：单例跑 spectrum.py（pw-record 直采 + numpy rfft），双屏共用一份。
-// 行协议 "v0;v1;…"（12 柱 0-7），归一按帧内最大，无状态不僵死。
+// 声谱服务：单例跑 spectrum.py（pw-record 直采 + numpy rfft），双屏共用一份。
+// 全浮点行协议 "0.312;0.045;…"（12 柱，0-1.5），直存 bands，量化只在落像素时发生。
+// 按需启停：切到声谱且有播放器在播才跑进程，否则停进程清数据，静默零开销。
 // 起不来时 bands 常空，调用方自行回落。
 Item {
     id: root
     visible: false
 
     property var bands: []
-    property bool fftOk: false
+    // 任一播放器在播：播放开关的唯一事实源（舞者/频谱/暂停压平共用）
+    property bool anyPlaying: {
+        var vs = Mpris.players.values;
+        for (var i = 0; i < vs.length; i++) {
+            try {
+                if (vs[i].isPlaying)
+                    return true;
+            } catch (e) {}
+        }
+        return false;
+    }
+    // 任一播放器在播 + 切到声谱才需要进程
+    property bool wantSpectrum: UiState.vizEffect === "spectrum" && root.anyPlaying
+    // running 走绑定自动启停；这里只负责停后清数据
+    onWantSpectrumChanged: {
+        if (!wantSpectrum)
+            root.bands = [];
+    }
 
     // 重启壳时的孤儿进程进场先清掉
     Component.onCompleted: Exec.sh("pkill -f 'quickshell.*spectrum\\.py'");
 
     Process {
         id: proc
-        running: true
+        running: root.wantSpectrum
         command: [Exec.scriptDir + "/spectrum.py"]
         stdout: SplitParser {
             splitMarker: "\n"
@@ -28,13 +47,13 @@ Item {
                     return;
                 var vals = [];
                 for (var i = 0; i < parts.length && i < 16; i++) {
-                    var n = parseInt(parts[i], 10);
+                    var n = parseFloat(parts[i]);
                     if (isNaN(n))
                         n = 0;
-                    vals.push(Math.max(0, Math.min(1, n / 7)));
+                    // 全浮点直存（0-1.5），钳位防爆，高度换算时再归一
+                    vals.push(Math.max(0, Math.min(1.5, n)));
                 }
                 root.bands = vals;
-                root.fftOk = true;
             }
         }
         onExited: respawn.restart()
@@ -42,6 +61,6 @@ Item {
     Timer {
         id: respawn
         interval: 2000
-        onTriggered: { if (!proc.running) proc.running = true; }
+        onTriggered: { if (root.wantSpectrum && !proc.running) proc.running = true; }
     }
 }

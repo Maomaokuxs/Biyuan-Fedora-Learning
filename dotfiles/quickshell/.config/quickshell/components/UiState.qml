@@ -43,7 +43,7 @@ QtObject {
     // 注意：读端必须直接下标（见 anchorMap 注释），禁止包 anchorFor 方法。
     property var popupGeom: ({
         media: { anchor: "mediaAnchorX", w: 360 },
-        viz: { anchor: "vizAnchorX", w: 400 },
+        viz: { anchor: "vizAnchorX", w: 480 },
         vol: { anchor: "volAnchorX", w: 280 },
         bri: { anchor: "briAnchorX", w: 280 },
         wall: { anchor: "wallAnchorX", w: 560 },
@@ -59,6 +59,12 @@ QtObject {
     // 过渡风格：wave 追逐波 / fade 均匀淡入 / off 硬切 / random 随机抽取，
     // wipe 横扫 / outside 反波 / twinkle 闪烁（壁纸卡下拉框切换，落盘记忆）
     property string transitionStyle: "wave"
+    // 电平可视化效果：dance 律动 / spectrum 声谱 / off 基线
+    // （电平浮窗切换，落盘记忆）
+    property string vizEffect: "dance"
+    // 舞者编排：-1 自动（一次一式跟音乐换场），0-7 固定单式，8 混合（八式同放）；
+    // VizCard 落盘记忆
+    property int dancePattern: -1
     // random 落点：每次新配色抽一次，非 random 模式不用它（读端自行判断）
     property string transitionPick: "wave"
 
