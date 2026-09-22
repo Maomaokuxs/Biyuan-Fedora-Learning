@@ -169,7 +169,7 @@ Row {
             // pill 在鼠标下滑来滑去 → entered/exited 疯狂互触发 = 全体颤抖。
             // scale 只影响自身绘制，不触发布局，无反馈环。
             property bool hovered: false
-            width: isActive ? 48 : 18
+            width: isActive ? 36 : 14
             height: isActive ? 24 : 20
             scale: (hovered && !isActive) ? 1.2 : 1
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
