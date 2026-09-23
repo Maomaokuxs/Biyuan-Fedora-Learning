@@ -23,6 +23,9 @@ QtObject {
     // 壁纸窗
     property bool wallOpen: false
     property string wallScreen: ""
+    // 控制中心
+    property bool ccOpen: false
+    property string ccScreen: ""
     // 锚点按屏分键：双栏下两边 pill 同时上报，单全局值会被盖掉错乱。
     // 结构 {key: {screenName: x}}，整体重赋以触发绑定。
     property var anchorMap: ({})
@@ -47,6 +50,7 @@ QtObject {
         vol: { anchor: "volAnchorX", w: 280 },
         bri: { anchor: "briAnchorX", w: 280 },
         wall: { anchor: "wallAnchorX", w: 560 },
+        cc: { anchor: "ccAnchorX", w: 460 },
         notif: { w: 420 }
     })
     // 启动动画门：false 时所有 Pill 显隐直接到位（加载期数据陆续到达，
@@ -99,6 +103,8 @@ QtObject {
             root.wallOpen = false;
         if (except !== "notif")
             root.notifOpen = false;
+        if (except !== "cc")
+            root.ccOpen = false;
     }
 
     function toggleNotif(screenName: string) {
@@ -163,6 +169,16 @@ QtObject {
             root.wallScreen = screenName;
             root.wallOpen = true;
             root.closeOthers("wall");
+        }
+    }
+
+    function toggleCC(screenName: string) {
+        if (root.ccOpen && root.ccScreen === screenName)
+            root.ccOpen = false;
+        else {
+            root.ccScreen = screenName;
+            root.ccOpen = true;
+            root.closeOthers("cc");
         }
     }
 

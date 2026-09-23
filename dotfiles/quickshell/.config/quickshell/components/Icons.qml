@@ -19,6 +19,7 @@ QtObject {
     readonly property string loopOne: "\uF456"
     readonly property string wallpaper: "\uF03E"
     readonly property string bell: "\uF0F3"
+    readonly property string sliders: "\uF1DE"
     readonly property string coverFallback: "\uF001"
     readonly property string volMute: "\u{F075F}"
     readonly property string vol0: "\uF026"
