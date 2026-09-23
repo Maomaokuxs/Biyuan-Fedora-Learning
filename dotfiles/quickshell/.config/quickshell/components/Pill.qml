@@ -33,7 +33,17 @@ Rectangle {
     function updateAnchor() {
         if (anchorKey === "" || width <= 0)
             return;
-        var p = mapToItem(null, width / 2, 0);
+        // 顶层 parent 即本窗 contentItem：顶栏窗全宽贴屏无边距，
+        // 相对它的横坐标就是输出坐标。禁止 mapToItem(null)——
+        // 本 Qt 版本传 null 近似返回原点，锚点恒 ~20，浮窗全飞左缘。
+        var top = root;
+        try {
+            while (top.parent)
+                top = top.parent;
+        } catch (e) {
+            return;
+        }
+        var p = root.mapToItem(top, width / 2, 0);
         if (p)
             UiState.setAnchor(anchorKey, anchorScreen, p.x);
     }

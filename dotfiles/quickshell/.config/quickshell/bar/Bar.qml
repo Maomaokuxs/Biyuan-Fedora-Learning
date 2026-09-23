@@ -343,6 +343,14 @@ RowLayout {
     }
     Comp.Pill {
         normalBg: theme.frameBg; normalFg: theme.fg
+        anchorKey: "ccAnchorX"
+        anchorScreen: root.screenName
+        pillText: Comp.Icons.sliders
+        textSize: 15
+        onLeftClicked: Comp.UiState.toggleCC(root.screenName)
+    }
+    Comp.Pill {
+        normalBg: theme.frameBg; normalFg: theme.fg
         pillText: Comp.Icons.power
         clickLeft: "~/.config/rofi/scripts/powermenu.sh"
         clickRight: "bash " + Comp.Exec.commonDir + "/toggle-system.sh"

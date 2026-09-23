@@ -243,6 +243,34 @@ ShellRoot {
         }
     }
 
+    // 控制中心 overlay：标签页 + 滑杆 + 开关（rofi 做不了的三件套）。
+    // 锚 pill 中心，左右缘钳制（VizCard 同款：直接下标 + Math 钳位，不包方法）。
+    Variants {
+        model: Quickshell.screens
+        PanelWindow {
+            required property var modelData
+            screen: modelData
+            visible: Comp.UiState.ccOpen && modelData.name === Comp.UiState.ccScreen
+
+            Theme { id: ccTheme }
+
+            anchors { top: true; left: true }
+            margins { top: 52; left: Math.max(0, Math.min(((Comp.UiState.anchorMap[Comp.UiState.popupGeom.cc.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.cc.w / 2, (modelData.width || 99999) - Comp.UiState.popupGeom.cc.w)) }
+            implicitWidth: 460
+            implicitHeight: 470
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+            Comp.ControlCenter {
+                anchors.fill: parent
+                theme: ccTheme
+                onRequestClose: Comp.UiState.ccOpen = false
+            }
+        }
+    }
+
     // dock 仅主屏底部居中悬浮 + 自动隐藏：
     // exclusionMode.Ignore → 纯 overlay，不占 exclusiveZone，不挤占窗口；
     // 隐藏时整窗下沉只留 6px 窥视条，HoverHandler 悬停即滑出，离开 800ms 后滑回。
