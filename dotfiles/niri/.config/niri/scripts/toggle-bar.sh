@@ -30,9 +30,16 @@ refresh_bar() {
             # 先清 mako（否则它占着通知总线，quickshell 接管不回来）
             systemctl --user stop mako 2>/dev/null
             pkill -x mako 2>/dev/null
+            # 刷新不断风格：先记下当前在跑的 -p 路径再杀，起回同一个；
+            # 记不到才走 launcher（读持久化记录）
+            cur="$(pgrep -af '^quickshell -p' | head -n 1 | sed -n 's/.*-p \([^ ]*\).*/\1/p')"
             pkill -x quickshell 2>/dev/null
             wait_gone "$QS_PAT"
-            quickshell -p ~/.config/quickshell -d -n & disown ;;
+            if [ -n "$cur" ]; then
+                quickshell -p "$cur" -d -n & disown
+            else
+                bash ~/.config/niri/scripts/quickshell-launch.sh
+            fi ;;
     esac
 }
 
@@ -50,6 +57,7 @@ else
     pkill waybar 2>/dev/null; pkill cava 2>/dev/null; pkill sed 2>/dev/null
     systemctl --user stop mako 2>/dev/null
     pkill -x mako 2>/dev/null
-    quickshell -p ~/.config/quickshell -d -n & disown
+    # 经 launcher 回切：恢复持久化的风格（无记录回落线上栏）
+    bash ~/.config/niri/scripts/quickshell-launch.sh
     notify-send "顶栏" "已切换到 quickshell" -t 2000 2>/dev/null &
 fi

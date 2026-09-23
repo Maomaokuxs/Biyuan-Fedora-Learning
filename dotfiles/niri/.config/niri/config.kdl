@@ -286,7 +286,8 @@ layout {
 // This line starts waybar, a commonly used bar for Wayland compositors.
 // 已切换到 quickshell（waybar 保留，需要时取消注释切回）：
 // spawn-at-startup "waybar"
-spawn-at-startup "sh" "-c" "quickshell -p ~/.config/quickshell -d -n"
+// 经 launcher 启动：读持久化风格记录（无记录回落线上栏）
+spawn-at-startup "sh" "-c" "~/.config/niri/scripts/quickshell-launch.sh"
 
 // To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
@@ -620,8 +621,8 @@ binds {
     }
     // 顶栏切换：waybar <-> quickshell（二者只跑一个，配色重载自动找正主）
     Ctrl+Alt+B hotkey-overlay-title="Toggle Bar waybar/quickshell" { spawn "~/.config/niri/scripts/toggle-bar.sh"; }
-    // 重启 quickshell（dock/bar 异常时一键恢复）
-    Ctrl+Alt+S hotkey-overlay-title="Restart Quickshell" { spawn-sh "pkill -x quickshell; sleep 0.5; quickshell -p ~/.config/quickshell -d -n & disown"; }
+    // 重启 quickshell（dock/bar 异常时一键恢复）：走 launcher，恢复持久化的风格而非写死线上
+    Ctrl+Alt+S hotkey-overlay-title="Restart Quickshell" { spawn "bash" "~/.config/niri/scripts/quickshell-launch.sh" }
     // 昼夜模式切换
     Ctrl+Alt+C hotkey-overlay-title="Toggle Day/Night Theme" { spawn "~/.config/niri/scripts/toggle-theme.sh"; }
     // Super+Alt+W 已取消（原随机壁纸），wallpaper-picker.sh 文件保留
