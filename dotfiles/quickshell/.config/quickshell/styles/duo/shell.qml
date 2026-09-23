@@ -154,6 +154,8 @@ ShellRoot {
         }
         Timer { interval: 30000; running: true; repeat: true; onTriggered: extBriProc.running = true }
         Component.onCompleted: { extBriProc.running = true; updatesProc.running = true; weatherProc.running = true; batProc.running = true; }
+        // 工作区
+        property var wsList: []
         Process {
             id: wsProc
             command: ["niri", "msg", "-j", "workspaces"]
@@ -385,27 +387,6 @@ ShellRoot {
     Variants {
         model: Quickshell.screens
         PanelWindow {
-            required property var modelData
-            screen: modelData
-            visible: true
-            anchors { top: true; left: true }
-            margins { top: 200; left: 700 }
-            implicitWidth: 400
-            implicitHeight: 100
-            color: "transparent"
-            exclusionMode: ExclusionMode.Ignore
-            Text {
-                anchors.centerIn: parent
-                text: "LYR[" + lab.lyricT + "] W:" + lab.wsList.length
-                font.pixelSize: 28
-                color: "#ff0000"
-            }
-        }
-    }
-    // DUMMY-ANCHOR
-    Variants {
-        model: Quickshell.screens
-        PanelWindow {
             id: barWin
             required property var modelData
             screen: modelData
@@ -422,6 +403,42 @@ ShellRoot {
             implicitHeight: 46
             color: "transparent"
 
+            // 过渡 veil：调色板变化时，两道 accent 光带从两边向中间扫过会合后淡出
+            // （和 800ms 底色交叉淡化叠加，更迭感更丰富）
+            Item {
+                id: veilArea
+                anchors.fill: parent
+                visible: veilAnim.running
+                Rectangle {
+                    id: veilL
+                    anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                    height: 40; width: 0; radius: 20
+                    color: lab.cAccent
+                    opacity: 0
+                }
+                Rectangle {
+                    id: veilR
+                    anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                    height: 40; width: 0; radius: 20
+                    color: lab.cAccent
+                    opacity: 0
+                }
+                SequentialAnimation {
+                    id: veilAnim
+                    ParallelAnimation {
+                        NumberAnimation { target: veilL; property: "width"; from: 0; to: veilArea.width / 2; duration: 450; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: veilR; property: "width"; from: 0; to: veilArea.width / 2; duration: 450; easing.type: Easing.OutCubic }
+                        NumberAnimation { target: veilL; property: "opacity"; from: 0; to: 0.45; duration: 450 }
+                        NumberAnimation { target: veilR; property: "opacity"; from: 0; to: 0.45; duration: 450 }
+                    }
+                    NumberAnimation { target: veilL; property: "opacity"; to: 0; duration: 400 }
+                    NumberAnimation { target: veilR; property: "opacity"; to: 0; duration: 400 }
+                }
+                Connections {
+                    target: lab
+                    function onCAccentChanged() { veilAnim.restart(); }
+                }
+            }
             // 左岛：启动＋工作区＋开关组（宽跟内容走，动画顺滑不断跳）
             Rectangle {
                 id: leftIsland
@@ -473,88 +490,130 @@ ShellRoot {
                             }
                         }
                     }
-                    Rectangle { width: 1; height: 20; color: Qt.alpha(lab.cMuted, 0.7); anchors.verticalCenter: parent.verticalCenter }
-                    // 小工具组：录屏 / 截图 / 取色 / 剪贴板 / 显示器（线上同款动作）
-                    Text {
-                        text: lab.recT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                    // 小工具组胶囊：录屏 / 截图 / 取色 / 剪贴板 / 显示器（全空时整个藏起）
+                    Rectangle {
+                        height: 28
+                        visible: (lab.recT + lab.shotT + lab.pickT + lab.clipT + lab.screenT) !== ""
+                        width: capToolsRow.implicitWidth + 22
+                        radius: 14
+                        color: Qt.alpha(lab.cAccent, 0.28)
+                        border.width: 1
+                        border.color: Qt.alpha(lab.cMuted, 0.6)
                         anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", "/home/biyuan/.config/rofi/scripts/recorder.sh"]) }
-                    }
-                    Text {
-                        text: lab.shotT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 15; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/screenshot.sh"]) }
-                    }
-                    Text {
-                        text: lab.pickT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 15; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/pick-color.sh"]) }
-                    }
-                    Text {
-                        text: lab.clipT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 15; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["copyq", "toggle"]) }
-                    }
-                    Text {
-                        text: lab.screenT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 15; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/screen.sh", "menu"]) }
-                    }
-                    // 开关组：主题 / 护眼 / 熄屏抑制 / 性能
-                    Text {
-                        text: lab.themeT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 15; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", lab.niriScripts + "/toggle-theme.sh"]) }
-                    }
-                    Text {
-                        text: lab.gammaT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 15; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: lab.runCmd(["bash", "-c", "pkill gammastep && notify-send 护眼 已关闭 || (gammastep -O 4500 & notify-send 护眼 已开启)"]);
+                        Row {
+                            id: capToolsRow
+                            anchors.centerIn: parent
+                            spacing: 8
+                        Text {
+                            text: lab.recT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", "/home/biyuan/.config/rofi/scripts/recorder.sh"]) }
+                        }
+                        Text {
+                            text: lab.shotT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/screenshot.sh"]) }
+                        }
+                        Text {
+                            text: lab.pickT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/pick-color.sh"]) }
+                        }
+                        Text {
+                            text: lab.clipT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["copyq", "toggle"]) }
+                        }
+                        Text {
+                            text: lab.screenT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/screen.sh", "menu"]) }
+                        }
                         }
                     }
-                    Text {
-                        text: lab.inhibitT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                    // 开关组胶囊：主题 / 护眼 / 熄屏抑制 / 性能
+                    Rectangle {
+                        height: 28
+                        width: capToggleRow.implicitWidth + 22
+                        radius: 14
+                        color: Qt.alpha(lab.cAccent, 0.28)
+                        border.width: 1
+                        border.color: Qt.alpha(lab.cMuted, 0.6)
                         anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/inhibit.sh", "toggle"]) }
-                    }
-                    Text {
-                        text: lab.ppT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 15; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/powerprofiles.sh", "toggle"]) }
-                    }
-                    // 壁纸：左键随机一张，右键开图库（线上栏同款）
-                    Text {
-                        text: "\uF03E"; font.pixelSize: 15
-                        font.family: lab.font; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea {
-                            anchors.fill: parent
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            onClicked: mouse => {
-                                if (mouse.button === Qt.RightButton)
-                                    lab.runCmd(["waypaper"]);
-                                else
-                                    lab.openWall();
+                        Row {
+                            id: capToggleRow
+                            anchors.centerIn: parent
+                            spacing: 8
+                        Text {
+                            text: lab.themeT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", lab.niriScripts + "/toggle-theme.sh"]) }
+                        }
+                        Text {
+                            text: lab.gammaT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: lab.runCmd(["bash", "-c", "pkill gammastep && notify-send 护眼 已关闭 || (gammastep -O 4500 & notify-send 护眼 已开启)"]);
                             }
                         }
+                        Text {
+                            text: lab.inhibitT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/inhibit.sh", "toggle"]) }
+                        }
+                        Text {
+                            text: lab.ppT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 15; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd([lab.shRoot + "/common/powerprofiles.sh", "toggle"]) }
+                        }
+                        }
                     }
-                    // 风格切换菜单入口（漆刷图标，和其它小工具同色）
-                    Text {
-                        text: "\uF1FC"; font.pixelSize: 15
-                        font.family: lab.font; color: lab.cFg
+                    // 视图组胶囊：壁纸选择 / 风格切换
+                    Rectangle {
+                        height: 28
+                        width: capViewRow.implicitWidth + 22
+                        radius: 14
+                        color: Qt.alpha(lab.cAccent, 0.28)
+                        border.width: 1
+                        border.color: Qt.alpha(lab.cMuted, 0.6)
                         anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.styleMenuOpen = !lab.styleMenuOpen; }
+                        Row {
+                            id: capViewRow
+                            anchors.centerIn: parent
+                            spacing: 8
+                        Text {
+                            text: "\uF03E"; font.pixelSize: 15
+                            font.family: lab.font; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: mouse => {
+                                    if (mouse.button === Qt.RightButton)
+                                        lab.runCmd(["waypaper"]);
+                                    else
+                                        lab.openWall();
+                                }
+                            }
+                        }
+                        // 风格切换菜单入口（漆刷图标，和其它小工具同色）
+                        Text {
+                            text: "\uF1FC"; font.pixelSize: 15
+                            font.family: lab.font; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.styleMenuOpen = !lab.styleMenuOpen; }
+                        }
+                        }
                     }
                         }
                     }
@@ -597,34 +656,50 @@ ShellRoot {
                     id: rightRow
                     anchors.centerIn: parent
                     spacing: 10
-                    Text {
-                        text: lab.songT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 14; color: lab.cFg
+                    // 音乐组胶囊：歌名＋音律
+                    Rectangle {
+                        height: 28
+                        width: musCapRow.implicitWidth + 22
+                        radius: 14
+                        color: Qt.alpha(lab.cAccent, 0.28)
+                        border.width: 1
+                        border.color: Qt.alpha(lab.cMuted, 0.6)
                         anchors.verticalCenter: parent.verticalCenter
-                        MouseArea {
-                            anchors.fill: parent
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            onClicked: mouse => {
-                                if (mouse.button === Qt.RightButton)
-                                    lab.runCmd(["playerctl", "next"]);
-                                else
-                                    lab.runCmd(["playerctl", "play-pause"]);
+                        visible: lab.songT !== "" || lab.playing
+                        Row {
+                            id: musCapRow
+                            anchors.centerIn: parent
+                            spacing: 8
+                        Text {
+                            text: lab.songT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 14; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea {
+                                anchors.fill: parent
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                onClicked: mouse => {
+                                    if (mouse.button === Qt.RightButton)
+                                        lab.runCmd(["playerctl", "next"]);
+                                    else
+                                        lab.runCmd(["playerctl", "play-pause"]);
+                                }
                             }
                         }
-                    }
-                    Row {
-                        spacing: 2; visible: lab.playing
-                        anchors.verticalCenter: parent.verticalCenter
-                        Repeater {
-                            model: 12
-                            Rectangle {
-                                required property int index
-                                property real v: lab.bands.length > index ? lab.bands[index] : 0
-                                width: 4; height: Math.max(3, Math.min(1, v) * 20)
-                                radius: 2
-                                color: lab.cAccent
-                                anchors.verticalCenter: parent.verticalCenter
+                        Row {
+                            spacing: 2; visible: lab.playing
+                            anchors.verticalCenter: parent.verticalCenter
+                            Repeater {
+                                model: 12
+                                Rectangle {
+                                    required property int index
+                                    property real v: lab.bands.length > index ? lab.bands[index] : 0
+                                    width: 4; height: Math.max(3, Math.min(1, v) * 20)
+                                    radius: 2
+                                    color: lab.cAccent
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
                             }
+                        }
                         }
                     }
                     // 播放键胶囊（大一号好点）
@@ -633,6 +708,8 @@ ShellRoot {
                         width: mprisRow.implicitWidth + 26
                         radius: 14
                         color: Qt.alpha(lab.cAccent, 0.28)
+                        border.width: 1
+                        border.color: Qt.alpha(lab.cMuted, 0.6)
                         anchors.verticalCenter: parent.verticalCenter
                         Row {
                             id: mprisRow
@@ -658,112 +735,190 @@ ShellRoot {
                             }
                         }
                     }
-                    Rectangle { width: 1; height: 20; color: Qt.alpha(lab.cMuted, 0.7); anchors.verticalCenter: parent.verticalCenter }
-                    // 音量（点静音＋滚轮，pactl 直调，线上 Pill 同款 onWheel）
-                    Text {
-                        text: (lab.volMuted ? "󰝟 " : " ") + lab.volPct + "%"
-                        font.family: lab.font; font.pixelSize: 14; color: lab.cFg
+                    // 媒体胶囊：音量＋亮度
+                    Rectangle {
+                        height: 28
+                        width: medCapRow.implicitWidth + 22
+                        radius: 14
+                        color: Qt.alpha(lab.cAccent, 0.28)
+                        border.width: 1
+                        border.color: Qt.alpha(lab.cMuted, 0.6)
                         anchors.verticalCenter: parent.verticalCenter
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: lab.runCmd(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"])
-                            onWheel: wheel => {
-                                lab.runCmd(["pactl", "set-sink-volume", "@DEFAULT_SINK@", wheel.angleDelta.y > 0 ? "+5%" : "-5%"]);
-                            }
-                        }
-                    }
-                    // 亮度（内外屏分流：内屏 brightness.sh，外屏 ddc；线上 Pill 同款 onWheel）
-                    Text {
-                        text: isExternal ? (lab.extBriT !== "" ? lab.extBriT : "󰃟 --") : (lab.briT !== "" ? lab.briT : "󰃟 --")
-                        font.family: lab.font; font.pixelSize: 14; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
-                                if (isExternal)
-                                    lab.runCmd(["ddcutil", "setvcp", "10", "50"]);
-                                else
-                                    lab.runCmd([lab.shRoot + "/brightness.sh", "mid"]);
-                            }
-                            onWheel: wheel => {
-                                if (isExternal)
-                                    lab.extBriCommit(wheel.angleDelta.y > 0 ? 5 : -5);
-                                else
-                                    lab.runCmd([lab.shRoot + "/brightness.sh", wheel.angleDelta.y > 0 ? "up" : "down"]);
-                            }
-                        }
-                    }
-                    Rectangle { width: 1; height: 20; color: Qt.alpha(lab.cMuted, 0.7); anchors.verticalCenter: parent.verticalCenter }
-                    // 信息组：更新 / 天气 / 电池
-                    Text {
-                        text: lab.updatesT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 14; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    Text {
-                        text: lab.weatherT; visible: text !== ""
-                        font.family: lab.font; font.pixelSize: 14; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    // 电池：线上 BatteryPill 同款（字形＋百分比；充电/满电 vena 闪电款）
-                    Text {
-                        visible: lab.batPct >= 0
-                        text: lab.batCharging ? "\uF140B " + lab.batPct + "%" : (lab.batPct >= 90 ? "" : lab.batPct >= 70 ? "" : lab.batPct >= 40 ? "" : lab.batPct >= 15 ? "" : "") + " " + lab.batPct + "%"
-                        font.family: lab.font; font.pixelSize: 14; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    // 托盘：线上同款左键通用链＋右键菜单（图标可能是主题名，必须 IconImage）
-                    Row {
-                        spacing: 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        Repeater {
-                            model: SystemTray.items.values
+                        Row {
+                            id: medCapRow
+                            anchors.centerIn: parent
+                            spacing: 8
+                        // 音量（点静音＋滚轮，pactl 直调，线上 Pill 同款 onWheel）
+                        Text {
+                            text: (lab.volMuted ? "󰝟 " : " ") + lab.volPct + "%"
+                            font.family: lab.font; font.pixelSize: 14; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
                             MouseArea {
-                                id: trayMouse
-                                width: 24; height: 28
-                                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                onClicked: e => {
-                                    if (e.button === Qt.LeftButton) {
-                                        if (modelData.onlyMenu && modelData.hasMenu)
-                                            trayMenu.open();
-                                        else
-                                            lab.trayOpen(modelData.id, modelData.title, modelData.tooltipTitle);
-                                    } else {
-                                        if (modelData.hasMenu)
-                                            trayMenu.open();
-                                        else
-                                            modelData.secondaryActivate();
+                                anchors.fill: parent
+                                onClicked: lab.runCmd(["pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle"])
+                                onWheel: wheel => {
+                                    lab.runCmd(["pactl", "set-sink-volume", "@DEFAULT_SINK@", wheel.angleDelta.y > 0 ? "+5%" : "-5%"]);
+                                }
+                            }
+                        }
+                        // 亮度（内外屏分流：内屏 brightness.sh，外屏 ddc；线上 Pill 同款 onWheel）
+                        Text {
+                            text: isExternal ? (lab.extBriT !== "" ? lab.extBriT : "󰃟 --") : (lab.briT !== "" ? lab.briT : "󰃟 --")
+                            font.family: lab.font; font.pixelSize: 14; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (isExternal)
+                                        lab.runCmd(["ddcutil", "setvcp", "10", "50"]);
+                                    else
+                                        lab.runCmd([lab.shRoot + "/brightness.sh", "mid"]);
+                                }
+                                onWheel: wheel => {
+                                    if (isExternal)
+                                        lab.extBriCommit(wheel.angleDelta.y > 0 ? 5 : -5);
+                                    else
+                                        lab.runCmd([lab.shRoot + "/brightness.sh", wheel.angleDelta.y > 0 ? "up" : "down"]);
+                                }
+                            }
+                        }
+                        }
+                    }
+                    // 信息组胶囊：更新 / 天气 / 电池
+                    Rectangle {
+                        height: 28
+                        width: sysCapRow.implicitWidth + 22
+                        radius: 14
+                        color: Qt.alpha(lab.cAccent, 0.28)
+                        border.width: 1
+                        border.color: Qt.alpha(lab.cMuted, 0.6)
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: (lab.updatesT + lab.weatherT) !== "" || lab.batPct >= 0
+                        Row {
+                            id: sysCapRow
+                            anchors.centerIn: parent
+                            spacing: 8
+                        // 信息组：更新 / 天气 / 电池
+                        Text {
+                            text: lab.updatesT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 14; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: lab.weatherT; visible: text !== ""
+                            font.family: lab.font; font.pixelSize: 14; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                                // 电池：小尺寸绘制版（无字形依赖）
+                    // 电池一体小件：描边＋填充＋顶帽＋百分比同色（充电走 accent）
+                    Row {
+                        spacing: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: lab.batPct >= 0
+                        Rectangle {
+                            width: 8; height: 13; radius: 2.5
+                            color: "transparent"
+                            border.width: 1.25
+                            border.color: lab.batCharging ? lab.cAccent : lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            Rectangle {
+                                anchors { left: parent.left; right: parent.right; bottom: parent.bottom; margins: 1.75 }
+                                height: (parent.height - 3.5) * lab.batPct / 100
+                                radius: 1
+                                color: lab.batCharging ? lab.cAccent : lab.cFg
+                            }
+                            Rectangle {
+                                anchors { top: parent.top; topMargin: -2.75; horizontalCenter: parent.horizontalCenter }
+                                width: 4; height: 2; radius: 1
+                                color: lab.batCharging ? lab.cAccent : lab.cFg
+                            }
+                        }
+                        Text {
+                            text: lab.batPct + "%"
+                            font.family: lab.font; font.pixelSize: 13
+                            color: lab.batCharging ? lab.cAccent : lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
+                        }
+                    }
+                    // 托盘胶囊（空时整个藏起）
+                    Rectangle {
+                        height: 28
+                        width: trayCapRow.implicitWidth + 22
+                        radius: 14
+                        color: Qt.alpha(lab.cAccent, 0.28)
+                        border.width: 1
+                        border.color: Qt.alpha(lab.cMuted, 0.6)
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: SystemTray.items.values.length > 0
+                        Row {
+                            id: trayCapRow
+                            anchors.centerIn: parent
+                            spacing: 2
+                            Repeater {
+                                model: SystemTray.items.values
+                                MouseArea {
+                                    id: trayMouse
+                                    width: 24; height: 28
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onClicked: e => {
+                                        if (e.button === Qt.LeftButton) {
+                                            if (modelData.onlyMenu && modelData.hasMenu)
+                                                trayMenu.open();
+                                            else
+                                                lab.trayOpen(modelData.id, modelData.title, modelData.tooltipTitle);
+                                        } else {
+                                            if (modelData.hasMenu)
+                                                trayMenu.open();
+                                            else
+                                                modelData.secondaryActivate();
+                                        }
+                                    }
+                                    QsMenuAnchor {
+                                        id: trayMenu
+                                        anchor.window: barWin
+                                        anchor.item: trayMouse
+                                        anchor.edges: Edges.Bottom
+                                        anchor.gravity: Edges.Bottom
+                                        menu: modelData.menu
+                                    }
+                                    IconImage {
+                                        anchors.centerIn: parent
+                                        implicitSize: 19
+                                        source: modelData.icon
                                     }
                                 }
-                                QsMenuAnchor {
-                                    id: trayMenu
-                                    anchor.window: barWin
-                                    anchor.item: trayMouse
-                                    anchor.edges: Edges.Bottom
-                                    anchor.gravity: Edges.Bottom
-                                    menu: modelData.menu
-                                }
-                                IconImage {
-                                    anchors.centerIn: parent
-                                    implicitSize: 19
-                                    source: modelData.icon
-                                }
                             }
                         }
                     }
-                    Text {
-                        text: Qt.formatDateTime(lab.now, "hh:mm")
-                        font.family: lab.font; font.pixelSize: 16; font.bold: true; color: lab.cAccent
+                    // 时钟电源胶囊
+                    Rectangle {
+                        height: 28
+                        width: clkCapRow.implicitWidth + 22
+                        radius: 14
+                        color: Qt.alpha(lab.cAccent, 0.28)
+                        border.width: 1
+                        border.color: Qt.alpha(lab.cMuted, 0.6)
                         anchors.verticalCenter: parent.verticalCenter
+                        Row {
+                            id: clkCapRow
+                            anchors.centerIn: parent
+                            spacing: 8
+                        Text {
+                            text: Qt.formatDateTime(lab.now, "hh:mm")
+                            font.family: lab.font; font.pixelSize: 16; font.bold: true; color: lab.cAccent
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        // 电源菜单（线上同款 powermenu.sh）
+                        Text {
+                            text: "⏻"; font.pixelSize: 15
+                            font.family: lab.font; color: lab.cFg
+                            anchors.verticalCenter: parent.verticalCenter
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", "/home/biyuan/.config/rofi/scripts/powermenu.sh"]) }
+                        }
+                        }
                     }
-                    // 电源菜单（线上同款 powermenu.sh）
-                    Text {
-                        text: "⏻"; font.pixelSize: 15
-                        font.family: lab.font; color: lab.cFg
-                        anchors.verticalCenter: parent.verticalCenter
-                        MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", "/home/biyuan/.config/rofi/scripts/powermenu.sh"]) }
-                    }
-                    Text { text: "L:" + lab.lyricT + "|W:" + myWs.length; font.pixelSize: 9; color: "#ff0000"; anchors.verticalCenter: parent.verticalCenter } // TEMP-PROBE3
                 }
             }
         }
