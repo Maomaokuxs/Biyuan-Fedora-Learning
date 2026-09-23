@@ -17,20 +17,19 @@ Column {
             width: 380
             height: toastCol.implicitHeight + 24
             radius: 9
-            // 客户端兜底过期：server 端过期不可靠（常驻不走），>0 按它来，
-            // <0（server 默认）给 8s，==0 常驻不管。delegate 销毁时 timer 同灭，
-            // 与 server 真过期 double-dismiss 互不干扰。
-            // 注意：到手的值是毫秒（文档写秒是错的，3000 按秒算就是 50 分钟），
-            // >1000 的当毫秒除以 1000。
+            // 客户端兜底过期：全部临时toast，无常驻——
+            // expireTimeout 语义恒为毫秒：-1（server 默认）/0（永不过期）一律 5s；
+            // 正值毫秒转秒，超 30s 按 30s 收（个别应用填 INT_MAX 级，等于常驻）。
+            // 旧逻辑把 <=1000ms 当秒算（-t 1000 变 1000 秒），那就是"固定"的来源。
             Timer {
                 property real timeoutSecs: {
-                    var t = modelData.expireTimeout;
-                    if (t > 1000)
-                        return t / 1000;
-                    return t;
+                    var t = Number(modelData.expireTimeout);
+                    if (!(t > 0))
+                        return 5;
+                    return Math.min(t / 1000, 30);
                 }
-                interval: (timeoutSecs > 0 ? timeoutSecs : 8) * 1000
-                running: timeoutSecs !== 0
+                interval: timeoutSecs * 1000
+                running: true
                 onTriggered: modelData.dismiss()
             }
             color: modelData.urgency === NotificationUrgency.Critical ? root.theme.accent : root.theme.bg

@@ -6,7 +6,7 @@ import Quickshell.Services.Pipewire
 // 多标签常驻（顶栏/主题/音律/音乐）、滑杆（音量/亮度）、开关实时状态位。
 // 动作层全部复用线上脚本（toggle-bar 系/toggle-theme/toggle-music 系），
 // 和键位保持同源，不另起契约。
-// 注：lab 风格路径写死 ~/Documents（用户要求风格不进主仓库，代价在此）。
+// 注：lab 风格在 ~/Documents（仅 duo 进了主仓库 styles/，下行特殊处理）。
 Item {
     id: root
     property var theme
@@ -93,6 +93,8 @@ Item {
                 height: 360
                 visible: root.page === "bar"
                 property string current: ""
+                // 风格表：只要 waybar / default / duo 三套
+                property var styleNames: ["waybar", "default", "duo"]
                 function detect() {
                     detectProc.running = true;
                 }
@@ -112,7 +114,7 @@ Item {
                             if (m) {
                                 var d = m[1];
                                 if (d === "/home/biyuan/.config/quickshell")
-                                    barPage.current = "live";
+                                    barPage.current = "default";
                                 else
                                     barPage.current = d.split("/").pop();
                             }
@@ -120,12 +122,12 @@ Item {
                     }
                 }
                 function launch(id) {
+                    // 统一切换入口全部走 qs-switch（等旧实例退干净再起，防锁冲突）；
+                    // 只有 waybar 走内联（它和 quickshell 锁无关）
                     if (id === "waybar") {
                         Exec.sh("pkill -x quickshell; pkill waybar 2>/dev/null; pkill cava 2>/dev/null; waybar & disown");
-                    } else if (id === "live") {
-                        Exec.sh("pkill waybar 2>/dev/null; pkill -x quickshell; systemctl --user stop mako 2>/dev/null; pkill -x mako 2>/dev/null; quickshell -p /home/biyuan/.config/quickshell -d -n & disown");
                     } else {
-                        Exec.sh("pkill -x quickshell; sleep 0.5; quickshell -p " + root.labRoot + "/" + id + " -d -n & disown");
+                        Exec.sh("bash /home/biyuan/Documents/quickshell/bar-lab/qs-switch.sh " + id);
                     }
                 }
                 Column {
@@ -142,7 +144,7 @@ Item {
                         columnSpacing: 8
                         rowSpacing: 8
                         Repeater {
-                            model: ["waybar", "live", "duo", "decker", "notch", "caelestia", "frame", "material", "noctalia", "bottom", "capsules", "tabs"]
+                            model: barPage.styleNames
                             Rectangle {
                                 required property string modelData
                                 width: (parent.width - 24) / 4; height: 32; radius: 9
