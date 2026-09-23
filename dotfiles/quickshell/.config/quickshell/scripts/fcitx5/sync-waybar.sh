@@ -316,16 +316,29 @@ if [[ "${1:-}" == "--install" ]]; then
   else
     echo "   ( remote 重载失败，走冷启动)"
   fi
+  # 本来就没进程：不等 30s，直接冷启动一次
+  if ! pgrep -x fcitx5 >/dev/null 2>&1; then
+    setsid fcitx5 -d >/dev/null 2>&1 </dev/null &
+  fi
+  # 健康守卫：remote -r 本身就是一次重启（rime 首载慢），先耐心等 30s；
+  # 全程不杀——杀正在启动的实例等于复位读条，之前就是这么把自己杀死的。
+  # （nice 19 下启动更慢，但只会慢不会死，等够久就行。）
   ok=false
-  for i in 1 2 3 4 5; do
+  for i in 1 2 3 4 5 6 7 8 9 10; do
     sleep 3
     if fcitx5-remote --check >/dev/null 2>&1; then ok=true; break; fi
-    # 只杀残留 waiter，不碰健康守护：remote 不通时在场 fcitx5 进程即视为残留
+  done
+  if ! $ok; then
+    # 30s 还不通：清残留冷启动一次，再等 30s；再不行才算真死（不再连杀）
     pkill -x fcitx5 2>/dev/null
     sleep 1
     setsid fcitx5 -d >/dev/null 2>&1 </dev/null &
-  done
-  # 健康守卫：5 轮约 15s 还不通（rime 首载慢也覆盖了）才算真死，大声报错
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      sleep 3
+      if fcitx5-remote --check >/dev/null 2>&1; then ok=true; break; fi
+    done
+  fi
+  # 健康守卫：上述两轮都没起来才算真死，大声报错
   if $ok; then
     echo "   fcitx5 健康"
   else
