@@ -62,6 +62,11 @@ QtObject {
     // 电平可视化效果：dance 律动 / spectrum 声谱 / off 基线
     // （电平浮窗切换，落盘记忆）
     property string vizEffect: "dance"
+    // 音律自动关闭状态（LevelMeter 驱动，双屏实例幂等）：
+    // 无音频 → vizEffect 切 "off"，用户选择暂存 vizEffectSaved，来声恢复；
+    // VizCard 落盘读取/手动点选时看这个旗：自动关闭中只动暂存，手动点选直接清旗
+    property string vizEffectSaved: ""
+    property bool vizEffectAutoOff: false
     // 舞者编排：-1 自动（一次一式跟音乐换场），0-7 固定单式，8 混合（八式同放）；
     // VizCard 落盘记忆
     property int dancePattern: -1

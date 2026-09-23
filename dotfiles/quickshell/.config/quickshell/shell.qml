@@ -83,7 +83,9 @@ ShellRoot {
             Theme { id: vizTheme }
 
             anchors { top: true; left: true }
-            margins { top: 52; left: ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.viz.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.viz.w / 2 }
+            // 居中锚定 + 屏幕边缘钳制：左侧收起后 pill 左移，anchor-w/2 会成负数；
+            // modelData.width 兜底 99999（取不到时退化为只钳左缘，原行为不变）
+            margins { top: 52; left: Math.max(0, Math.min(((Comp.UiState.anchorMap[Comp.UiState.popupGeom.viz.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.viz.w / 2, (modelData.width || 99999) - Comp.UiState.popupGeom.viz.w)) }
             implicitWidth: 480
             // 卡片高度跟内容走（dance 模式多一排编排选项）
             implicitHeight: vizCard.implicitHeight

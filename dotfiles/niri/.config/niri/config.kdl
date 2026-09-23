@@ -172,7 +172,7 @@ layout {
         // off
 
         // How many logical pixels the ring extends out from the windows.
-        width 4
+        width 6
 
         // Colors can be set in a variety of ways:
         // - CSS named colors: "red"
@@ -231,7 +231,7 @@ layout {
     // You can enable drop shadows for windows.
     shadow {
         // Uncomment the next line to enable shadows.
-        // on
+        on
 
         // By default, the shadow draws only around its window, and not behind it.
         // Uncomment this setting to make the shadow draw behind its window.
@@ -253,7 +253,7 @@ layout {
         // pixels and match the CSS box-shadow properties.
 
         // Softness controls the shadow blur radius.
-        softness 30
+        softness 12
 
         // Spread expands the shadow.
         spread 5
@@ -261,8 +261,8 @@ layout {
         // Offset moves the shadow relative to the window.
         offset x=0 y=5
 
-        // You can also change the shadow color and opacity.
-        color "#00000077"
+        // 阴影主体色走主题（color-niri.kdl 由 theme-sync 生成，与边框同色 ACCENT+aa），
+        // 此处不重复定义，避免覆盖 include。
     }
 
     // Struts shrink the area occupied by windows, similarly to layer-shell panels.

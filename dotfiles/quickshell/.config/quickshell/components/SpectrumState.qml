@@ -13,19 +13,32 @@ Item {
     visible: false
 
     property var bands: []
-    // 任一播放器在播：播放开关的唯一事实源（舞者/频谱/暂停压平共用）
+    // 任一播放器在播：播放开关的唯一事实源（舞者/频谱/暂停压平共用）。
+    // valid 守卫：播放器退出后模型里可能留僵尸对象，valid===false 的直接跳过
+    // （无该属性时 undefined !== false，不影响旧逻辑）
     property bool anyPlaying: {
         var vs = Mpris.players.values;
         for (var i = 0; i < vs.length; i++) {
             try {
-                if (vs[i].isPlaying)
+                if (vs[i].valid !== false && vs[i].isPlaying)
                     return true;
             } catch (e) {}
         }
         return false;
     }
-    // 任一播放器在播 + 切到声谱才需要进程
-    property bool wantSpectrum: UiState.vizEffect === "spectrum" && root.anyPlaying
+    // 有没有播放器（暂停也算有）：模块显隐的门；暂停留 baseline，只有人走茶凉才藏
+    property bool hasPlayer: {
+        var vs = Mpris.players.values;
+        for (var i = 0; i < vs.length; i++) {
+            try {
+                if (vs[i].valid !== false)
+                    return true;
+            } catch (e) {}
+        }
+        return false;
+    }
+    // 任一播放器在播 + 切到声谱 + 总闸没拉下才需要进程（尾闸只藏跟随者，不管本模块）
+    property bool wantSpectrum: UiState.vizEffect === "spectrum" && root.anyPlaying && !BarState.flagM
     // running 走绑定自动启停；这里只负责停后清数据
     onWantSpectrumChanged: {
         if (!wantSpectrum)

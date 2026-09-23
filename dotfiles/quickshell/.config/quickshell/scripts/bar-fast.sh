@@ -36,4 +36,5 @@ jq -cn \
     --argjson flagL "$(flag ~/.cache/by-mgr/waybar_left_hidden)" \
     --argjson flagS "$(flag ~/.cache/by-mgr/waybar_system_hidden)" \
     --argjson flagM "$(flag ~/.cache/by-mgr/waybar_music_hidden)" \
-    '{rec:$rec,shot:$shot,pick:$pick,clip:$clip,gamma:$gamma,screen:$screen,lyric:$lyric,bri:$bri,cpu:$cpu,mem:$mem,net:$net,inhibit:$inhibit,theme:$theme,pp:$pp,flagL:$flagL,flagS:$flagS,flagM:$flagM}'
+    --argjson flagT "$(flag ~/.cache/by-mgr/qs_music_tail_hidden)" \
+    '{rec:$rec,shot:$shot,pick:$pick,clip:$clip,gamma:$gamma,screen:$screen,lyric:$lyric,bri:$bri,cpu:$cpu,mem:$mem,net:$net,inhibit:$inhibit,theme:$theme,pp:$pp,flagL:$flagL,flagS:$flagS,flagM:$flagM,flagT:$flagT}'

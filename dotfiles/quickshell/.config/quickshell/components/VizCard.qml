@@ -45,8 +45,15 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 var t = this.text.trim();
-                if (t === "dance" || t === "spectrum" || t === "off")
-                    UiState.vizEffect = t;
+                if (t !== "dance" && t !== "spectrum" && t !== "off")
+                    return;
+                // 自动关闭中 → 只更新暂存（来声恢复用），不覆盖 live 的 off；
+                // 与 LevelMeter 的完成顺序无关，哪边先跑结果都一致
+                if (UiState.vizEffectAutoOff && t !== "off") {
+                    UiState.vizEffectSaved = t;
+                    return;
+                }
+                UiState.vizEffect = t;
             }
         }
     }
@@ -139,6 +146,8 @@ Item {
                         anchors.fill: parent
                         onClicked: {
                             UiState.vizEffect = modelData.id;
+                            // 手动点选优先：自动恢复取消（自动关闭中 picking 也生效）
+                            UiState.vizEffectAutoOff = false;
                             Exec.sh("printf '" + modelData.id + "' > ~/.cache/by-mgr/qs-vizeffect");
                             root.requestClose();
                         }
