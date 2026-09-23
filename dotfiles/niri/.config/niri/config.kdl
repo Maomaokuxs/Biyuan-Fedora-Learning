@@ -228,10 +228,9 @@ layout {
         // inactive-gradient from="#505050" to="#808080" angle=45 relative-to="workspace-view"
     }
 
-    // You can enable drop shadows for windows.
+    // Drop shadows for windows (off = cleaner look).
     shadow {
-        // Uncomment the next line to enable shadows.
-        on
+        off
 
         // By default, the shadow draws only around its window, and not behind it.
         // Uncomment this setting to make the shadow draw behind its window.
@@ -622,7 +621,7 @@ binds {
     // 顶栏切换：waybar <-> quickshell（二者只跑一个，配色重载自动找正主）
     Ctrl+Alt+B hotkey-overlay-title="Toggle Bar waybar/quickshell" { spawn "~/.config/niri/scripts/toggle-bar.sh"; }
     // 重启 quickshell（dock/bar 异常时一键恢复）：走 launcher，恢复持久化的风格而非写死线上
-    Ctrl+Alt+S hotkey-overlay-title="Restart Quickshell" { spawn "bash" "~/.config/niri/scripts/quickshell-launch.sh" }
+    Ctrl+Alt+S hotkey-overlay-title="Restart Quickshell" { spawn "bash ~/.config/niri/scripts/quickshell-launch.sh"; }
     // 昼夜模式切换
     Ctrl+Alt+C hotkey-overlay-title="Toggle Day/Night Theme" { spawn "~/.config/niri/scripts/toggle-theme.sh"; }
     // Super+Alt+W 已取消（原随机壁纸），wallpaper-picker.sh 文件保留
