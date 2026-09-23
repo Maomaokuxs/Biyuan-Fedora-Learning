@@ -6,6 +6,8 @@ import "../components" as Comp
 // 纯时间函数动画：正弦干涉编排由 tick 时钟推进，开关只看播放状态；
 // 峰值事件仅提供幅度包络，断流时用假设包络续跳（monitor 哑了也不冻）。
 // 对称镜像；暂停即回基线停摆。spectrum 模式下本文件不实例化，monitor 零开销。
+// 无音频占用时主动关闭：无 Mpris 播放 → 停摆 + 关 monitor（零 PipeWire 流量）；
+// 有 Mpris 但 15s 无峰值（哑流/断连）→ 同样停摆，monitor 留守，来声即恢复。
 Item {
     id: root
     property var theme
@@ -19,22 +21,33 @@ Item {
     property bool dancing: false
     // 播放开关走 SpectrumState 单一事实源（不另建 Mpris 绑定）
     property bool anyPlaying: Comp.SpectrumState.anyPlaying
+    // 哑流超时：有 Mpris 但这么久无峰值，视为无音频占用，主动停摆
+    property int idleMs: 15000
     property double lastPeakT: 0
+    function poke() {
+        var now = Date.now();
+        root.lastSoundT = now;
+        root.lastPeakT = now;
+        if (!root.dancing)
+            root.dancing = true;
+    }
+    function shutdown() {
+        root.dancing = false;
+        root.levels = [];
+        root.energy = 0;
+        root.business = 0;
+        root.beatPulse = 0;
+        root.beatAvg = 0;
+    }
     onAnyPlayingChanged: {
-        if (root.anyPlaying) {
-            root.lastSoundT = Date.now();
-            if (!root.dancing)
-                root.dancing = true;
-        } else {
-            root.dancing = false;
-            root.levels = [];
-        }
+        if (root.anyPlaying)
+            root.poke();
+        else
+            root.shutdown();
     }
     Component.onCompleted: {
-        if (root.anyPlaying) {
-            root.lastSoundT = Date.now();
-            root.dancing = true;
-        }
+        if (root.anyPlaying)
+            root.poke();
     }
     // 忙闲度：连续峰值差分大=忙（快歌/鼓点密），小=舒缓
     property real business: 0
@@ -96,10 +109,17 @@ Item {
         repeat: true
         onTriggered: {
             // 暂停即停摆；peak 断流但仍在播→用假设包络续跳（纯函数动画不死机）
-            var stale = Date.now() - root.lastPeakT > 1500;
-            if (!root.anyPlaying) {
-                root.dancing = false;
-                root.levels = [];
+            var now = Date.now();
+            var stale = now - root.lastPeakT > 1500;
+            // 暂停或总闸拉下 → 主动停摆（尾闸不管本模块活动，只藏跟随者）
+            if (!root.anyPlaying || Comp.BarState.flagM) {
+                root.shutdown();
+                return;
+            }
+            // 哑流超时：Mpris 在播但长期无峰值 → 无音频占用，主动停摆；
+            // monitor 留守（anyPlaying 仍真），来声即恢复
+            if (now - root.lastPeakT > root.idleMs) {
+                root.shutdown();
                 return;
             }
             root.tick += 1;
@@ -184,13 +204,18 @@ Item {
     PwNodePeakMonitor {
         id: monitor
         node: Pipewire.ready ? Pipewire.defaultAudioSink : null
-        enabled: node !== null
+        // 按需监听：无 Mpris/已停摆/总闸拉下时关闭，零 PipeWire 流量；
+        // 启动靠 anyPlaying（Mpris），恢复靠留守监听中的峰值，来声即 poke
+        enabled: node !== null && (root.anyPlaying || root.dancing) && !Comp.BarState.flagM
         onPeaksChanged: {
-            root.lastPeakT = Date.now();
             var v = 0;
             for (var i = 0; i < peaks.length; i++)
                 v = Math.max(v, peaks[i]);
             v = Math.max(0, Math.min(1, v));
+            // 静默时钟只认真峰值：空闲 sink 也可能吐全零事件，用它刷新时钟
+            // 会导致哑流熄火永不触发、假设包络空跳到天荒地老
+            if (v > 0.02)
+                root.lastPeakT = Date.now();
             // 包络跟随：重低通，只取大势不吃碎拍（跟太紧就是抖）
             root.energy = root.energy + (v - root.energy) * (v > root.energy ? 0.12 : 0.015);
             var diff = Math.abs(v - root.lastPeak);

@@ -100,24 +100,30 @@ RowLayout {
     Comp.MusicInfo {
         normalBg: theme.mediaBg; normalFg: theme.fg
         theme: root.theme; screenName: root.screenName
-        musicHidden: Comp.BarState.flagM
     }
     BarMod.LevelMeter { theme: root.theme; screenName: root.screenName }
     Comp.MprisButton {
         normalBg: theme.mediaBg; normalFg: theme.fg
-        mode: "prev"; musicHidden: Comp.BarState.flagM
+        mode: "prev"; musicHidden: Comp.BarState.flagM || Comp.BarState.flagT
     }
     Comp.MprisButton {
         normalBg: theme.mediaBg; normalFg: theme.fg
-        mode: "toggle"; musicHidden: Comp.BarState.flagM
+        mode: "toggle"; musicHidden: Comp.BarState.flagM || Comp.BarState.flagT
     }
     Comp.MprisButton {
         normalBg: theme.mediaBg; normalFg: theme.fg
-        mode: "next"; musicHidden: Comp.BarState.flagM
+        mode: "next"; musicHidden: Comp.BarState.flagM || Comp.BarState.flagT
     }
     Comp.Pill {
         normalBg: theme.mediaBg; normalFg: theme.fg
         pillText: Comp.BarState.lyricT
+        // 音乐组跟随者：总闸或尾闸拉下都折叠（开关位在歌名/音律右键）
+        forceHidden: Comp.BarState.flagM || Comp.BarState.flagT
+        // 右键：音乐总开关（与歌名右键一致，含音律），点后即时补刷
+        onRightClicked: {
+            Comp.Exec.sh("bash " + Comp.Exec.commonDir + "/toggle-music.sh");
+            Comp.BarState.refresh();
+        }
     }
 
     Item {

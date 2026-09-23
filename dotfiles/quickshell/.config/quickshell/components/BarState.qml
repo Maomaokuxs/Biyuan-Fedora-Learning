@@ -42,11 +42,14 @@ Item {
     property bool flagL: false
     property bool flagS: false
     property bool flagM: false
+    // 尾闸：只藏音律后面的跟随者（播放键/歌词），音律条和歌名留守；跟随者取 flagM || flagT
+    property bool flagT: false
     // flag 翻转（外部 rofi 菜单切的）立刻补刷一次，文本不等下个 2s 周期，
     // 显隐只差一次快刷（200ms），和 forceHidden 变化几乎同时到位
     onFlagLChanged: refreshFast.restart()
     onFlagSChanged: refreshFast.restart()
     onFlagMChanged: refreshFast.restart()
+    onFlagTChanged: refreshFast.restart()
     // 启动动画门：放行前所有 pill 静默就位（替代 Flags 的 6×500ms 门）
     property int runs: 0
 
@@ -99,6 +102,7 @@ Item {
             if ("flagL" in o) root.flagL = o.flagL === 1;
             if ("flagS" in o) root.flagS = o.flagS === 1;
             if ("flagM" in o) root.flagM = o.flagM === 1;
+            if ("flagT" in o) root.flagT = o.flagT === 1;
             if (!UiState.animReady && ++root.runs >= 2)
                 UiState.animReady = true;
         } catch (e) {}
