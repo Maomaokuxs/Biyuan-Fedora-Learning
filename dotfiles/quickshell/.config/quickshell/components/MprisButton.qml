@@ -3,6 +3,7 @@ import Quickshell.Services.Mpris
 
 // 原生 mpris 传输键：替代 mprev/mplay/mnext 三个 ScriptPill。
 // mode: "prev" | "toggle" | "next"，图标与 waybar exec 一致。
+// 右键：歌词显隐总开关（lyric_off 全局旗，两栏通用，三个键一致）。
 Pill {
     id: root
     property string mode: "toggle"
@@ -34,5 +35,10 @@ Pill {
             if (p.canTogglePlaying)
                 p.togglePlaying();
         }
+    }
+
+    onRightClicked: {
+        Exec.sh("bash " + Exec.commonDir + "/toggle-lyric.sh");
+        BarState.refresh();
     }
 }
