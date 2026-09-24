@@ -720,6 +720,18 @@ binds {
       open-floating true
   }
 
+  // wechat — 微信图片和视频查看器
+  window-rule {
+      match app-id="wechat" title="^图片和视频$"
+      open-floating true
+  }
+
+  // btrfs-assistant — 仅确认类弹窗悬浮，主窗口保持平铺
+  window-rule {
+      match app-id="btrfs-assistant" title="^Confirm$"
+      open-floating true
+  }
+
   // kitty — Kitty 终端
   window-rule {
       match app-id="kitty"
