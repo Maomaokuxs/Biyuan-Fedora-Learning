@@ -85,6 +85,10 @@ install_nvidia_drivers() {
     # 只有一个内核就直接编它。编完逐个验，有一个失败就红字点名。
     echo -e "${YELLOW}>> Building NVIDIA kernel modules now (do NOT reboot until done)...${NC}"
     mapfile -t _kernels < <(rpm -q kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V)
+    if [ ${#_kernels[@]} -eq 0 ]; then
+        echo -e "${RED}❌ 内核列表为空，无法编译，中止（先修 rpm/dnf）。${NC}"
+        return 1
+    fi
     local _targets=()
     if [ ${#_kernels[@]} -le 1 ]; then
         _targets=("${_kernels[@]}")
@@ -97,7 +101,8 @@ install_nvidia_drivers() {
     for _k in "${_targets[@]}"; do
         sudo dnf install -y "kernel-devel-$_k" --skip-unavailable
         sudo akmods --force --kernels "$_k"
-        if ls "/lib/modules/$_k/extra/nvidia/" 2>/dev/null | grep -q "nvidia.ko"; then
+        # 注：模块为压缩格式 nvidia.ko.xz，通配匹配
+        if ls "/lib/modules/$_k/extra/nvidia/nvidia.ko"* 2>/dev/null | grep -q .; then
             echo -e "${GREEN}✅ NVIDIA kmod ready for $_k.${NC}"
             sudo dracut --kver "$_k" -f
         else
@@ -135,7 +140,8 @@ setup_gpu_drivers() {
         echo -e "${YELLOW}⚠️  运行中不是最新内核，建议手动重启进新内核后再装驱动。${NC}"
     fi
 
-    # 硬件扫描
+    # 硬件扫描（pciutils 最小化系统未必有，先保再扫）
+    command -v lspci &>/dev/null || sudo dnf install -y pciutils
     # 自动检测出你是 AMD、Intel 还是 NVIDIA（或者两者都有，比如笔记本的核显+独显组合）
     echo -e "${CYAN}>> Scanning PCI buses for graphics hardware...${NC}"
     local gpu_info
@@ -155,6 +161,12 @@ setup_gpu_drivers() {
     echo "$gpu_info" | grep -qi "amd\|radeon" && has_amd=true
     echo "$gpu_info" | grep -qi "intel" && has_intel=true
     echo "$gpu_info" | grep -qi "nvidia" && has_nvidia=true
+
+    # SecureBoot 检查：akmod 默认不签名，开着 SB 进内核会被拒载——先告警，不硬拦
+    if command -v mokutil &>/dev/null && mokutil --sb-state 2>/dev/null | grep -qi enabled; then
+        echo -e "${RED}⚠️  SecureBoot 开启中：akmod 模块无签名会被内核拒载。${NC}"
+        echo -e "${YELLOW}   二选一：BIOS 关 SB，或签模块（kmodgenca + mokutil --import），签完再重跑。${NC}"
+    fi
 
     # 一级菜单
     echo -e "\n${CYAN}Based on the detection, how would you like to proceed?${NC}"
