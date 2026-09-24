@@ -79,6 +79,37 @@ install_intel_drivers() {
 install_nvidia_drivers() {
     # 移除了废弃的 nvidia-vaapi-driver，保留 libva-nvidia-driver 即可
     execute_installation "NVIDIA (Proprietary)" akmod-nvidia xorg-x11-drv-nvidia-cuda libva-nvidia-driver libva-utils
+
+    # 防黑屏：akmod 默认异步编译，模块没好就重启进新内核必黑；
+    # 这里手动全编： except 最旧内核（留作保命 fallback，不碰）；
+    # 只有一个内核就直接编它。编完逐个验，有一个失败就红字点名。
+    echo -e "${YELLOW}>> Building NVIDIA kernel modules now (do NOT reboot until done)...${NC}"
+    mapfile -t _kernels < <(rpm -q kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V)
+    local _targets=()
+    if [ ${#_kernels[@]} -le 1 ]; then
+        _targets=("${_kernels[@]}")
+        echo -e "${CYAN}>> 单内核，直接编译：${_targets[*]}${NC}"
+    else
+        _targets=("${_kernels[@]:1}")
+        echo -e "${CYAN}>> 跳过最旧保命内核 ${_kernels[0]}，编译：${_targets[*]}${NC}"
+    fi
+    local _fail=()
+    for _k in "${_targets[@]}"; do
+        sudo dnf install -y "kernel-devel-$_k" --skip-unavailable
+        sudo akmods --force --kernels "$_k"
+        if ls "/lib/modules/$_k/extra/nvidia/" 2>/dev/null | grep -q "nvidia.ko"; then
+            echo -e "${GREEN}✅ NVIDIA kmod ready for $_k.${NC}"
+            sudo dracut --kver "$_k" -f
+        else
+            echo -e "${RED}❌ NVIDIA kmod MISSING for $_k — 别进这个内核。${NC}"
+            _fail+=("$_k")
+        fi
+    done
+    if [ ${#_fail[@]} -eq 0 ]; then
+        echo -e "${GREEN}✅ initramfs rebuilt, safe to reboot.${NC}"
+    else
+        echo -e "${YELLOW}   等 akmods 后台编完（journalctl -u akmods -f），或重跑本脚本。${NC}"
+    fi
 }
 
 # --- 4. 主干交互逻辑 ---
@@ -95,6 +126,14 @@ setup_gpu_drivers() {
     echo -e "\n${BLUE}=====================================================${NC}"
     echo -e "${GREEN}          GPU Acceleration Setup${NC}"
     echo -e "${BLUE}=====================================================${NC}"
+
+    # 内核一览：驱动要装在正用的内核上；刚更完内核没重启的话先列出来，
+    # 手动重启进新内核再跑（本脚本不自动重启）。
+    echo -e "${CYAN}>> Installed kernels (running: $(uname -r)): ${NC}"
+    rpm -q kernel --queryformat '   - %{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V
+    if [ "$(uname -r)" != "$(rpm -q kernel --queryformat '%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null | sort -V | tail -n 1)" ]; then
+        echo -e "${YELLOW}⚠️  运行中不是最新内核，建议手动重启进新内核后再装驱动。${NC}"
+    fi
 
     # 硬件扫描
     # 自动检测出你是 AMD、Intel 还是 NVIDIA（或者两者都有，比如笔记本的核显+独显组合）
