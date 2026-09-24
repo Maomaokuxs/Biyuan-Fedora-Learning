@@ -1,18 +1,21 @@
 # 概述
 
-- 主仓库中的是我使用的 niri 配置文件，通常适用于最小化安装的 Fedora GNU/Linux 操作系统，主要是 Niri 和 KDE 桌面环境，如果有其他桌面环境也可以尝试使用，我使用了极简的登录管理器，如果在安装前有其他登录管理器可以跳过安装。
+本仓库是 niri 配置仓库，安装脚本暂时只适合于 Fedora Linux 使用，主要的特色功能是随壁纸切换主要工具的配色，可搭配kde桌面环境使用。
+
+## 说明
 
 - 对于使用 Fedora 的新手朋友可以先看一下这一部分[建议](https://github.com/Maomaokuxs/Biyuan-Fedora-Wiki/blob/main/01-%E5%BF%AB%E9%80%9F%E5%BC%80%E5%A7%8B/%E4%BD%BF%E7%94%A8Fedora%E7%9A%84%E5%BB%BA%E8%AE%AE.md)。
 
-- 请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Wiki)页面查看 wiki 内容，对于我的配置文件的使用说明可以直接[跳转](docs/config-guide/README.md)。
+- 请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Wiki)页面查看 wiki 内容，对于我的配置文件的使用说明可以直接[跳转](docs/user-guide/README.md)。
 
-- 我至今依旧是小白，这些脚本是在 AI 的帮助下完成的，现在主要是 Opencode 配合 Deepseek 使用。
+- 我至今依旧是小白，这些脚本是在 AI 的帮助下完成的。
 
 ## 桌面截图
 
 - niri
 
 ![niri](images/desktop-screenshot-niri.png)
+![niri](docs/user-guide/images/WallpaperSwitching.gif)
 
 ## 安装
 
@@ -41,83 +44,11 @@ chmod +x ./install.sh
 
 - 基于 《linux 命令行与 shell 脚本编程大全》;
 - 基于网络文章；
-- 询问 AI 并实践验证，并不是直接复制粘贴到 Wiki。
+- 询问 AI 并测试验证。
 
-## 仓库脚本文件结构
+## 仓库文件结构
 
-```text
-Biyuan-Fedora-Learning/
-├── README.md                    # 安装指引
-├── install.sh                   # 安装脚本
-├── config/
-│   └── repos.list               # 软件仓库清单
-│
-├── scripts/                     # 【逻辑层】执行脚本
-│   ├── by-mgr                   # 核心引擎：备份、部署、系统维护
-│   ├── utils.sh                 # 公共工具函数
-│   ├── 01_snapper_config.sh     # 基础环境与依赖包安装
-│   ├── 02_base_env.sh           # 配置基础环境
-│   ├── 03_gpu_drivers.sh        # 配置显卡驱动
-│   ├── 04_desktop_niri.sh       # 配置 niri 桌面环境
-│   ├── 05_desktop_kde.sh        # 配置 KDE 桌面环境
-│   ├── 06_desktop_gnome.sh      # 配置 Gnome 桌面环境
-│   └── 07_greetd_setup.sh       # 配置 Greetd/Tuigreet
-│
-├── dotfiles/                    # 【资产层】配置文件 (Stow 部署)
-│   ├── fastfetch/
-│   │   └── .config/fastfetch/
-│   │       └── config.jsonc     # Fastfetch 系统信息展示
-│   ├── hypr/
-│   │   └── .config/hypr/
-│   │       ├── hypridle.conf    # 空闲监听配置
-│   │       └── hyprlock.conf    # 锁屏界面 (由 theme-sync 生成)
-│   ├── kitty/
-│   │   └── .config/kitty/
-│   │       └── kitty.conf       # 终端配置，引入 color-kitty.conf
-│   ├── niri/
-│   │   └── .config/niri/
-│   │       ├── config.kdl       # Niri 核心配置 (平铺、快捷键、启动项)
-│   │       ├── keybinds.kdl     # 快键键配置
-│   │       └── scripts/
-│   │           ├── theme-sync.sh        # 壁纸取色 & 全局配色分发
-│   │           ├── wallpaper.sh         # 随机壁纸切换
-│   │           ├── wallpaper-picker.sh  # 壁纸选择器
-│   │           ├── init-wallpaper.sh    # 初始化壁纸
-│   │           └── toggle-theme.sh      # 昼夜模式切换
-│   ├── rofi/
-│   │   └── .config/rofi/
-│   │       ├── config.rasi      # Rofi 全局配置
-│   │       ├── scripts/         # 菜单脚本 (powermenu/music/recorder)
-│   │       └── themes/          # 主题样式，引入 color-rofi.rasi
-│   ├── starship/
-│   │   └── .config/
-│   │       ├── starship.toml        # 终端提示符 (palette 拼接生成)
-│   │       └── starship_base.toml   # Starship 基础模板
-│   ├── waybar/
-│   │   └── .config/waybar/
-│   │       ├── config.jsonc     # Waybar 模块布局
-│   │       ├── style.css        # 样式表，引入 color-waybar.css
-│   │       └── scripts/         # 模块脚本 (天气/音乐/更新等)
-│   ├── xdg-desktop-portal/
-│   │   └── .config/xdg-desktop-portal/
-│   │       └── niri-portals.conf
-│   └── bash/
-│       └── .bashrc              # 终端环境变量
-│
-├──配色生成路径 (theme-sync.sh 输出)
-│   ~/.cache/by-mgr/hellwal/
-│  ├── global-palette.env       # 中央色彩数据库 (唯一数据源)
-│  ├── color-niri.kdl           # Niri 边框配色
-│  ├── color-waybar.css         # Waybar 颜色变量
-│  ├── color-rofi.rasi          # Rofi 颜色变量
-│  ├── color-kitty.conf         # Kitty 配色 (含 16 色)
-│  └── color-starship.toml      # Starship palette 切片
-│
-└── 额外配置仓库 (by-mgr)
-    ~/.config/by-mgr/
-    ├── weather.conf             # 天气位置 (LOCATION/CITY_CODE，本地持久化)
-    └── templates/               # 配置模板
-```
+完整目录树与每个配置文件用途见 [docs/user-guide/file-tree.md](docs/user-guide/file-tree.md)。
 
 ## 涉及到的部分软件包
 
