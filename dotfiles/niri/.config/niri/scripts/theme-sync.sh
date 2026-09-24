@@ -175,11 +175,19 @@ if pgrep -x plasmashell >/dev/null 2>&1; then
 fi
 
 # Wayland 壁纸渲染：仅在非 KDE 环境且调用方未自行渲染时执行
-# 壁纸未变化时跳过重渲染（9K 图一次 2.7 秒），只做配色同步
+# 壁纸未变化时跳过重渲染（9K 图一次 2.7 秒），只做配色同步；
+# 但跨会话 daemon 不保留状态：当前没在显示这张图就必须重渲染，否则新登录黑屏
 if [ -n "$WAYLAND_DISPLAY" ] && ! $IN_KDE && ! $NO_RENDER; then
     if command -v awww &> /dev/null; then
-        awww query &>/dev/null || awww init &>/dev/null
+        # awww 0.12+ 没有 init 子命令：daemon 不在就起一个（起完等 1 秒再发图）
+        if ! awww query &>/dev/null; then
+            (awww-daemon >/dev/null 2>&1 & disown)
+            sleep 1
+        fi
         if [ "$WALLPAPER_CHANGED" = true ]; then
+            awww img "$WALLPAPER" --transition-type random --transition-pos center --transition-duration 2
+        elif ! awww query 2>/dev/null | grep -Fq "image: $WALLPAPER"; then
+            _debug "daemon lost image across sessions, re-render"
             awww img "$WALLPAPER" --transition-type random --transition-pos center --transition-duration 2
         else
             _debug "wallpaper unchanged, skip awww re-render"
@@ -439,6 +447,8 @@ layout {
 }
 EOF
 echo "   Niri 配色 -> $TARGET_DIR/color-niri.kdl"
+# 注：主配置用 include optional=true 引用本文件，缺失只告警；
+# 生成后 niri watcher 自动重载，无需 sed 挂钩。
 
 # --- B. Waybar (color-waybar.css) ---
 # GLib >= 2.89 按"软链接展开后的真实路径"解析 @import，旧版按加载路径解析。
