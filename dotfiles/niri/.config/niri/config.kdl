@@ -287,6 +287,8 @@ layout {
 // spawn-at-startup "waybar"
 // 经 launcher 启动：读持久化风格记录（无记录回落线上栏）
 spawn-at-startup "sh" "-c" "~/.config/niri/scripts/quickshell-launch.sh"
+// 首次图形登录补跑壁纸初始化（无头装机时装机阶段不落 init 锁，靠这行渲染首张壁纸；有锁则秒退）
+spawn-at-startup "sh" "-c" "~/.config/niri/scripts/init-wallpaper.sh"
 
 // To run a shell command (with variables, pipes, etc.), use spawn-sh-at-startup:
 // spawn-sh-at-startup "qs -c ~/source/qs/MyAwesomeShell"
@@ -620,6 +622,8 @@ binds {
     }
     // 顶栏切换：waybar <-> quickshell（二者只跑一个，配色重载自动找正主）
     Ctrl+Alt+B hotkey-overlay-title="Toggle Bar waybar/quickshell" { spawn "~/.config/niri/scripts/toggle-bar.sh"; }
+    // quickshell 风格轮换：default <-> duo（写持久化记录，重启不丢）
+    Ctrl+Alt+Q hotkey-overlay-title="Switch Quickshell Style" { spawn "bash ~/.config/niri/scripts/qs-switch.sh next"; }
     // 重启 quickshell（dock/bar 异常时一键恢复）：走 launcher，恢复持久化的风格而非写死线上
     Ctrl+Alt+S hotkey-overlay-title="Restart Quickshell" { spawn "bash ~/.config/niri/scripts/quickshell-launch.sh"; }
     // 昼夜模式切换
