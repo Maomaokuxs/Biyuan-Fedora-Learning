@@ -28,11 +28,13 @@ setup_base() {
         host=${mirrors[$name]}
         
         # 将()中的逻辑放入后台执行 (&)
-        # 优化 ping 参数：-c 3 发3个包，-w 3 设置整个 ping 命令硬超时为3秒，防止死锁
+        # 用 HTTP 实测代替 ping：ICMP 常被防火墙拦会误报超时，而 dnf 要的本来就是 HTTP；
+        # --max-time 6 硬超时（含 DNS），失败记 Timeout
         (
-            latency=$(ping -c 3 -w 3 "$host" 2>/dev/null | tail -1 | awk '{print $4}' | cut -d '/' -f 2)
-            if [ -n "$latency" ]; then
-                echo "$latency" > "$TMP_DIR/$host"
+            secs=$(curl -o /dev/null -s --max-time 6 -w "%{time_total}" "http://$host/" 2>/dev/null)
+            rc=$?
+            if [ $rc -eq 0 ] && [[ "$secs" =~ ^[0-9.]+$ ]]; then
+                awk -v s="$secs" 'BEGIN{printf "%.0f", s*1000}' > "$TMP_DIR/$host"
             else
                 echo "Timeout" > "$TMP_DIR/$host"
             fi
@@ -97,10 +99,15 @@ setup_base() {
         echo -e "${CYAN}>> No changes applied.${NC}"
     fi
 
-    # --- 2. 系统更新 (确保安装前系统版本最新) --- #
-    echo -e "${YELLOW}>> Refreshing package cache and upgrading system...${NC}"
-    # 使用 --refresh 强制刷新元数据，确保获取到最新的补丁
-    sudo dnf upgrade -y --refresh
+    # --- 2. 系统更新 (可跳过：刚装好的系统通常不需要，或稍后手动升) --- #
+    read -p "Skip system upgrade to save time? (y/N): " skip_upgrade
+    if [[ "$skip_upgrade" =~ ^[Yy]$ ]]; then
+        echo -e "${CYAN}>> Skipping system upgrade.${NC}"
+    else
+        echo -e "${YELLOW}>> Refreshing package cache and upgrading system...${NC}"
+        # 使用 --refresh 强制刷新元数据，确保获取到最新的补丁
+        sudo dnf upgrade -y --refresh
+    fi
 
     # --- 3. 初始化家目录结构 --- #
     echo -e "${YELLOW}>> Initializing standard user directories...${NC}"
@@ -133,18 +140,47 @@ setup_base() {
     mkdir -p "$HOME/Documents/github"
     mkdir -p "$HOME/Pictures/wallpapers"
 
+    # 0. 字体三方源：自打包字体（nerd/sarasa/maple/霞鹜文楷）先启用，失败回落官方+assets
+    echo -e "${CYAN}>> Enabling biyuan/software COPR repository (fonts)...${NC}"
+    if sudo dnf copr enable -y biyuan/software; then
+        echo -e "${GREEN}✅ Repository [biyuan/software] enabled.${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Failed to enable biyuan/software, fonts fall back to official repo + assets.${NC}"
+    fi
+
     # 1. 基础系统工具与 Fedora 仓库字体包
-    # 包含了你指定的 JetBrains Mono, Noto Emoji, Noto CJK
+    # JetBrains Mono（原生）、jetbrainsmono-nerd-fonts（图标，waybar/kitty 必需）、
+    # sarasa-gothic-fonts（更纱黑体，中文终端对齐）、Noto Emoji/CJK
     local pkgs=(
         dnf-plugins-core figlet git curl wget
         fzf
         jetbrains-mono-fonts-all.noarch
+        jetbrainsmono-nerd-fonts.noarch
+        sarasa-gothic-fonts.noarch
+        fontawesome-6-free-fonts.noarch
+        google-noto-sans-yi-fonts.noarch
         google-noto-emoji-fonts.noarch
         google-noto-sans-cjk-fonts.noarch
     )
     
     echo -e "${YELLOW}>> Installing base tools and official repository fonts...${NC}"
-    sudo dnf install -y "${pkgs[@]}"
+    # 字体包版本间常改名/缺包，用 --skip-unavailable 保流程不炸，缺的下面验出来单独报
+    sudo dnf install -y "${pkgs[@]}" --skip-unavailable
+
+    # --- 3.5 字体验收入口：缺啥报啥，不静默带过 --- #
+    echo -e "${CYAN}>> Verifying fonts...${NC}"
+    local missing=()
+    fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd Font" || missing+=("jetbrainsmono-nerd-fonts（图标，waybar/kitty 会掉图标）")
+    fc-list 2>/dev/null | grep -qi "Sarasa" || missing+=("sarasa-gothic-fonts（中文终端对齐）")
+    fc-list 2>/dev/null | grep -qi "Font Awesome 6 Free" || missing+=("fontawesome-6-free-fonts（kitty 图标区）")
+    fc-list 2>/dev/null | grep -qi "Noto Sans Yi" || missing+=("google-noto-sans-yi-fonts（彝文歌词）")
+    fc-list 2>/dev/null | grep -qi "Noto Sans CJK" || missing+=("google-noto-sans-cjk-fonts（中文）")
+    if [ ${#missing[@]} -eq 0 ]; then
+        echo -e "${GREEN}✅ Fonts OK.${NC}"
+    else
+        echo -e "${YELLOW}⚠️  以下字体缺失，请手动补装后重跑本脚本或执行 fc-cache -f：${NC}"
+        printf '   - %s\n' "${missing[@]}"
+    fi
 
     # --- 4. Iosevka Nerd Font 本地部署 --- #
     # 不依赖外部 REPO_DIR，改为根据脚本位置自动推导
@@ -176,6 +212,18 @@ setup_base() {
         echo -e "${GREEN}✅ 字体资产部署完成。${NC}"
     else
         echo -e "${RED}❌ 错误: 找不到源目录或目录下无文件: $SOURCE_FONTS_DIR${NC}"
+    fi
+
+    # --- 5. 硬件访问组：ddcutil 外屏亮度要读 /dev/i2c-*，缺组即 EACCES ---
+    if getent group i2c >/dev/null 2>&1; then
+        if id -nG "$USER" 2>/dev/null | grep -qw i2c; then
+            echo -e "${GREEN}✅ 已在 i2c 组。${NC}"
+        else
+            sudo usermod -aG i2c "$USER"
+            echo -e "${YELLOW}⚠️  已加入 i2c 组，需重登录生效（ddcutil 外屏亮度）。${NC}"
+        fi
+    else
+        echo -e "${YELLOW}⚠️  无 i2c 组（ddcutil 未装？），跳过。${NC}"
     fi
 
     echo -e "${GREEN}✅ Base environment and font configuration successful.${NC}"
