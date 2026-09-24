@@ -49,6 +49,15 @@ install_desktop_niri() {
         sudo dnf swap -y ffmpeg-free ffmpeg --allowerasing
     fi
 
+    # 2. 预清理孤立冲突包：kmime 无人依赖，却与 akonadi 链拉入的 kf6-kmime 文件冲突，
+    # 不清则整个事务回滚（--allowerasing 也救不了，因为删了没人要的包 solver 不敢动）。
+    # 有人依赖时不动，交回 --allowerasing 处理。
+    # 注意：rpm 的“没有软件包需要”走 stdout，只能用退出码判断（非零=无人要）。
+    if rpm -q kmime &>/dev/null && ! rpm -q --whatrequires kmime &>/dev/null; then
+        echo -e "${CYAN}>> Removing orphaned kmime (conflicts with kf6-kmime)...${NC}"
+        sudo dnf remove -y kmime || true
+    fi
+
     # 启用 gpu-screen-recorder 仓库
     echo -e "${CYAN}>> Enabling gpu-screen-recorder COPR repository...${NC}"
     sudo dnf copr enable -y ackerman/nexus
@@ -65,29 +74,32 @@ install_desktop_niri() {
         https://download.opensuse.org/repositories/home:luisbocanegra/Fedora_44/home:luisbocanegra.repo
 
     # 3. 执行补全安装
-    # 核心：niri (窗口管理器), waybar (状态栏), rofi-wayland (启动器)
+    # 核心：niri (窗口管理器), waybar (状态栏), rofi (2.x 原生 Wayland 启动器)
     # 美化：awww (壁纸后端), hellwal (色彩方案生成), kde-material-you-colors (KDE M3配色), starship (终端美化)，cava（终端可视化音乐实现）
     # 功能：fcitx5 (输入法), dolphin (文件管理), mako (通知通知), hyprlock/idle (锁屏与休眠)，gwenview（图片查看器），
-    # blueman（蓝牙管理工具），btop（资源占用查看工具)，kate（文本编辑器）,ddcutil(显示器亮度调整)，nmtui（网络连接工具）
+    # blueman（蓝牙管理工具），btop（资源占用查看工具)，kate（文本编辑器）,ddcutil(显示器亮度调整)，NetworkManager-tui（nmtui 网络连接工具）
     # kwallet libsecret（密钥及管理工具）ncdu(终端磁盘文件占用查看器) ranger（终端文件管理器）
     
     local niri_pkgs=(
-        niri waybar quickshell rofi-wayland stow unzip kitty 
+        niri waybar quickshell rofi stow unzip kitty 
         fastfetch jq awww hellwal 
         waypaper starship hyprlock hypridle 
         gpu-screen-recorder libnotify mako 
-        grim slurp imagemagick wl-clipboard copyq 
+        grim slurp ImageMagick wl-clipboard copyq 
         fcitx5 fcitx5-chinese-addons 
         xdg-desktop-portal-kde xdg-desktop-portal-wlr
         polkit-kde firefox cava dolphin gwenview
-        blueman btop kate ddcutil nmtui 
+        blueman btop kate ddcutil NetworkManager-tui 
         kwallet libsecret ncdu ranger
         kde-material-you-colors playerctl brightnessctl python3-requests
     )
 
     echo -e "${YELLOW}>> Deploying Niri ecosystem components...${NC}"
-    # 使用 --skip-unavailable 增强容错性（缺包不炸，但下面验出来点名）
-    sudo dnf install -y "${niri_pkgs[@]}" --skip-unavailable
+    # 先刷新软件源缓存：刚启用一批 COPR，直接装可能读到旧元数据
+    sudo dnf makecache 2>/dev/null || sudo dnf makecache --refresh
+    # --skip-unavailable 缺包不炸；--allowerasing 允许换掉冲突包
+    # （如 kf6-kmime 与 kmime 文件冲突，不加则整个事务回滚、一个都装不上）
+    sudo dnf install -y "${niri_pkgs[@]}" --skip-unavailable --allowerasing
 
     # --- 4.0 装完验包：--skip-unavailable 会静默跳过，缺啥点名，不带过 ---
     echo -e "${CYAN}>> Verifying packages...${NC}"
