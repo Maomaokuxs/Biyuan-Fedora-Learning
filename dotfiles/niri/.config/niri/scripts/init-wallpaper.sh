@@ -98,6 +98,10 @@ else
 fi
 
 # --- 5. 激活视觉引擎 ---
+# 自启时无终端，输出同时落地到日志，首启失败可查
+INIT_LOG="$HOME/.cache/by-mgr/init-wallpaper.log"
+exec > >(tee -a "$INIT_LOG") 2>&1
+echo "===== init-wallpaper $(date '+%F %T') PID=$$ WAYLAND=${WAYLAND_DISPLAY:-none} ===="
 if [ -f "$THEME_SYNC_SCRIPT" ]; then
     echo ">> Found visual engine: $THEME_SYNC_SCRIPT"
     chmod +x "$THEME_SYNC_SCRIPT"

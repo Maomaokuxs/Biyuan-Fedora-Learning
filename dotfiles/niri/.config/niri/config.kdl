@@ -667,13 +667,12 @@ binds {
   // 通知：quickshell 自带中心接管，mako 停用（需要时取消注释切回）
   // spawn-at-startup "mako"
 
-  // 剪贴板历史 — CopyQ（已装，未装时静默跳过）
-  spawn-at-startup "sh" "-c" "command -v copyq >/dev/null && copyq & sleep 1 && copyq enable &"
+    // 剪贴板历史 — CopyQ（已装，未装时静默跳过）
+    spawn-at-startup "sh" "-c" "command -v copyq >/dev/null && copyq & sleep 1 && copyq enable &"
 
-  //默认壁纸
-  spawn-at-startup "~/.config/niri/scripts/init-wallpaper.sh"
+    //默认壁纸初始化已在顶部自启区（init-wallpaper.sh，有锁秒退），此处不重复，避免并发互杀
 
-  // 锁屏
+    // 锁屏
   // 同步环境：告诉系统底层当前的显示协议和桌面环境
   spawn-at-startup "dbus-update-activation-environment" "--systemd" "WAYLAND_DISPLAY" "XDG_CURRENT_DESKTOP" "QT_QPA_PLATFORMTHEME"
 
