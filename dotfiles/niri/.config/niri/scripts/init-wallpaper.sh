@@ -55,9 +55,15 @@ INIT_LOCK="$CACHE_DIR/wallpaper_init.lock"
 mkdir -p "$CACHE_DIR"
 
 # 如果发现锁文件，直接终止整个脚本，不执行任何后续操作！
+# 自愈：锁在但核心产物（中央库/壁纸记录）被人删了 → 当锁失效重跑，不静默跳过
 if [ -f "$INIT_LOCK" ]; then
-    echo -e "\033[0;34mℹ️  检测到缓存文件 $INIT_LOCK，初始化流程已跳过，脚本安全退出。\033[0m"
-    exit 0
+    if [ ! -f "$CACHE_DIR/hellwal/global-palette.env" ] || [ ! -f "$CACHE_DIR/last-wallpaper" ]; then
+        echo -e "\033[0;33m⚠️  锁在但配色产物缺失，自愈重跑。\033[0m"
+        rm -f "$INIT_LOCK" "$IMPORT_LOCK"
+    else
+        echo -e "\033[0;34mℹ️  检测到缓存文件 $INIT_LOCK，初始化流程已跳过，脚本安全退出。\033[0m"
+        exit 0
+    fi
 fi
 
 # --- 3. 调试输出 ---
@@ -69,11 +75,11 @@ echo "   Target Engine: $THEME_SYNC_SCRIPT"
 # --- 4. 导入全量壁纸与锁定默认项 ---
 echo ">> 正在同步仓库壁纸库..."
 
-# A. 全量导入：将仓库 assets/wallpapers 下的所有图片软链接到系统的图片目录
+# A. 全量导入：直接复制（不用软链接：仓库移动/删除后不断链，waypaper/awww 读实体最稳）
 if [ -d "$SOURCE_WALL_DIR" ] && [ "$(ls -A "$SOURCE_WALL_DIR")" ]; then
-    # 使用 -s 创建软链接，-f 强制覆盖同名链接，保护 SSD 且不占双份空间
-    ln -sf "$SOURCE_WALL_DIR"/* "$WALL_DEST_DIR/"
-    echo -e "\033[0;32m✅ 成功将壁纸资产库链接至: $WALL_DEST_DIR\033[0m"
+    # -f 覆盖同名，仓库为准；用户自加的图不受影响
+    cp -f "$SOURCE_WALL_DIR"/* "$WALL_DEST_DIR/"
+    echo -e "\033[0;32m✅ 成功将壁纸资产库复制至: $WALL_DEST_DIR\033[0m"
 else
     echo -e "\033[0;33m⚠️  Warning: 资产目录不存在或为空: $SOURCE_WALL_DIR\033[0m"
 fi
@@ -81,7 +87,7 @@ fi
 # B. 默认壁纸仲裁逻辑
 echo ">> Checking default wallpaper asset..."
 if [ -f "$FINAL_WALLPAPER" ]; then
-    # 如果目标目录成功拿到了默认壁纸（通过刚才的软链接）
+    # 如果目标目录成功拿到了默认壁纸（刚才复制过来的）
     echo -e "\033[0;32m✅ 锁定默认壁纸: $FINAL_WALLPAPER\033[0m"
     
 else
@@ -124,7 +130,8 @@ else
         bash "$ALT_SYNC" "$FINAL_WALLPAPER"
     else
         if [ -n "$WAYLAND_DISPLAY" ]; then
-            awww query &>/dev/null || awww init &>/dev/null
+            awww query &>/dev/null || (awww-daemon >/dev/null 2>&1 & disown)
+            sleep 1
             awww img "$FINAL_WALLPAPER" --transition-type center
         fi
     fi

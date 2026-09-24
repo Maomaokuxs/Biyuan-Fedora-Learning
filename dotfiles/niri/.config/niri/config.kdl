@@ -7,7 +7,9 @@
 // Find the full list of options on the wiki:
 // https://niri-wm.github.io/niri/Configuration:-Input
 
-include "~/.cache/by-mgr/hellwal/color-niri.kdl"
+// 配色引用：optional=true（niri 26.04+），文件缺失只告警不拒载；
+// 首启自启链跑完取色生成配色后，watcher 自动重载上色，无需钩子。
+include optional=true "~/.cache/by-mgr/hellwal/color-niri.kdl"
 include "niri-outputs.kdl"
 
 input {
@@ -654,14 +656,15 @@ binds {
     // kded6: KDE 守护进程，负责配色变更通知
     spawn-at-startup "kded6"
 
-   // polkit代理（ 提权工具）
+    // polkit代理（ 提权工具）
     // kde 
     spawn-at-startup "/usr/libexec/kf6/polkit-kde-authentication-agent-1"
-  
-  // awww
+
+  // awww 壁纸后端常驻：daemon 在此常驻，init-wallpaper/取色只管发图；
+  // 全局只留这一处，重复起会抢 socket 报错（取色脚本内 query||init 只是兜底）
   spawn-at-startup "awww-daemon"
   
-  // kitty 标题栏（仅 niri 隐藏，退出即恢复）
+    // kitty 标题栏（仅 niri 隐藏，退出即恢复）
   spawn-at-startup "~/.config/niri/scripts/niri-kitty-decor.sh"
   
   // 通知：quickshell 自带中心接管，mako 停用（需要时取消注释切回）
