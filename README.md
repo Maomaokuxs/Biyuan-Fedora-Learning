@@ -6,7 +6,7 @@
 
 - 对于使用 Fedora 的新手朋友可以先看一下这一部分[建议](https://github.com/Maomaokuxs/Biyuan-Fedora-Wiki/blob/main/01-%E5%BF%AB%E9%80%9F%E5%BC%80%E5%A7%8B/%E4%BD%BF%E7%94%A8Fedora%E7%9A%84%E5%BB%BA%E8%AE%AE.md)。
 
-- 请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Wiki)页面查看 wiki 内容，对于我的配置文件的使用说明可以直接[跳转](docs/user-guide/README.md)。
+- 请前往[wiki](https://github.com/Maomaokuxs/Biyuan-Fedora-Wiki)页面查看 wiki 内容，对于我的配置文件的使用说明可以直接[跳转](docs/user-guide/user-guide.md)。
 
 - 我至今依旧是小白，这些脚本是在 AI 的帮助下完成的。
 
