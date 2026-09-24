@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 
@@ -16,7 +17,7 @@ Item {
     implicitHeight: 470
 
     property string page: "bar" // bar|theme|viz|music
-    property string labRoot: "/home/biyuan/Documents/quickshell/bar-lab"
+    property string styleDir: Quickshell.shellDir + "/styles"
 
     Rectangle {
         anchors.fill: parent
@@ -113,7 +114,7 @@ Item {
                             var m = /-p (\S+)/.exec(t);
                             if (m) {
                                 var d = m[1];
-                                if (d === "/home/biyuan/.config/quickshell")
+                                if (d === Quickshell.shellDir)
                                     barPage.current = "default";
                                 else
                                     barPage.current = d.split("/").pop();
@@ -127,7 +128,7 @@ Item {
                     if (id === "waybar") {
                         Exec.sh("pkill -x quickshell; pkill waybar 2>/dev/null; pkill cava 2>/dev/null; waybar & disown");
                     } else {
-                        Exec.sh("bash /home/biyuan/Documents/quickshell/bar-lab/qs-switch.sh " + id);
+                        Exec.sh("bash " + root.styleDir + "/qs-switch.sh " + id);
                     }
                 }
                 Column {
@@ -209,7 +210,7 @@ Item {
                         }
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: Exec.sh("bash /home/biyuan/.config/niri/scripts/toggle-theme.sh");
+                            onClicked: Exec.sh("bash " + Quickshell.env("HOME") + "/.config/niri/scripts/toggle-theme.sh");
                         }
                     }
                     // 随机壁纸
@@ -236,7 +237,7 @@ Item {
                         }
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: Exec.sh("bash /home/biyuan/.config/niri/scripts/wallpaper.sh");
+                            onClicked: Exec.sh("bash " + Quickshell.env("HOME") + "/.config/niri/scripts/wallpaper.sh");
                         }
                     }
                     // 壁纸库
@@ -308,7 +309,7 @@ Item {
                                 onClicked: {
                                     UiState.vizEffect = parent.modelData.id;
                                     UiState.vizEffectAutoOff = false;
-                                    Exec.sh("printf '" + parent.modelData.id + "' > /home/biyuan/.cache/by-mgr/qs-vizeffect");
+                                    Exec.sh("printf '" + parent.modelData.id + "' > " + Quickshell.env("HOME") + "/.cache/by-mgr/qs-vizeffect");
                                 }
                             }
                         }
