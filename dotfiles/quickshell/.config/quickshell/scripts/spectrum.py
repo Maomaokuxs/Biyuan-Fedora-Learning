@@ -33,19 +33,23 @@ FALL = 0.06  # 下落固定速度/帧（12Hz 下全幅约 1.4s）：针式表的
 
 def resolve_monitor():
     try:
-        out = subprocess.run(
+        sinks = subprocess.run(
             ["pactl", "list", "sinks", "short"],
-            capture_output=True, text=True, timeout=5).stdout
-        for line in out.splitlines():
-            p = line.split()
-            if len(p) >= 3 and p[-1] == "RUNNING":
-                name = p[1]
-                return name if name.endswith(".monitor") else name + ".monitor"
-        out = subprocess.run(
+            capture_output=True, text=True, timeout=5).stdout.splitlines()
+        default_sink = subprocess.run(
             ["pactl", "get-default-sink"],
             capture_output=True, text=True, timeout=5).stdout.strip()
-        if out:
-            return out if out.endswith(".monitor") else out + ".monitor"
+        running = []
+        for line in sinks:
+            p = line.split()
+            if len(p) < 3:
+                continue
+            if p[1] == default_sink:
+                return p[0]
+            if p[-1] == "RUNNING":
+                running.append(p[0])
+        if running:
+            return running[0]
     except Exception:
         pass
     return None
