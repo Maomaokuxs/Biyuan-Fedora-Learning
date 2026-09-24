@@ -85,7 +85,7 @@ install_desktop_niri() {
         fastfetch jq awww hellwal 
         waypaper starship hyprlock hypridle 
         gpu-screen-recorder libnotify mako 
-        grim slurp ImageMagick wl-clipboard copyq 
+        grim slurp ImageMagick wl-clipboard copyq hyprpicker
         fcitx5 fcitx5-chinese-addons 
         xdg-desktop-portal-kde xdg-desktop-portal-wlr
         polkit-kde firefox cava dolphin gwenview
