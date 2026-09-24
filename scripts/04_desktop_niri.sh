@@ -38,6 +38,8 @@ install_desktop_niri() {
         echo -e "${RED}❌ Failed to enable Starship repository.${NC}"
     fi
 
+    # 注：biyuan/software 已在 02_base_env.sh（字体阶段）启用，这里不再重复。
+
     # --- 4. 安装 Niri 及桌面/视觉生态组件 ---
     echo -e "${YELLOW}>> Setting up multimedia and recording environment...${NC}"
     
@@ -70,7 +72,7 @@ install_desktop_niri() {
     # kwallet libsecret（密钥及管理工具）ncdu(终端磁盘文件占用查看器) ranger（终端文件管理器）
     
     local niri_pkgs=(
-        niri waybar rofi-wayland stow unzip kitty 
+        niri waybar quickshell rofi-wayland stow unzip kitty 
         fastfetch jq awww hellwal 
         waypaper starship hyprlock hypridle 
         gpu-screen-recorder libnotify mako 
@@ -84,8 +86,22 @@ install_desktop_niri() {
     )
 
     echo -e "${YELLOW}>> Deploying Niri ecosystem components...${NC}"
-    # 使用 --skip-unavailable 增强容错性
+    # 使用 --skip-unavailable 增强容错性（缺包不炸，但下面验出来点名）
     sudo dnf install -y "${niri_pkgs[@]}" --skip-unavailable
+
+    # --- 4.0 装完验包：--skip-unavailable 会静默跳过，缺啥点名，不带过 ---
+    echo -e "${CYAN}>> Verifying packages...${NC}"
+    local miss_pkgs=()
+    for p in "${niri_pkgs[@]}"; do
+        rpm -q "$p" &>/dev/null || miss_pkgs+=("$p")
+    done
+    if [ ${#miss_pkgs[@]} -eq 0 ]; then
+        echo -e "${GREEN}✅ All packages installed.${NC}"
+    else
+        echo -e "${YELLOW}⚠️  以下包缺失（源里没有或网络失败），请手动补装：${NC}"
+        printf '   - %s\n' "${miss_pkgs[@]}"
+        echo -e "${CYAN}   sudo dnf install -y ${miss_pkgs[*]}${NC}"
+    fi
 
     # --- 4.1 KDE/Qt 配色读取基石: plasma-integration ---
     # 提供 Qt6 的 KDE plasma 平台主题 (KDEPlasmaPlatformTheme6.so),
@@ -94,6 +110,20 @@ install_desktop_niri() {
     # plasma-desktop / plasma-workspace / kwin / ibus / vlc (= 整个 KDE)。
     echo -e "${YELLOW}>> Installing plasma-integration (KDE/Qt color scheme bridge)...${NC}"
     sudo dnf install -y --setopt=install_weak_deps=False plasma-integration
+
+    # --- 4.2 禁掉 xwaylandvideobridge 自启：它是 xdg-desktop-portal-kde 的依赖，
+    # 开机即占一个黑窗口（Wayland→X11 推流桥），纯 Wayland 会话用不上；
+    # 有 X11 投屏需求时手动起即可（D-Bus 按需也能拉起，不删包）
+    echo -e "${CYAN}>> Disabling xwaylandvideobridge autostart (black window on niri)...${NC}"
+    mkdir -p "$HOME/.config/autostart"
+    if [ -f /etc/xdg/autostart/org.kde.xwaylandvideobridge.desktop ]; then
+        cp -f /etc/xdg/autostart/org.kde.xwaylandvideobridge.desktop "$HOME/.config/autostart/" 2>/dev/null
+        grep -q "^Hidden=true" "$HOME/.config/autostart/org.kde.xwaylandvideobridge.desktop" 2>/dev/null \
+            || echo "Hidden=true" >> "$HOME/.config/autostart/org.kde.xwaylandvideobridge.desktop"
+        echo -e "${GREEN}✅ xwaylandvideobridge autostart disabled.${NC}"
+    else
+        echo -e "${CYAN}>> No videobridge autostart file, skipping.${NC}"
+    fi
 
     echo -e "\n${BLUE}-----------------------------------------------------${NC}"
     
