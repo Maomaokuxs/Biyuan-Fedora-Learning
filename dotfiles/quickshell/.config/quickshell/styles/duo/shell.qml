@@ -70,6 +70,7 @@ ShellRoot {
         property string clipT: ""
         property string screenT: ""
         Process {
+            id: fastProc
             running: true
             command: [lab.shRoot + "/bar-fast.sh"]
             stdout: SplitParser {
@@ -154,6 +155,8 @@ ShellRoot {
         }
         Timer { interval: 30000; running: true; repeat: true; onTriggered: extBriProc.running = true }
         Component.onCompleted: { extBriProc.running = true; updatesProc.running = true; weatherProc.running = true; batProc.running = true; }
+        // 聚合轮询（线上 BarState 同款：bar-fast.sh 单次输出，2s 重拉一次）
+        Timer { interval: 2000; running: true; repeat: true; onTriggered: { if (!fastProc.running) fastProc.running = true; } }
         // 工作区
         property var wsList: []
         Process {
