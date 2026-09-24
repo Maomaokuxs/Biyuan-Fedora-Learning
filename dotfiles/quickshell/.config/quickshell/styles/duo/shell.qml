@@ -1,8 +1,10 @@
 //@ pragma UseQApplication
 import QtQuick
 import Quickshell
+import Quickshell.Wayland
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import Quickshell.Services.Notifications
 import Quickshell.Services.SystemTray
 import Quickshell.Widgets
 
@@ -29,6 +31,14 @@ ShellRoot {
         Behavior on cAccent { ColorAnimation { duration: 800; easing.type: Easing.InOutCubic } }
         Behavior on cMuted { ColorAnimation { duration: 800; easing.type: Easing.InOutCubic } }
         property string font: "JetBrainsMono Nerd Font"
+        property var notifServer: NotificationServer {
+            onNotification: n => {
+                n.tracked = true;
+            }
+        }
+        function cleanText(value) {
+            return String(value || "").replace(/<[^>]*>/g, "");
+        }
         property string shRoot: Quickshell.shellDir + "/../../scripts"
         property string niriScripts: Quickshell.env("HOME") + "/.config/niri/scripts"
         property var now: new Date()
@@ -69,6 +79,27 @@ ShellRoot {
         property string pickT: ""
         property string clipT: ""
         property string screenT: ""
+        property bool recording: false
+        property bool recBlink: true
+        Process {
+            id: recordingProbe
+            command: ["bash", "-c", "if [ -e /tmp/recording_status ]; then printf 1; else printf 0; fi"]
+            stdout: StdioCollector {
+                onStreamFinished: lab.recording = String(text).trim() === "1"
+            }
+        }
+        Timer {
+            interval: 1000
+            running: true
+            repeat: true
+            onTriggered: recordingProbe.running = true
+        }
+        Timer {
+            interval: 800
+            running: lab.recording
+            repeat: true
+            onTriggered: lab.recBlink = !lab.recBlink
+        }
         Process {
             id: fastProc
             running: true
@@ -154,7 +185,7 @@ ShellRoot {
             }
         }
         Timer { interval: 30000; running: true; repeat: true; onTriggered: extBriProc.running = true }
-        Component.onCompleted: { extBriProc.running = true; updatesProc.running = true; weatherProc.running = true; batProc.running = true; }
+        Component.onCompleted: { recordingProbe.running = true; extBriProc.running = true; updatesProc.running = true; weatherProc.running = true; batProc.running = true; }
         // 聚合轮询（线上 BarState 同款：bar-fast.sh 单次输出，2s 重拉一次）
         Timer { interval: 2000; running: true; repeat: true; onTriggered: { if (!fastProc.running) fastProc.running = true; } }
         // 工作区
@@ -280,7 +311,7 @@ ShellRoot {
                         var full = a !== "" ? t + " - " + a : t;
                         txt = full.length <= 18 ? full : full.slice(0, 15) + "...";
                         if (txt !== "")
-                            txt = (playing ? "♪ " : "❚❚ ") + txt;
+                            txt = (playing ? "\uF04B " : "\uF04C ") + txt;
                     }
                 } catch (e3) {}
                 lab.playing = playing;
@@ -508,7 +539,10 @@ ShellRoot {
                             anchors.centerIn: parent
                             spacing: 8
                         Text {
+                            id: recIcon
                             text: lab.recT; visible: text !== ""
+                            opacity: lab.recording ? (lab.recBlink ? 1 : 0.3) : 1
+                            Behavior on opacity { NumberAnimation { duration: 260; easing.type: Easing.InOutQuad } }
                             font.family: lab.font; font.pixelSize: 15; color: lab.cFg
                             anchors.verticalCenter: parent.verticalCenter
                             MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", Quickshell.env("HOME") + "/.config/rofi/scripts/recorder.sh"]) }
@@ -707,6 +741,7 @@ ShellRoot {
                     }
                     // 播放键胶囊（大一号好点）
                     Rectangle {
+                        visible: lab.songT !== "" || lab.playing
                         height: 28
                         width: mprisRow.implicitWidth + 26
                         radius: 14
@@ -920,6 +955,79 @@ ShellRoot {
                             anchors.verticalCenter: parent.verticalCenter
                             MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", Quickshell.env("HOME") + "/.config/rofi/scripts/powermenu.sh"]) }
                         }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+        PanelWindow {
+            required property var modelData
+            screen: modelData
+            visible: modelData.isMainScreen !== false && lab.notifServer.trackedNotifications.values.length > 0
+            anchors { top: true; right: true }
+            margins { top: 52; right: 12 }
+            implicitWidth: 380
+            implicitHeight: notifCol.implicitHeight
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+
+            Column {
+                id: notifCol
+                anchors { top: parent.top; right: parent.right }
+                spacing: 8
+                Repeater {
+                    model: lab.notifServer.trackedNotifications.values.slice(-3)
+                    Rectangle {
+                        id: duoToast
+                        required property var modelData
+                        width: 380
+                        height: toastCol.implicitHeight + 20
+                        radius: 12
+                        color: lab.cBg
+                        border.width: 1
+                        border.color: lab.cAccent
+                        Column {
+                            id: toastCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
+                            spacing: 3
+                            Text {
+                                width: parent.width
+                                text: lab.cleanText(modelData.summary) || "(无标题)"
+                                font.family: lab.font
+                                font.pixelSize: 13
+                                font.bold: true
+                                color: lab.cFg
+                                elide: Text.ElideRight
+                            }
+                            Text {
+                                width: parent.width
+                                visible: lab.cleanText(modelData.body) !== ""
+                                text: lab.cleanText(modelData.body)
+                                font.family: lab.font
+                                font.pixelSize: 12
+                                color: lab.cFg
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 3
+                                elide: Text.ElideRight
+                            }
+                        }
+                        Timer {
+                            interval: {
+                                var timeout = Number(modelData.expireTimeout);
+                                return (timeout > 0 ? Math.min(timeout / 1000, 30) : 5) * 1000;
+                            }
+                            running: true
+                            onTriggered: modelData.dismiss()
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: modelData.dismiss()
                         }
                     }
                 }
