@@ -47,7 +47,10 @@ mkdir -p "$WALL_DEST_DIR"
 FINAL_WALLPAPER="$WALL_DEST_DIR/$DEFAULT_WALL_NAME"
 
 # 【极简拦截逻辑】：定义缓存并进行存在性检查
+# 双锁语义：import 锁只管壁纸导入（一次）；init 锁要求图形下 theme-sync 成功，
+# 无头装机（无 WAYLAND_DISPLAY）只做导入+配色、不落 init 锁，首次图形登录重跑渲染
 CACHE_DIR="$HOME/.cache/by-mgr"
+IMPORT_LOCK="$CACHE_DIR/wallpaper_import.lock"
 INIT_LOCK="$CACHE_DIR/wallpaper_init.lock"
 mkdir -p "$CACHE_DIR"
 
@@ -99,10 +102,16 @@ if [ -f "$THEME_SYNC_SCRIPT" ]; then
     echo ">> Found visual engine: $THEME_SYNC_SCRIPT"
     chmod +x "$THEME_SYNC_SCRIPT"
     # 使用 bash 调用确保稳定性
+    touch "$IMPORT_LOCK"
     bash "$THEME_SYNC_SCRIPT" "$FINAL_WALLPAPER"
-    # 主题同步成功后创建锁文件，确保下次不再重复执行
-    touch "$INIT_LOCK"
-    echo -e "\033[0;32m✅ Initialization lock created: $INIT_LOCK\033[0m"
+    SYNC_RC=$?
+    # 只有图形会话下成功才落 init 锁；无头装机下次图形登录由 niri 自启重跑
+    if [ $SYNC_RC -eq 0 ] && [ -n "$WAYLAND_DISPLAY" ]; then
+        touch "$INIT_LOCK"
+        echo -e "\033[0;32m✅ Initialization lock created: $INIT_LOCK\033[0m"
+    else
+        echo -e "\033[0;33m⚠️  本次未落 init 锁（rc=$SYNC_RC WAYLAND=${WAYLAND_DISPLAY:-none}），首次图形登录会重跑。\033[0m"
+    fi
 else
     echo -e "\033[0;31m⚠️  Error: Cannot locate engine at $THEME_SYNC_SCRIPT\033[0m"
     # 最后的保命逻辑：尝试从当前已安装的配置目录查找
