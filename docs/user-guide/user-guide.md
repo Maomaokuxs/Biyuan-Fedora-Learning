@@ -30,11 +30,11 @@ chmod +x install.sh
 
       waybar：优点是资源占用小，启动速度快，缺点就是动画简单没有那么华丽。
 
-      ![waybar](waybar.png)
+      ![waybar](images/waybar.png)
 
       quickshell：优点是扩展丰富，并且本身就支持弹窗，非常的方便，动画更加优雅，缺点是占用比waybar高。
 
-      ![quickshell](quickshell.png)
+      ![quickshell](images/quickshell.png)
 
     - 使用
 
@@ -42,7 +42,7 @@ chmod +x install.sh
 
       右键点击左侧 Fedora 徽标或电源开关可以隐藏很多小工具，在重启之后不取消隐藏状态。
 
-      ![HideTools](HideTools.gif)
+      ![HideTools](images/HideTools.gif)
 
       - 工具
 
@@ -52,11 +52,11 @@ chmod +x install.sh
 
         - 录屏
 
-      ![Screenrecording.png](Screenrecording.png)
+      ![Screenrecording.png](images/Screenrecording.png)
 
         - 壁纸
 
-      ![Wallpaper](Wallpaper.png)
+      ![Wallpaper](images/Wallpaper.png)
 
         - 天气
 
@@ -94,7 +94,7 @@ chmod +x install.sh
 
     其担任了应用启动器，媒体管理器，电源菜单，屏幕管理器，录屏管理器的功能，不需要过多的介绍，需要使用时会自然弹出，部分组件可看下图。
 
-    ![Screenrecording.png](Screenrecording.png)
+    ![Screenrecording.png](images/Screenrecording.png)
 
 4. kitty、fastfetch 及 starship
 
@@ -102,7 +102,7 @@ chmod +x install.sh
 
     加上窗口模糊及透明效果，及光标移动动画，starship 美化终端提示符，fastfetch 快速抓取主机信息丰富终端体验，诸如此类还有 btop 资源管理器，nmtui 网络管理器，ncdu 存储管理器等等。
 
-    ![kitty](kitty.png)
+    ![kitty](images/kitty.png)
 
 5. 壁纸
 
@@ -110,4 +110,4 @@ chmod +x install.sh
 
     前面提及可以使用快捷键位 Mod + B 调用 waypaper 来切换壁纸，其次是 quickshell 中的壁纸模块切换，如果喜欢随机壁纸可以使用快捷键，Ctrl + Alt + W ，需要着重介绍是因为整个主题会因为壁纸的不同配色发生改变，借助了 waypaper，quickshell，waybar，awww（原swww），kde-material-you-colors 以及仓库中的脚本，可以联动：Niri 边框、Waybar、Rofi、Kitty、Starship、Neovim、Cava、Hyprlock、KDE 、通知（Mako/QuickShell）、Fcitx5 输入法皮肤。
 
-    ![WallpaperSwitching](WallpaperSwitching.gif)
+    ![WallpaperSwitching](images/WallpaperSwitching.gif)
