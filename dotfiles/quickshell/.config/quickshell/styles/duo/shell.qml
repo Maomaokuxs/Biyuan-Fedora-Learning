@@ -29,13 +29,13 @@ ShellRoot {
         Behavior on cAccent { ColorAnimation { duration: 800; easing.type: Easing.InOutCubic } }
         Behavior on cMuted { ColorAnimation { duration: 800; easing.type: Easing.InOutCubic } }
         property string font: "JetBrainsMono Nerd Font"
-        property string shRoot: "/home/biyuan/.config/quickshell/scripts"
-        property string niriScripts: "/home/biyuan/.config/niri/scripts"
+        property string shRoot: Quickshell.shellDir + "/../../scripts"
+        property string niriScripts: Quickshell.env("HOME") + "/.config/niri/scripts"
         property var now: new Date()
         Timer { interval: 1000; running: true; repeat: true; onTriggered: lab.now = new Date() }
         FileView {
             id: palView
-            path: "/home/biyuan/.cache/by-mgr/hellwal/global-palette.env"
+            path: Quickshell.env("HOME") + "/.cache/by-mgr/hellwal/global-palette.env"
             onLoaded: lab.applyPalette(palView.text())
         }
         Timer {
@@ -213,7 +213,7 @@ ShellRoot {
         }
         function applyWall(fileUrl) {
             var p = String(fileUrl).replace(/^file:\/\//, "");
-            lab.runCmd(["bash", "-c", "bash /home/biyuan/.config/niri/scripts/theme-sync.sh " + lab.shQ(p)]);
+            lab.runCmd(["bash", "-c", "bash " + lab.niriScripts + "/theme-sync.sh " + lab.shQ(p)]);
         }
         Process {
             id: wallListProc
@@ -231,14 +231,14 @@ ShellRoot {
         }
         Process {
             id: wallCurProc
-            command: ["bash", "-c", "cat /home/biyuan/.cache/by-mgr/last-wallpaper 2>/dev/null"]
+            command: ["bash", "-c", "cat " + Quickshell.env("HOME") + "/.cache/by-mgr/last-wallpaper 2>/dev/null"]
             stdout: StdioCollector {
                 onStreamFinished: { lab.wallCurrent = String(text).trim(); }
             }
         }
         // 风格切换菜单：absolute 路径调 bar-lab 的 qs-switch（风格除 duo 外都在那边）
         property bool styleMenuOpen: false
-        property string qsSwitch: "/home/biyuan/Documents/quickshell/bar-lab/qs-switch.sh"
+        property string qsSwitch: Quickshell.shellDir + "/qs-switch.sh"
         function styleGo(name) {
             lab.styleMenuOpen = false;
             lab.runCmd(["bash", lab.qsSwitch, name]);
@@ -511,7 +511,7 @@ ShellRoot {
                             text: lab.recT; visible: text !== ""
                             font.family: lab.font; font.pixelSize: 15; color: lab.cFg
                             anchors.verticalCenter: parent.verticalCenter
-                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", "/home/biyuan/.config/rofi/scripts/recorder.sh"]) }
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", Quickshell.env("HOME") + "/.config/rofi/scripts/recorder.sh"]) }
                         }
                         Text {
                             text: lab.shotT; visible: text !== ""
@@ -918,7 +918,7 @@ ShellRoot {
                             text: "⏻"; font.pixelSize: 15
                             font.family: lab.font; color: lab.cFg
                             anchors.verticalCenter: parent.verticalCenter
-                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", "/home/biyuan/.config/rofi/scripts/powermenu.sh"]) }
+                            MouseArea { anchors.fill: parent; onClicked: lab.runCmd(["bash", Quickshell.env("HOME") + "/.config/rofi/scripts/powermenu.sh"]) }
                         }
                         }
                     }
