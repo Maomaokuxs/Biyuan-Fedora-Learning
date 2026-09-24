@@ -236,9 +236,9 @@ ShellRoot {
                 onStreamFinished: { lab.wallCurrent = String(text).trim(); }
             }
         }
-        // 风格切换菜单：absolute 路径调 bar-lab 的 qs-switch（风格除 duo 外都在那边）
+        // 风格切换菜单：调 styles/ 下的 qs-switch（和 duo 同仓）
         property bool styleMenuOpen: false
-        property string qsSwitch: Quickshell.shellDir + "/qs-switch.sh"
+        property string qsSwitch: Quickshell.shellDir + "/../qs-switch.sh"
         function styleGo(name) {
             lab.styleMenuOpen = false;
             lab.runCmd(["bash", lab.qsSwitch, name]);
