@@ -106,14 +106,27 @@ setup_base() {
     echo -e "${YELLOW}>> Initializing standard user directories...${NC}"
     sudo dnf install -y xdg-user-dirs
 
-    # 通过导出当前 LANG 变量，强制 xdg-user-dirs-update 识别系统语言
-    # 这会确保生成的文件夹名称与你当前的系统语言完美匹配
-    export LANG=$(localectl status | grep "System Locale" | cut -d= -f2)
-    
-    echo -e "${CYAN}>> Detected locale: $LANG. Syncing directories...${NC}"
-    
-    # 使用 --force 确保即使在非桌面环境下也能根据语言生成目录
-    xdg-user-dirs-update --force
+    # 强制英文家目录：不跟随系统 locale，避免生成 桌面/文档 等中文目录
+    # （终端、脚本、waypaper 全用英文路径；GNOME 登录时只补缺失不改名，不会弹回去）
+    echo -e "${CYAN}>> Forcing English user directories (LANG=C for xdg only)...${NC}"
+
+    # 使用 --force 确保即使在非桌面环境下也能生成目录（LANG 只作用于这一行，不污染后续输出语言）
+    LANG=C xdg-user-dirs-update --force
+
+    # 已存在中文目录时搬内容合并，避免中英两套并存（mv -n 不覆盖已有文件）
+    # 删除前必须验空（含隐藏文件）：非空一律保留并告警，绝不强删
+    for pair in "桌面:Desktop" "文档:Documents" "下载:Downloads" "图片:Pictures" "音乐:Music" "视频:Videos" "公共:Public" "模板:Templates"; do
+        zh="$HOME/${pair%%:*}"; en="$HOME/${pair##*:}"
+        if [ -d "$zh" ] && [ "$zh" != "$en" ]; then
+            mkdir -p "$en"
+            mv -n "$zh"/* "$en"/ 2>/dev/null
+            if [ -z "$(ls -A "$zh" 2>/dev/null)" ]; then
+                rmdir "$zh" && echo -e "${GREEN}✅ Merged $zh -> $en${NC}"
+            else
+                echo -e "${YELLOW}⚠️  $zh 非空已保留，请手动确认残留文件后再删${NC}"
+            fi
+        fi
+    done
 
     # 验证并创建自定义的额外路径
     # 注意：这里我们手动创建的路径建议保持英文，方便终端 CD 操作，不建议随语言改变
