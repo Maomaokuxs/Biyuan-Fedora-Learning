@@ -20,4 +20,10 @@ while pgrep -x quickshell >/dev/null 2>&1 && [ $i -lt 25 ]; do
     sleep 0.2
     i=$((i + 1))
 done
+# quickshell 未安装时回落 waybar，避免无栏可用（最小化安装常缺 quickshell 包）
+if ! command -v quickshell &>/dev/null; then
+    pkill -x waybar 2>/dev/null
+    waybar & disown
+    exit 0
+fi
 quickshell -p "$dir" -d -n & disown
