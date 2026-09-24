@@ -59,7 +59,8 @@ start_record() {
 
     if [ "$fmt" == "gif" ]; then
         local target_out="$SAVE_DIR/rec_$timestamp.gif"
-        out="/tmp/gif_tmp_$timestamp.mp4"
+        # GIF 中间源放磁盘（/tmp 是内存盘，长录制会吃光内存卡死），隐藏防误触，转完即删
+        out="$SAVE_DIR/.tmp_gif_$timestamp.mp4"
     fi
 
     local gsr_args=(-f 60 -a "default_output" -o "$out")
@@ -108,11 +109,17 @@ start_record() {
 
     notify-send "󰑊 录制开始" "格式: ${fmt^^} | $notify_msg" -t 2000 -a "Recorder"
 
-    # 计时子进程
+    # 计时子进程（10 分钟提醒一次，只提醒不停录）
     (
+        local reminded=false
         while pgrep -f "gpu-screen-recorder" > /dev/null; do
             now=$(date +%s)
             elapsed=$((now - start_time))
+            # 10 分钟提醒一次（只提醒不停录）
+            if [ "$reminded" = false ] && [ "$elapsed" -ge 600 ]; then
+                reminded=true
+                notify-send "󰑊 录制中" "已录 10 分钟，别忘了停" -t 5000 -a "Recorder"
+            fi
             printf "%02d:%02d" $((elapsed / 60)) $((elapsed % 60)) > "$STATUS_FILE"
             refresh_waybar
             sleep 1
