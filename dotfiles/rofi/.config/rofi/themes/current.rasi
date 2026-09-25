@@ -6,6 +6,7 @@
 
 * {
     /* 定义变量：这样你改颜色只需要改这里 */
+    font: "Sarasa Gothic SC 12";
     background-color: transparent;
     text-color: @fg;
     margin: 0;
