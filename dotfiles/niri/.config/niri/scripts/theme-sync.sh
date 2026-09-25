@@ -287,6 +287,33 @@ print('#%02x%02x%02x' % tuple(round(c*0.65 + 255*0.35) for c in (r, g, b)))
 PY
 )
     _debug "kitty day bg=$KITTY_BG"
+else
+    read BG FG < <(python3 - "$BG" "$FG" <<'PY'
+import sys
+
+def lum(h):
+    h = h.lstrip('#')
+    lin = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (lin(int(h[i:i + 2], 16) / 255) for i in (0, 2, 4))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+def ratio(a, b):
+    la, lb = sorted((lum(a), lum(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+def mix(c1, c2, t):
+    c1, c2 = c1.lstrip('#'), c2.lstrip('#')
+    return '#' + ''.join(f'{round(int(c1[i:i+2], 16) * (1-t) + int(c2[i:i+2], 16) * t):02x}' for i in (0, 2, 4))
+
+bg, fg = sys.argv[1:3]
+if lum(bg) > 0.22:
+    bg = mix(bg, '#101216', 0.78)
+if ratio(fg, bg) < 4.5:
+    fg = '#f5f5f5' if lum(bg) < 0.4 else '#1a1a1a'
+print(bg, fg)
+PY
+)
+    _debug "night contrast theme: BG=$BG FG=$FG"
 fi
 
 if [[ ! "$BG" =~ ^# ]] || [[ ! "$ACCENT" =~ ^# ]]; then
@@ -734,6 +761,31 @@ fi
 
 # 慢任务后置：fcitx 皮肤+重启又慢又闪输入法，等前端信号全发完再做
 # --- J. Fcitx5 (waybar-hud 浅+深两套皮肤：读中央库 global-palette.env 重生成) ---
+fcitx_full_reload() {
+    if pgrep -x fcitx5 >/dev/null 2>&1; then
+        fcitx5-remote -e >/dev/null 2>&1 || true
+        for _ in $(seq 1 50); do
+            pgrep -x fcitx5 >/dev/null 2>&1 || break
+            sleep 0.1
+        done
+    fi
+    setsid fcitx5 -d >/dev/null 2>&1 </dev/null &
+    for _ in $(seq 1 30); do
+        if fcitx5-remote --check >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+FCITX_CONF="$HOME/.config/fcitx5/conf/classicui.conf"
+if [ -f "$FCITX_CONF" ]; then
+    FCITX_THEME="hud-paper"
+    $THEME_NIGHT && FCITX_THEME="hud-paper-dark"
+    sed -i "s/^Theme=.*/Theme=$FCITX_THEME/" "$FCITX_CONF"
+    sed -i "s/^DarkTheme=.*/DarkTheme=$FCITX_THEME/" "$FCITX_CONF"
+    sed -i 's/^UseDarkTheme=.*/UseDarkTheme=False/' "$FCITX_CONF"
+fi
 FCITX_SYNC="${FCITX_SYNC:-$HOME/.config/quickshell/scripts/fcitx5/sync-waybar.sh}"
 if [ -x "$FCITX_SYNC" ]; then
     # 9>&-：断掉锁 fd 的继承。setsid 起的 fcitx5 是长驻进程，
@@ -744,7 +796,12 @@ if [ -x "$FCITX_SYNC" ]; then
 else
     echo "   未找到 fcitx5 皮肤生成器 ($FCITX_SYNC)，跳过 Fcitx5 配色"
 fi
-
+if [ -f "$FCITX_CONF" ]; then
+    fcitx5-remote -r >/dev/null 2>&1 || true
+fi
+if [ "${FCITX_FULL_RELOAD:-0}" = "1" ]; then
+    fcitx_full_reload || echo "   Fcitx5 完整重载失败"
+fi
 
 # 正常完成（_debug 在 DEBUG=false 时返回非零，不代表失败）
 exit 0

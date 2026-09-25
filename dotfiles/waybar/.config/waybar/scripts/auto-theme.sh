@@ -19,9 +19,9 @@ apply_day() {
     sed -i 's/^gtk-application-prefer-dark-theme=.*/gtk-application-prefer-dark-theme=false/' ~/.config/gtk-3.0/settings.ini 2>/dev/null
     sed -i 's/^gtk-application-prefer-dark-theme=.*/gtk-application-prefer-dark-theme=false/' ~/.config/gtk-4.0/settings.ini 2>/dev/null
     if plasma-apply-colorscheme -l 2>/dev/null | grep -q "MaterialYouLight"; then
-        plasma-apply-colorscheme MaterialYouLight 2>/dev/null &
+        plasma-apply-colorscheme MaterialYouLight 2>/dev/null
     else
-        plasma-apply-colorscheme BreezeLight 2>/dev/null &
+        plasma-apply-colorscheme BreezeLight 2>/dev/null
     fi
 }
 
@@ -30,9 +30,9 @@ apply_night() {
     sed -i 's/^gtk-application-prefer-dark-theme=.*/gtk-application-prefer-dark-theme=true/' ~/.config/gtk-3.0/settings.ini 2>/dev/null
     sed -i 's/^gtk-application-prefer-dark-theme=.*/gtk-application-prefer-dark-theme=true/' ~/.config/gtk-4.0/settings.ini 2>/dev/null
     if plasma-apply-colorscheme -l 2>/dev/null | grep -q "MaterialYouDark"; then
-        plasma-apply-colorscheme MaterialYouDark 2>/dev/null &
+        plasma-apply-colorscheme MaterialYouDark 2>/dev/null
     else
-        plasma-apply-colorscheme BreezeDark 2>/dev/null &
+        plasma-apply-colorscheme BreezeDark 2>/dev/null
     fi
 }
 
@@ -56,11 +56,11 @@ fi
 # 自动纠正：仅当目标与当前不一致时切换，并重跑取色联动配色
 if [ "$TARGET" = "day" ] && [ "$CURRENT" = "'prefer-dark'" ]; then
     apply_day
-    bash ~/.config/niri/scripts/theme-sync.sh &>/dev/null &
+    FCITX_FULL_RELOAD=1 bash ~/.config/niri/scripts/theme-sync.sh &>/dev/null &
     CURRENT="'default'"
 elif [ "$TARGET" = "night" ] && [ "$CURRENT" != "'prefer-dark'" ]; then
     apply_night
-    bash ~/.config/niri/scripts/theme-sync.sh &>/dev/null &
+    FCITX_FULL_RELOAD=1 bash ~/.config/niri/scripts/theme-sync.sh &>/dev/null &
     CURRENT="'prefer-dark'"
 fi
 
