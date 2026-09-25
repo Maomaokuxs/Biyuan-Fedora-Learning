@@ -33,6 +33,19 @@ ShellRoot {
         property string font: "JetBrainsMono Nerd Font"
         property var notifServer: NotificationServer {
             onNotification: n => {
+                var hints = {};
+                try { hints = n.hints || {}; } catch (e) {}
+                var desktop = "";
+                try { desktop = n.desktopEntry || ""; } catch (e2) {}
+                var app = "";
+                try { app = n.appName || ""; } catch (e3) {}
+                var summary = "";
+                try { summary = n.summary || ""; } catch (e4) {}
+                if (desktop === "org.kde.kded6"
+                        || hints["x-kde-appname"] === "kwrited"
+                        || app === "本地系统消息服务"
+                        || summary === "本地系统消息服务")
+                    return;
                 n.tracked = true;
             }
         }
@@ -185,7 +198,18 @@ ShellRoot {
             }
         }
         Timer { interval: 30000; running: true; repeat: true; onTriggered: extBriProc.running = true }
-        Component.onCompleted: { recordingProbe.running = true; extBriProc.running = true; updatesProc.running = true; weatherProc.running = true; batProc.running = true; }
+        Component.onCompleted: {
+            recordingProbe.running = true;
+            extBriProc.running = true;
+            updatesProc.running = true;
+            weatherProc.running = true;
+            batProc.running = true;
+            if (Quickshell.env("QS_WALLPAPER_SHOWCASE") === "1") {
+                lab.wallMenuOpen = true;
+                lab.wallStyle = 0;
+                lab.wallShowcase = true;
+            }
+        }
         // 聚合轮询（线上 BarState 同款：bar-fast.sh 单次输出，2s 重拉一次）
         Timer { interval: 2000; running: true; repeat: true; onTriggered: { if (!fastProc.running) fastProc.running = true; } }
         // 工作区
@@ -236,6 +260,10 @@ ShellRoot {
         property bool wallMenuOpen: false
         property var wallFiles: []
         property string wallCurrent: ""
+        property real wallAnchorX: 0
+        property string wallAnchorScreen: ""
+        property int wallStyle: 0
+        property bool wallShowcase: false
         function openWall() {
             lab.wallFiles = [];
             lab.wallMenuOpen = true;
@@ -245,6 +273,28 @@ ShellRoot {
         function applyWall(fileUrl) {
             var p = String(fileUrl).replace(/^file:\/\//, "");
             lab.runCmd(["bash", "-c", "bash " + lab.niriScripts + "/theme-sync.sh " + lab.shQ(p)]);
+        }
+        function currentWall() {
+            for (var i = 0; i < lab.wallFiles.length; i++) {
+                var u = String(lab.wallFiles[i].url);
+                if ("file://" + lab.wallCurrent === u || lab.wallCurrent === u.replace(/^file:\/\//, ""))
+                    return lab.wallFiles[i];
+            }
+            return lab.wallFiles[0] || null;
+        }
+        function cycleWallStyle() {
+            lab.wallStyle = (lab.wallStyle + 1) % 3;
+        }
+        Timer {
+            id: wallShowcaseTimer
+            interval: Number(Quickshell.env("QS_WALLPAPER_SHOWCASE_INTERVAL")) || 5000
+            running: lab.wallMenuOpen && lab.wallShowcase
+            repeat: true
+            onTriggered: {
+                lab.wallStyle = (lab.wallStyle + 1) % 3;
+                if (lab.wallStyle === 0)
+                    lab.wallShowcase = false;
+            }
         }
         Process {
             id: wallListProc
@@ -629,6 +679,7 @@ ShellRoot {
                             anchors.centerIn: parent
                             spacing: 8
                         Text {
+                            id: wallButton
                             text: "\uF03E"; font.pixelSize: 15
                             font.family: lab.font; color: lab.cFg
                             anchors.verticalCenter: parent.verticalCenter
@@ -636,10 +687,16 @@ ShellRoot {
                                 anchors.fill: parent
                                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                                 onClicked: mouse => {
-                                    if (mouse.button === Qt.RightButton)
+                                    if (mouse.button === Qt.RightButton) {
                                         lab.runCmd(["waypaper"]);
-                                    else
+                                    } else if (lab.wallMenuOpen) {
+                                        lab.wallMenuOpen = false;
+                                    } else {
+                                        var p = wallButton.mapToItem(leftIsland, wallButton.width / 2, 0);
+                                        lab.wallAnchorX = leftIsland.x + p.x;
+                                        lab.wallAnchorScreen = modelData.name;
                                         lab.openWall();
+                                    }
                                 }
                             }
                         }
@@ -1118,19 +1175,37 @@ ShellRoot {
         PanelWindow {
             required property var modelData
             screen: modelData
-            visible: lab.wallMenuOpen
-            anchors { top: true; bottom: true; left: true; right: true }
+            visible: lab.wallMenuOpen && (lab.wallAnchorScreen === "" || lab.wallAnchorScreen === modelData.name)
+            anchors { top: true; left: true }
+            margins { top: 52; left: Math.max(12, lab.wallAnchorX - 300) }
+            implicitWidth: 600
+            implicitHeight: 450
             exclusionMode: ExclusionMode.Ignore
             color: "transparent"
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
-            MouseArea {
-                anchors.fill: parent
-                onClicked: lab.wallMenuOpen = false
-            }
-            Rectangle {
+            WallpaperPicker {
                 anchors.centerIn: parent
-                width: 560
-                height: 480
+                visible: lab.wallMenuOpen
+                width: 600
+                height: 450
+                entries: lab.wallFiles
+                currentPath: lab.wallCurrent
+                backgroundColor: lab.cBg
+                foregroundColor: lab.cFg
+                accentColor: lab.cAccent
+                mutedColor: lab.cMuted
+                onApplyRequested: url => lab.applyWall(url)
+                onRandomRequested: lab.runCmd(["bash", lab.niriScripts + "/wallpaper.sh"])
+                onCloseRequested: lab.wallMenuOpen = false
+            }
+
+            Rectangle {
+                visible: false
+                anchors.centerIn: parent
+                width: 420
+                height: 300
                 radius: 18
                 color: Qt.alpha(lab.cBg, 0.97)
                 border.width: 1
@@ -1140,8 +1215,8 @@ ShellRoot {
                     onClicked: mouse => mouse.accepted = true
                 }
                 Column {
-                    anchors { top: parent.top; left: parent.left; right: parent.right; margins: 18; topMargin: 16 }
-                    spacing: 10
+                    anchors { top: parent.top; left: parent.left; right: parent.right; margins: 14; topMargin: 12 }
+                    spacing: 8
                     Row {
                         width: parent.width
                         height: 28
@@ -1149,11 +1224,30 @@ ShellRoot {
                         Text {
                             text: "壁纸"
                             font.family: lab.font; font.pixelSize: 15; font.bold: true
-                            color: lab.cFg
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Text {
-                            text: "随机一张"
+                             color: lab.cFg
+                             anchors.verticalCenter: parent.verticalCenter
+                         }
+                         Text {
+                             text: lab.wallFiles.length + " 张"
+                             font.family: lab.font; font.pixelSize: 11
+                             color: lab.cMuted
+                             anchors.verticalCenter: parent.verticalCenter
+                         }
+                          Text {
+                              text: "样式"
+                              font.family: lab.font; font.pixelSize: 11
+                              color: lab.cMuted
+                              anchors.verticalCenter: parent.verticalCenter
+                              MouseArea {
+                                  anchors.fill: parent
+                                  anchors.margins: -5
+                                  onClicked: lab.cycleWallStyle()
+                              }
+                          }
+                          Text {
+                              text: "随机一张"
+
+
                             font.family: lab.font; font.pixelSize: 12
                             color: lab.cAccent
                             anchors.verticalCenter: parent.verticalCenter
@@ -1175,13 +1269,135 @@ ShellRoot {
                             }
                         }
                     }
-                    GridView {
-                        id: wallGrid
+                     Item {
+                         id: wallPreview
+                         width: parent.width
+                         height: 226
+                         visible: lab.wallStyle === 0
+                         Rectangle {
+                             id: previewFrame
+                             anchors { top: parent.top; left: parent.left; right: parent.right }
+                             height: 132
+                             radius: 12
+                             color: Qt.alpha(lab.cBg, 0.7)
+                             border.width: 1
+                             border.color: Qt.alpha(lab.cMuted, 0.45)
+                             clip: true
+                             Image {
+                                 anchors.fill: parent
+                                 source: lab.currentWall() ? lab.currentWall().thumb : ""
+                                 sourceSize.width: 640
+                                 sourceSize.height: 320
+                                 asynchronous: true
+                                 cache: true
+                                 smooth: true
+                                 fillMode: Image.PreserveAspectCrop
+                             }
+                             Rectangle {
+                                 anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                                 height: 26
+                                 color: Qt.alpha(lab.cBg, 0.78)
+                                 Text {
+                                     anchors { left: parent.left; bottom: parent.bottom; margins: 9 }
+                                     text: "当前壁纸"
+                                     font.family: lab.font; font.pixelSize: 11; font.bold: true
+                                     color: lab.cFg
+                                 }
+                             }
+                         }
+                         ListView {
+                             id: previewStrip
+                             anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                             height: 72
+                             orientation: ListView.Horizontal
+                             spacing: 6
+                             clip: true
+                             model: lab.wallFiles
+                             delegate: Item {
+                                 required property var modelData
+                                 width: 82
+                                 height: 64
+                                 Rectangle {
+                                     anchors.fill: parent
+                                     anchors.margins: 3
+                                     radius: 8
+                                     color: "transparent"
+                                     border.width: ("file://" + lab.wallCurrent === String(modelData.url)
+                                         || lab.wallCurrent === String(modelData.url).replace(/^file:\/\//, "")) ? 2 : 1
+                                     border.color: ("file://" + lab.wallCurrent === String(modelData.url)
+                                         || lab.wallCurrent === String(modelData.url).replace(/^file:\/\//, "")) ? lab.cAccent : Qt.alpha(lab.cMuted, 0.45)
+                                     clip: true
+                                     Image {
+                                         anchors.fill: parent
+                                         source: modelData.thumb
+                                         sourceSize.width: 220
+                                         sourceSize.height: 140
+                                         asynchronous: true
+                                         cache: true
+                                         smooth: true
+                                         fillMode: Image.PreserveAspectCrop
+                                     }
+                                 }
+                                 MouseArea {
+                                     anchors.fill: parent
+                                     onClicked: lab.applyWall(modelData.url)
+                                 }
+                             }
+                         }
+                     }
+                     Item {
+                         id: wallFilm
+                         width: parent.width
+                         height: 226
+                         visible: lab.wallStyle === 1
+                         ListView {
+                             anchors.fill: parent
+                             orientation: ListView.Horizontal
+                             spacing: 8
+                             clip: true
+                             model: lab.wallFiles
+                             delegate: Item {
+                                 required property var modelData
+                                 width: 190
+                                 height: 130
+                                 Rectangle {
+                                     anchors.fill: parent
+                                     anchors.margins: 4
+                                     radius: 11
+                                     color: Qt.alpha(lab.cBg, 0.7)
+                                     border.width: ("file://" + lab.wallCurrent === String(modelData.url)
+                                         || lab.wallCurrent === String(modelData.url).replace(/^file:\/\//, "")) ? 2 : 1
+                                     border.color: ("file://" + lab.wallCurrent === String(modelData.url)
+                                         || lab.wallCurrent === String(modelData.url).replace(/^file:\/\//, "")) ? lab.cAccent : Qt.alpha(lab.cMuted, 0.45)
+                                     clip: true
+                                     Image {
+                                         anchors.fill: parent
+                                         source: modelData.thumb
+                                         sourceSize.width: 420
+                                         sourceSize.height: 280
+                                         asynchronous: true
+                                         cache: true
+                                         smooth: true
+                                         fillMode: Image.PreserveAspectCrop
+                                     }
+                                 }
+                                 MouseArea {
+                                     anchors.fill: parent
+                                     onClicked: lab.applyWall(modelData.url)
+                                 }
+                             }
+                         }
+                     }
+                     GridView {
+                         id: wallGrid
+                         visible: lab.wallStyle === 2
+
                         width: parent.width
-                        height: 380
-                        clip: true
-                        cellWidth: Math.floor(width / 3)
-                        cellHeight: 108
+                         height: 226
+                         clip: true
+                         cellWidth: Math.floor(width / 4)
+                         cellHeight: 72
+
                         model: lab.wallFiles
                         highlightMoveDuration: 150
                         highlight: Rectangle {
@@ -1195,14 +1411,15 @@ ShellRoot {
                             height: wallGrid.cellHeight
                             Rectangle {
                                 anchors.fill: parent
-                                anchors.margins: 6
-                                radius: 12
+                                anchors.margins: 4
+                                radius: 9
                                 color: "transparent"
                                 clip: true
                                 property bool isCurrent: ("file://" + lab.wallCurrent === String(modelData.url)
                                     || lab.wallCurrent === String(modelData.url).replace(/^file:\/\//, ""))
-                                border.color: isCurrent ? lab.cFg : "transparent"
-                                border.width: isCurrent ? 2 : 0
+                                 border.color: isCurrent ? lab.cAccent : Qt.alpha(lab.cMuted, 0.45)
+                                 border.width: isCurrent ? 2 : 1
+
                                 Image {
                                     anchors.fill: parent
                                     source: modelData.thumb
@@ -1211,9 +1428,19 @@ ShellRoot {
                                     asynchronous: true
                                     cache: true
                                     smooth: true
-                                    fillMode: Image.PreserveAspectCrop
-                                }
-                            }
+                                     fillMode: Image.PreserveAspectCrop
+                                 }
+                                 Text {
+                                     anchors { right: parent.right; top: parent.top; margins: 5 }
+                                     visible: parent.isCurrent
+                                     text: "✓"
+                                     font.family: lab.font
+                                     font.pixelSize: 13
+                                     font.bold: true
+                                     color: lab.cAccent
+                                 }
+                             }
+
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
