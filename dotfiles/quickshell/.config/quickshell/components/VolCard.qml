@@ -1,7 +1,8 @@
 import QtQuick
-import Quickshell.Services.Pipewire
+import Quickshell.Io
 
-// 音量滑动卡：overlay 承载。滑杆实时写 Pipewire，静音键切换。
+// 音量滑动卡：overlay 承载。滑杆经 wpctl 读写，静音键切换。
+// Quickshell Pipewire 服务在新版 pipewire 下 sink 永不 ready，原生绑定弃用。
 Item {
     id: root
     property var theme
@@ -12,9 +13,42 @@ Item {
     implicitWidth: 280
     implicitHeight: 68
 
-    property var sink: Pipewire.ready ? Pipewire.defaultAudioSink : null
-    property real vol: (sink && sink.ready && sink.audio) ? sink.audio.volume : 0
-    property bool muted: sink && sink.ready && sink.audio ? sink.audio.muted : false
+    property real vol: 0
+    property bool muted: false
+
+    function refresh() { poller.running = true; }
+    Component.onCompleted: root.refresh()
+
+    Timer {
+        id: ticker
+        interval: 1000
+        repeat: true
+        running: true
+        onTriggered: { if (!poller.running) poller.running = true; }
+    }
+
+    Process {
+        id: poller
+        command: ["bash", "-c", Exec.commonDir + "/audio.sh"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    var j = JSON.parse(this.text);
+                    root.vol = Math.max(0, Math.min(1, Number(j.vol || 0)));
+                    root.muted = !!j.muted;
+                } catch (e) {}
+            }
+        }
+    }
+
+    function setVol(ratio, commit) {
+        var v = Math.max(0, Math.min(1, ratio));
+        if (commit)
+            Exec.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", v.toFixed(2)]);
+        else
+            Exec.run(["bash", "-c", "wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null; wpctl set-volume @DEFAULT_AUDIO_SINK@ " + v.toFixed(2)]);
+        root.refresh();
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -39,9 +73,8 @@ Item {
                     anchors.fill: parent
                     anchors.margins: -6
                     onClicked: {
-                        var s = root.sink;
-                        if (s && s.ready && s.audio)
-                            s.audio.muted = !s.audio.muted;
+                        Exec.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
+                        root.refresh();
                     }
                 }
             }
@@ -52,19 +85,8 @@ Item {
                 width: parent.width - 24 - 48 - 20 - 20
                 theme: root.theme
                 value01: root.vol
-                onMoved: ratio => {
-                    var s = root.sink;
-                    if (s && s.ready && s.audio) {
-                        if (s.audio.muted)
-                            s.audio.muted = false;
-                        s.audio.volume = Math.max(0, Math.min(1, ratio));
-                    }
-                }
-                onReleased: ratio => {
-                    var s = root.sink;
-                    if (s && s.ready && s.audio)
-                        s.audio.volume = Math.max(0, Math.min(1, ratio));
-                }
+                onMoved: ratio => root.setVol(ratio, false)
+                onReleased: ratio => root.setVol(ratio, true)
             }
 
             Text {

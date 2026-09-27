@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Services.Pipewire
 
 // 控制中心 overlay 卡：rofi 做不了的三件套——
 // 多标签常驻（顶栏/主题/音律/音乐）、滑杆（音量/亮度）、开关实时状态位。
@@ -330,7 +329,7 @@ Item {
                 Column {
                     anchors.fill: parent
                     spacing: 10
-                    // 音量滑杆（Pipewire 直写）
+                    // 音量滑杆（wpctl 读写）
                     Rectangle {
                         width: parent.width; height: 56; radius: 10
                         color: Qt.alpha(root.theme.accent, 0.18)
@@ -347,8 +346,8 @@ Item {
                                     anchors.fill: parent
                                     anchors.margins: -6
                                     onClicked: {
-                                        if (volSink.sink && volSink.sink.ready && volSink.sink.audio)
-                                            volSink.sink.audio.muted = !volSink.sink.audio.muted;
+                                        Exec.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]);
+                                        volSink.refresh();
                                     }
                                 }
                             }
@@ -470,18 +469,38 @@ Item {
         }
     }
 
-    // 音量后端（VolCard 同款直写）
+    // 音量后端：wpctl 脚本轮询（Pipewire 原生绑定在新版 pipewire 下不可用）
     Item {
         id: volSink
-        property var sink: Pipewire.ready ? Pipewire.defaultAudioSink : null
-        property real vol: (sink && sink.ready && sink.audio) ? sink.audio.volume : 0
-        property bool muted: sink && sink.ready && sink.audio ? sink.audio.muted : false
+        property real vol: 0
+        property bool muted: false
+        function refresh() { volPoller.running = true; }
         function setVol(ratio, commit) {
-            var s = volSink.sink;
-            if (s && s.ready && s.audio) {
-                if (s.audio.muted)
-                    s.audio.muted = false;
-                s.audio.volume = Math.max(0, Math.min(1, ratio));
+            var v = Math.max(0, Math.min(1, ratio)).toFixed(2);
+            if (commit)
+                Exec.run(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", v]);
+            else
+                Exec.run(["bash", "-c", "wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 >/dev/null; wpctl set-volume @DEFAULT_AUDIO_SINK@ " + v]);
+            volSink.refresh();
+        }
+        Component.onCompleted: volSink.refresh()
+        Timer {
+            interval: 2000
+            repeat: true
+            running: true
+            onTriggered: { if (!volPoller.running) volPoller.running = true; }
+        }
+        Process {
+            id: volPoller
+            command: ["bash", "-c", Exec.commonDir + "/audio.sh"]
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    try {
+                        var j = JSON.parse(this.text);
+                        volSink.vol = Math.max(0, Math.min(1, Number(j.vol || 0)));
+                        volSink.muted = !!j.muted;
+                    } catch (e) {}
+                }
             }
         }
     }

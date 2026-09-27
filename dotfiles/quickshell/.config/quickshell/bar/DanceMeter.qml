@@ -1,13 +1,12 @@
 import QtQuick
-import Quickshell.Services.Pipewire
 import "../components" as Comp
 
 // 律动舞者：不读实时分频，只做得好看。
 // 纯时间函数动画：正弦干涉编排由 tick 时钟推进，开关只看播放状态；
-// 峰值事件仅提供幅度包络，断流时用假设包络续跳（monitor 哑了也不冻）。
-// 对称镜像；暂停即回基线停摆。spectrum 模式下本文件不实例化，monitor 零开销。
-// 无音频占用时主动关闭：无 Mpris 播放 → 停摆 + 关 monitor（零 PipeWire 流量）；
-// 有 Mpris 但 15s 无峰值（哑流/断连）→ 同样停摆，monitor 留守，来声即恢复。
+// 峰值事件仅提供幅度包络，断流时用假设包络续跳（源哑了也不冻）。
+// 峰值源走 SpectrumState（spectrum.py pw-record 直采），
+// PwNodePeakMonitor 在 pipewire 1.6 下永不 ready，已弃用。
+// 对称镜像；暂停即回基线停摆。无音频占用时主动关闭轮询（零 Process 泡水）。
 Item {
     id: root
     property var theme
@@ -20,6 +19,7 @@ Item {
     property double lastSoundT: 0
     property bool dancing: false
     // 播放开关走 SpectrumState 单一事实源（不另建 Mpris 绑定）
+    // wantSource 落进 SpectrumState 启停门：把 ^ property 传过去让它控制进程启停
     property bool anyPlaying: Comp.SpectrumState.anyPlaying
     // 哑流超时：有 Mpris 但这么久无峰值，视为无音频占用，主动停摆
     property int idleMs: 15000
@@ -45,9 +45,12 @@ Item {
         else
             root.shutdown();
     }
+
+    property bool wantSource: root.anyPlaying && !Comp.BarState.flagM && (root.dancing || Comp.UiState.vizEffect === "spectrum")
     Component.onCompleted: {
         if (root.anyPlaying)
             root.poke();
+        Comp.BarState.danceAlive = Qt.binding(function() { return root.wantSource; });
     }
     // 忙闲度：连续峰值差分大=忙（快歌/鼓点密），小=舒缓
     property real business: 0
@@ -201,22 +204,31 @@ Item {
         }
     }
 
-    PwNodePeakMonitor {
+    // 峰值后端：走 Comp.SpectrumState 频谱带（spectrum.py pw-record 直采），
+    // 合成包络 v = max(bands)。PwNodePeakMonitor 在 pipewire 1.6 下永不 ready，弃用。
+    // 按需监听：无 Mpris/已停摆/总闸拉下时零 Process 流量；
+    // 启动靠 anyPlaying（Mpris），恢复靠留守 band 峰值，来声即 poke
+    Timer {
         id: monitor
-        node: Pipewire.ready ? Pipewire.defaultAudioSink : null
-        // 按需监听：无 Mpris/已停摆/总闸拉下时关闭，零 PipeWire 流量；
-        // 启动靠 anyPlaying（Mpris），恢复靠留守监听中的峰值，来声即 poke
-        enabled: node !== null && (root.anyPlaying || root.dancing) && !Comp.BarState.flagM
-        onPeaksChanged: {
+        // 峰值直读 SpectrumState.bands（spectrum.py 输出，80ms 节奏）
+        interval: 80
+        running: root.dancing || (root.anyPlaying && !Comp.BarState.flagM)
+        repeat: true
+        onTriggered: {
+            var bands = Comp.SpectrumState.bands;
             var v = 0;
-            for (var i = 0; i < peaks.length; i++)
-                v = Math.max(v, peaks[i]);
-            v = Math.max(0, Math.min(1, v));
-            // 静默时钟只认真峰值：空闲 sink 也可能吐全零事件，用它刷新时钟
-            // 会导致哑流熄火永不触发、假设包络空跳到天荒地老
+            for (var i = 0; i < bands.length; i++)
+                v = Math.max(v, bands[i]);
+            // 与历史 peak 语义对齐：频谱带是"分频后每柱满格"的量纲，
+            // peak monitor 是整段 RMS；取 max 后除 2 再二次曲线压顶部，
+            // 让包络量级回到历史 peak 的尺度（0-0.6 为主），
+            // 上不封顶保住大动态，下自然趋零
+            v = Math.max(0, Math.min(1, v / 1.5));
+            v = v * v * 0.9;
+            // 静默时钟只认真峰值
             if (v > 0.02)
                 root.lastPeakT = Date.now();
-            // 包络跟随：重低通，只取大势不吃碎拍（跟太紧就是抖）
+            // 包络跟随：与历史版完全同参（0.12/0.015 重低通），只取大势不吃碎拍
             root.energy = root.energy + (v - root.energy) * (v > root.energy ? 0.12 : 0.015);
             var diff = Math.abs(v - root.lastPeak);
             root.lastPeak = v;
@@ -233,6 +245,10 @@ Item {
                 root.lastSoundT = Date.now();
                 if (!root.dancing)
                     root.dancing = true;
+            }
+            // 空转优雅退出： bands 长期为空且没在跳，关掉自己的轮询
+            if (bands.length === 0 && nowB - root.lastPeakT > root.idleMs) {
+                monitor.running = false;
             }
         }
     }

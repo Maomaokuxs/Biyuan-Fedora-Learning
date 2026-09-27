@@ -173,7 +173,7 @@ RowLayout {
         onFileChanged: weatherPill.refresh()
     }
     Comp.AudioPill {
-        normalBg: theme.deviceBg; normalFg: theme.fg
+        baseBg: theme.deviceBg; baseFg: theme.fg
         screenName: root.screenName
     }
     // 内接屏亮度走共享聚合；外接屏 ddc 太慢，独立 ScriptPill 保留。
