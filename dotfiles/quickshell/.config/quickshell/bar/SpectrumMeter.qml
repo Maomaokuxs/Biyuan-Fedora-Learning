@@ -3,7 +3,7 @@ import "../components" as Comp
 
 // 声谱柱：数据直给高度，无趋近无 tween 无死区——
 // 实测直给稳，抖全是显示层后加的；平滑由 spectrum.py 的 VU 弹道负责。
-// 镜像取大（非平均）：对称外观不变，动态不砍半，无需补偿增益。
+// 直给 12 柱原序（低频在左），不镜像。
 // dance 模式下本文件不实例化，进程由 SpectrumState 按需启停。
 Item {
     id: root
@@ -38,10 +38,8 @@ Item {
             var live = root.pending;
             if (live.length < 12)
                 return;
-            var half = [];
-            for (var j = 0; j < 6; j++)
-                half.push(Math.max(live[j], live[11 - j]));
-            var target = half.concat(half.slice().reverse()).slice(0, root.bars);
+            // 直给 12 柱原序（非镜像）：低频在左不折返，等宽直观
+            var target = live.slice(0, root.bars);
             var cur = root.levels;
             var same = cur.length === root.bars;
             if (same)
