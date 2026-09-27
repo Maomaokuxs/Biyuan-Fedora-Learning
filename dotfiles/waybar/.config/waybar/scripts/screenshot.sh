@@ -5,9 +5,12 @@ TMP=$(mktemp /tmp/screenshot-XXXX.png)
 REGION=$(slurp)
 [ -z "$REGION" ] && rm -f "$TMP" && exit 0
 grim -g "$REGION" "$TMP"
-swappy -f "$TMP"
-# swappy 会直接修改 $TMP，保存后复制
-if [ -f "$TMP" ]; then
+if command -v swappy &>/dev/null; then
+    # 有 swappy：标注/保存/复制全交给他（save_dir 已配到截图目录）
+    swappy -f "$TMP"
+    rm -f "$TMP"
+else
+    # 无 swappy：自动落盘 + 进剪贴板
     FILE="$DIR/Screenshot-$(date +%Y%m%d-%H%M%S).png"
     cp "$TMP" "$FILE"
     wl-copy < "$FILE"
