@@ -44,6 +44,8 @@ Item {
     property bool flagM: false
     // 尾闸：只藏音律后面的跟随者（播放键/歌词），音律条和歌名留守；跟随者取 flagM || flagT
     property bool flagT: false
+    // 舞者活着（DanceMeter 写入）：SpectrumState 据此让声谱进程也活起来
+    property bool danceAlive: false
     // flag 翻转（外部 rofi 菜单切的）立刻补刷一次，文本不等下个 2s 周期，
     // 显隐只差一次快刷（200ms），和 forceHidden 变化几乎同时到位
     onFlagLChanged: refreshFast.restart()

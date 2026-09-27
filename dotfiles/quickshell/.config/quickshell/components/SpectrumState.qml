@@ -37,8 +37,8 @@ Item {
         }
         return false;
     }
-    // 任一播放器在播 + 切到声谱 + 总闸没拉下才需要进程（尾闸只藏跟随者，不管本模块）
-    property bool wantSpectrum: UiState.vizEffect === "spectrum" && root.anyPlaying && !BarState.flagM
+    // 启停门加舞者通路：BarState.danceAlive 由 DanceMeter 写入，写在前头自己看吧
+    property bool wantSpectrum: (UiState.vizEffect === "spectrum" || BarState.danceAlive) && root.anyPlaying && !BarState.flagM
     // running 走绑定自动启停；这里只负责停后清数据
     onWantSpectrumChanged: {
         if (!wantSpectrum)
