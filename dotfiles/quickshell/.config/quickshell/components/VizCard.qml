@@ -16,14 +16,17 @@ Item {
     implicitWidth: 480
     implicitHeight: UiState.vizEffect === "dance" ? 375 : 200
 
-    function effectName(id: string) {
+    function effectName(id) {
         if (id === "spectrum")
             return "声谱";
         if (id === "off")
             return "关闭";
         return "律动";
     }
-    function effectDesc(id: string) {
+    // 描述不加返回类型：QML 函数带 void 标注被 Interpreter 误警
+    // "should be coerced to void"（几百条 ERROR 日志就是它刷的），
+    // 保持无标注函数，调用处 text: root.effectDesc(id) 不变。
+    function effectDesc(id) {
         if (id === "spectrum")
             return "pw-record 直采 + FFT，真分频";
         if (id === "off")
@@ -31,7 +34,9 @@ Item {
         return "程序编排跟响度走，零外部进程";
     }
     // 编排选项：0 自动，1-8 起伏/斜纹/呼吸/交错/脉冲/驼峰/闪烁/峭壁，9 混合（存值 -1/0-7/8）
-    function patName(i: int) {
+    // 不加 ": string" 返回标注——quickshell 0.2 的 QSLint 对带标注函数误报 coerced
+    // ERROR，几百条日志全是它刷的
+    function patName(i) {
         return ["自动", "起伏", "斜纹", "呼吸", "交错", "脉冲", "驼峰", "闪烁", "峭壁", "混合"][i];
     }
     function refreshEffect() {

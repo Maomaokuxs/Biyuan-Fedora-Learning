@@ -29,7 +29,7 @@ QtObject {
     // 锚点按屏分键：双栏下两边 pill 同时上报，单全局值会被盖掉错乱。
     // 结构 {key: {screenName: x}}，整体重赋以触发绑定。
     property var anchorMap: ({})
-    function setAnchor(key: string, screen: string, x: real): void {
+    function setAnchor(key: string, screen: string, x: real) {
         if (key === "" || screen === "")
             return;
         var m = Object.assign({}, root.anchorMap);

@@ -30,7 +30,7 @@ Item {
     function refreshCurrent() {
         curProc.running = true;
     }
-    function styleName(id: string) {
+    function styleName(id) {
         if (id === "fade")
             return "淡入";
         if (id === "off")
@@ -45,7 +45,9 @@ Item {
             return "闪烁";
         return "追逐波";
     }
-    function styleValid(id: string) {
+                    // 函数式判断量大被 Interpreter 记为高频 coerced 噪音，
+                    // 不改逻辑只去标注
+    function styleValid(id) {
         return id === "wave" || id === "fade" || id === "off" || id === "random" || id === "wipe" || id === "outside" || id === "twinkle";
     }
     function refreshAll() {
