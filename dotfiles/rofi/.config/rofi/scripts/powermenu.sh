@@ -29,13 +29,17 @@ case "$SELECTED" in
     "$LOCK")
         loginctl lock-session ;;
     "$SUSPEND")
-        # 推荐：先锁定，稍微等待让 Layer Shell 渲染，再休眠
-        loginctl lock-session && sleep 0.5 && systemctl suspend ;;
+        # 先锁定，等hyprlock进程出现再休眠（固定sleep不可靠）
+        loginctl lock-session
+        for i in $(seq 1 50); do pgrep -x hyprlock >/dev/null && break; sleep 0.1; done
+        systemctl suspend ;;
      "$HIBERNATE")
         # 1. 向系统发送标准锁定信号，hypridle 会收到并立刻调起 hyprlock
         loginctl lock-session
-        # 2. 强制等待 1 秒，确保锁屏界面已经在显卡中渲染完成
-        sleep 1
+        # 2. 等锁屏进程出现（最多5秒），确保锁屏已渲染再休眠
+        for i in $(seq 1 50); do pgrep -x hyprlock >/dev/null && break; sleep 0.1; done
+        # 兜底：信令没送达就直接起锁屏
+        pgrep -x hyprlock >/dev/null || { hyprlock & sleep 1; }
         # 3. 无休眠配置的机器直接 hibernate 会失败且无兜底，走 sleep-safe.sh：
         # 有物理 swap + resume= 才休眠，否则降级挂起，再不行保底熄屏
         if swapon --show --noheadings 2>/dev/null | grep -v "zram" | grep -q . \
