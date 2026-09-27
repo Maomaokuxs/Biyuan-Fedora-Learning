@@ -671,7 +671,7 @@ binds {
   // spawn-at-startup "mako"
 
     // 剪贴板历史 — CopyQ（已装，未装时静默跳过）
-    spawn-at-startup "sh" "-c" "command -v copyq >/dev/null && copyq & sleep 1 && copyq enable &"
+    spawn-at-startup "sh" "-c" "command -v copyq >/dev/null && QT_QPA_PLATFORM=xcb copyq & sleep 1 && copyq enable &"
 
     //默认壁纸初始化已在顶部自启区（init-wallpaper.sh，有锁秒退），此处不重复，避免并发互杀
 
@@ -831,8 +831,10 @@ binds {
 environment {
     // Fcitx5 环境设置
     "XMODIFIERS" "@im=fcitx"
+    // Wayland原生程序走text-input协议，不需要IM_MODULE；XWayland程序走XIM(XMODIFIERS)
+    // 全局设置GTK/QT_IM_MODULE会触发fcitx5的环境检查通知，故注释掉
     // "GTK_IM_MODULE" "fcitx"
-    "QT_IM_MODULE" "fcitx"
+    // "QT_IM_MODULE" "fcitx"
     "SDL_IM_MODULE" "fcitx"
     "CLUTTER_IM_MODULE" "fcitx"
     
