@@ -294,16 +294,19 @@ Row {
             property bool hovered: false
             // 是否正在被拖拽（长按拿起的那个）
             property bool dragging: root.dragKey !== "" && root.dragKey === gkey
-            function hasFocused(): boolean {
-                for (var i = 0; i < vis.length; i++) if (vis[i].is_focused) return true;
+            // focused/urgent 走纯绑定：事件流每次窗口状态变化都重建 delegate，
+            // 函数+属性组合会在绑定失效时报几百条 coerced ERROR（此处全局最高频日志）。
+            // 直接内联条件表达式，不经过函数。
+            property bool focused: {
+                var vs = vis;
+                for (var i = 0; i < vs.length; i++) if (vs[i].is_focused) return true;
                 return false;
             }
-            function hasUrgent(): boolean {
-                for (var i = 0; i < vis.length; i++) if (vis[i].is_urgent) return true;
+            property bool urgent: {
+                var vs = vis;
+                for (var i = 0; i < vs.length; i++) if (vs[i].is_urgent) return true;
                 return false;
             }
-            property bool focused: hasFocused()
-            property bool urgent: hasUrgent()
             property bool allMin: vis.length === 0 && mini.length > 0
 
             // 固定 48：hover 只换色，绝不改宽高。改宽高会推动 Row 布局、
