@@ -253,6 +253,7 @@ Image=
 # 浅色：面板=waybar bg，文字=waybar fg，高亮=壁纸 accent 块 + 对比字
 # guard 返回 (字, 底) 顺序
 _ltext, _lpanel = guard(fg, bg, "light")
+_lpanel = "#ffffff"
 _lhl, _ = guard(hltext, accent, "light-hl")
 light = ("hud-paper", "Hud Paper light — paper bg, accent selection",
          _lpanel, _ltext, _lhl, accent)
