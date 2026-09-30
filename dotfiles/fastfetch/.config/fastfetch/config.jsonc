@@ -40,7 +40,7 @@
         { "type": "gpu", "key": "│  󰢮 GPU", "keyColor": "yellow", "format": "{2} [Discrete]" },
         { "type": "memory", "key": "│  󰑭 Memory", "keyColor": "yellow" },
         { "type": "swap", "key": "│  󰓡 Swap", "keyColor": "yellow" },
-        { "type": "disk", "key": "│  󰋊 Disk (/)", "keyColor": "yellow", "folders": "/", "format": "{1} / {2} ({3}) - {9}" },
+        { "type": "disk", "key": "│  󰋊 Disk", "keyColor": "yellow", "format": "{1} / {2} ({3}) - {9}" },
         { "type": "custom", "format": "\u001b[33m└──────────────────────────────────────\u001b[0m" },
         
         "break",
