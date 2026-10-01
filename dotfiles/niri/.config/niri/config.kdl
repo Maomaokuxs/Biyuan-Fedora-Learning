@@ -174,7 +174,7 @@ layout {
         // off
 
         // How many logical pixels the ring extends out from the windows.
-        width 6
+        width 3
 
         // Colors can be set in a variety of ways:
         // - CSS named colors: "red"
@@ -230,9 +230,9 @@ layout {
         // inactive-gradient from="#505050" to="#808080" angle=45 relative-to="workspace-view"
     }
 
-    // Drop shadows for windows (off = cleaner look).
+    // Drop shadows for windows.
     shadow {
-        off
+        on
 
         // By default, the shadow draws only around its window, and not behind it.
         // Uncomment this setting to make the shadow draw behind its window.
@@ -254,13 +254,13 @@ layout {
         // pixels and match the CSS box-shadow properties.
 
         // Softness controls the shadow blur radius.
-        softness 12
+        softness 30
 
         // Spread expands the shadow.
-        spread 5
+        spread 8
 
         // Offset moves the shadow relative to the window.
-        offset x=0 y=5
+        offset x=0 y=12
 
         // 阴影主体色走主题（color-niri.kdl 由 theme-sync 生成，与边框同色 ACCENT+aa），
         // 此处不重复定义，避免覆盖 include。
