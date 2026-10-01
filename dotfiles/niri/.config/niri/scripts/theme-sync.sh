@@ -165,6 +165,20 @@ if [ "$WALLPAPER" == "$last_wp" ]; then
 else
     WALLPAPER_CHANGED=true
     echo "$WALLPAPER" > "$HOME/.cache/by-mgr/last-wallpaper"
+    # 回写 waypaper 配置：换壁纸入口有多条（随机脚本/rofi/waypaper UI），
+    # 但昼夜切换走自动检测时优先读 waypaper config.ini；此处统一回写，
+    # 否则检测到过期路径会把壁纸拽回旧图（A→B 后切昼夜跳回 A 的根因）。
+    WAYPAPER_INI="$HOME/.config/waypaper/config.ini"
+    if [ -f "$WAYPAPER_INI" ]; then
+        WP_SHORT="${WALLPAPER/#$HOME/\~}"
+        WP_ESC=$(printf '%s' "$WP_SHORT" | sed 's/[&|\\]/\\&/g')
+        if grep -q '^[[:space:]]*wallpaper[[:space:]]*=' "$WAYPAPER_INI"; then
+            sed -i "s|^[[:space:]]*wallpaper[[:space:]]*=.*|wallpaper = $WP_ESC|" "$WAYPAPER_INI"
+        elif grep -q '^\[Settings\]' "$WAYPAPER_INI"; then
+            sed -i "/^\[Settings\]/a wallpaper = $WP_ESC" "$WAYPAPER_INI"
+        fi
+        _debug "waypaper config synced to $WP_SHORT"
+    fi
 fi
 
 # 检测是否在 KDE Plasma 环境下（避免与 KDE 壁纸管理冲突）

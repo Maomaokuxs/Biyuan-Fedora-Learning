@@ -48,3 +48,6 @@ dotfiles/by-mgr/
 dotfiles/waybar/.config/waybar/color-waybar.css
 dotfiles/quickshell/.config/quickshell/scripts/fcitx5/hud-paper/
 dotfiles/quickshell/.config/quickshell/scripts/fcitx5/hud-paper-dark/
+
+# backup
+*.bak-*
