@@ -460,7 +460,7 @@ echo "正在为各应用分发色彩配置..."
 source "$PALETTE_FILE"
 
 # --- A. Niri (color-niri.kdl) ---
-# 边框 + 阴影主体色同源（ACCENT），阴影带 aa 透明度做深度；
+# 边框走 ACCENT；阴影用深黑固定色压出厚重感，不再随主题变；
 # 主配置只留几何（on/softness/spread/offset），颜色全走这里，避免重复定义覆盖。
 cat <<EOF > "$TARGET_DIR/color-niri.kdl"
 layout {
@@ -469,7 +469,7 @@ layout {
         inactive-color "$MUTED"
     }
     shadow {
-        color "${ACCENT}aa"
+        color "#00000099"
     }
 }
 EOF
