@@ -76,32 +76,35 @@ def guard(fg_, bg_, why):
     print(f"contrast guard [{why}]: {fg_} on {bg_} ({contrast(fg_, bg_):.2f}) -> {cand} on {bg_} ({contrast(cand, bg_):.2f})")
     return cand, bg_
 
-# 整体缩放：默认 0.8，可用 FCITX_SCALE=1.0 覆盖（改这里或环境变量均可）
-S = float(os.environ.get("FCITX_SCALE", "0.8"))
+# 整体缩放：默认 1.0（2026-10-01 1.2 试后回退），可用 FCITX_SCALE 环境变量覆盖（改这里或环境变量均可）
+S = float(os.environ.get("FCITX_SCALE", "1.0"))
 def px(v):
     return max(1, round(v * S))
 
 VB = px(60)            # SVG 内禀尺寸：60*0.8=48
-PR = px(18)            # 面板圆角半径：14
-HR = px(14)            # 选中块圆角半径：11
+PR = px(6)             # 面板圆角：视觉上与高亮 r=3 一致（面板更大，需更大绝对半径）(2026-10-02)
+HR = px(4)             # 高亮圆角：用户目测确定，独立可调 (2026-10-02)
+HL_SHADOW = False       # 高亮阴影开关：多层半透明模拟柔边（fcitx5 不支持 SVG 滤镜）(2026-10-02)
 PINSET, PSIZE = px(3), VB - px(3) * 2    # 面板外框：2,44
 HINSET, HSIZE = px(4), VB - px(4) * 2    # 选中块外框：3,42
-PM = PR                # 面板九宫格边距 = 圆角半径（48-28=20 中心可拉伸）
-HM = HR                # 选中块九宫格边距（48-22=26 中心可拉伸）
-HM_TB = px(10)         # 选中块纵向收紧（只压高度，宽度不动）
+PM = PR                # 面板九宫格边距 = 圆角半径
+HM = px(9)             # 高亮边距固定：控制高亮块向外扩张（大小），不随圆角半径变化 (2026-10-02 用户要求单独调整)
+HM_TB = HM             # 高亮纵向边距 = 横向：Margin 双重作用（9-patch 切片+向外扩张），四边必须一致 (2026-10-02)
 # 内容边距：隔离缝 = 内容边距 + 文字边距 − 选中块胀出，四边都按 2px 配平
 # 横向：7 + 6 − 11 = 2；纵向：8 + 2 − 8 = 2
 # 另需候选间距 (左6+右6=12) > 高亮横向胀出 (11)，否则高亮盖住下一个序号
 CM_LR = px(9)
-CM_TB = px(10)
+CM_TB = CM_LR  # 高亮到面板外边距四边一致 (2026-10-02 用户要求)
 SW = round(1.5 * S, 1) # 描边宽度：1.2
 
 def rr(x, y, w, h, r):
+    # 真圆弧 arc：Q 二次贝塞尔只是近似圆，45° 处比真圆内收约 6% 半径，
+    # 大圆角下肉眼可见不够圆顺；mellow 用真圆弧所以没这个问题 (2026-10-01)
     x1, y1 = x + w, y + h
-    return (f"M {x+r},{y} H {x1-r} Q {x1},{y} {x1},{y+r} "
-            f"V {y1-r} Q {x1},{y1} {x1-r},{y1} "
-            f"H {x+r} Q {x},{y1} {x},{y1-r} "
-            f"V {y+r} Q {x},{y} {x+r},{y} Z")
+    return (f"M {x+r},{y} H {x1-r} A {r},{r} 0 0 1 {x1},{y+r} "
+            f"V {y1-r} A {r},{r} 0 0 1 {x1-r},{y1} "
+            f"H {x+r} A {r},{r} 0 0 1 {x},{y1-r} "
+            f"V {y+r} A {r},{r} 0 0 1 {x+r},{y} Z")
 
 def panel_svg(panel, stroke):
     # 只用 <path>（fcitx5 对 <rect>/滤镜支持有 bug）；扁平无阴影。
@@ -114,9 +117,18 @@ def panel_svg(panel, stroke):
 '''
 
 def highlight_svg(fill):
+    # 阴影层画在 pill 之下：每层向外扩张1px，圆角同步+1（同心），透明度由外向内递增
+    shadow = ""
+    if HL_SHADOW:
+        _layers = []
+        for _ex, _op in ((3, 0.05), (2, 0.09), (1, 0.14)):
+            _i, _sz, _r = HINSET - _ex, HSIZE + _ex * 2, HR + _ex
+            _d = rr(_i, _i, _sz, _sz, _r)
+            _layers.append("  <path d=\"" + _d + "\" fill=\"#000000\" fill-opacity=\"" + str(_op) + "\"/>")
+        shadow = "\n".join(_layers) + "\n"
     return f'''<?xml version="1.0" encoding="UTF-8"?>
 <svg width="{VB}" height="{VB}" version="1.1" viewBox="0 0 {VB} {VB}" xmlns="http://www.w3.org/2000/svg">
-  <path d="{rr(HINSET, HINSET, HSIZE, HSIZE, HR)}"
+{shadow}  <path d="{rr(HINSET, HINSET, HSIZE, HSIZE, HR)}"
         fill="{fill}" fill-opacity="1"/>
 </svg>
 '''
@@ -124,7 +136,7 @@ def highlight_svg(fill):
 def theme_conf(name, desc, panel, text, hl_text, hl_bg):
     # 横排候选：FullWidthHighlight=False 让高亮只包住当前候选（HUD 色块感）
     # 高亮块模仿 waybar #clock 反色：hl_bg + hl_text
-    tl, tr, tt, tb = px(8), px(8), px(3), px(3)
+    tl, tr, tt, tb = px(3), px(3), px(3), px(3)  # 文字边距四边一致：高亮块内文字居中 (2026-10-02)
     ml, mr, mt, mb = px(6), px(6), px(5), px(5)
     mhm = px(8)
     cx, cy = px(5), px(4)
@@ -250,17 +262,18 @@ Image=
 Image=
 '''
 
-# 浅色：面板=waybar bg，文字=waybar fg，高亮=壁纸 accent 块 + 对比字
+# 候选框背景固定：白昼 #ffffff / 黑夜 #000000，不再跟壁纸取色（2026-10-01 用户要求）
+# 文字色仍走 guard 对比度兜底，保证在纯白/纯黑底上可读；高亮块仍取壁纸 accent
 # guard 返回 (字, 底) 顺序
-_ltext, _lpanel = guard(fg, bg, "light")
-_lpanel = "#ffffff"
+FIXED_LIGHT_PANEL = "#ffffff"
+FIXED_DARK_PANEL = "#000000"
+_ltext, _lpanel = guard(fg, FIXED_LIGHT_PANEL, "light")
 _lhl, _ = guard(hltext, accent, "light-hl")
-light = ("hud-paper", "Hud Paper light — paper bg, accent selection",
+light = ("hud-paper", "Hud Paper light — fixed white panel, accent selection",
          _lpanel, _ltext, _lhl, accent)
-# 深色：底=黑（或更暗色），文字=更亮色，高亮=壁纸 accent 块 + 对比字
-_dtext, _dpanel = guard(lightcolor, darkbg, "dark")
+_dtext, _dpanel = guard(lightcolor, FIXED_DARK_PANEL, "dark")
 _dhl, _ = guard(hltext, accent, "dark-hl")
-dark = ("hud-paper-dark", "Hud Paper dark — black panel, accent selection",
+dark = ("hud-paper-dark", "Hud Paper dark — fixed black panel, accent selection",
         _dpanel, _dtext, _dhl, accent)
 
 for dirname, desc, panel, text, hl_text, hl_bg in (light, dark):
