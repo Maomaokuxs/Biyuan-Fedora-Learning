@@ -31,7 +31,10 @@ Rectangle {
     // overlay 只取自己屏的值，互不覆盖。
     property string anchorScreen: ""
     function updateAnchor() {
-        if (anchorKey === "" || width <= 0)
+        // 隐藏 pill（forceHidden/空文本）不上报：它的 width 恒为 contentW，
+        // 只靠 Layout.preferredWidth 压到 0，width 守卫拦不住，假锚点会把
+        // 同 key 的弹窗拽到左缘（如 HDMI-A-1 的亮度卡）。shown 已含 forceHidden。
+        if (anchorKey === "" || !root.shown)
             return;
         // 顶层 parent 即本窗 contentItem：顶栏窗全宽贴屏无边距，
         // 相对它的横坐标就是输出坐标。禁止 mapToItem(null)——
