@@ -5,7 +5,12 @@
 # dnf5 输出带 ANSI 颜色码：先剥离，再过滤汇总行（否则包行被转义符挡住、汇总行被误计）
 # 通过 PackageKit(pkcon) 获取更新：普通用户即可见完整系统状态（与软件中心一致）。
 # dnf5 check-update 在用户态元数据受限，仅能列出极少量包，不可用。
-UPDATE_LIST=$(pkcon get-updates 2>/dev/null | grep -E "\([a-z0-9-]+\)$" | sed "s/^[^ ]* *//")
+# pkcon 管道输出包行实测格式为 "严重性：<空格>包ID (仓库)"
+# （如 "增强：       7zip-26.03-1.fc44.x86_64 (updates)"，行尾即 (仓库)，无 tab、无描述；
+#  /tmp/pkcon-raw.txt 实采验证，2026-10-02）。
+# 旧 grep "\([a-z0-9-]+\)$" 按终端格式写的，管道格式下长期匹配不到 → pill 恒显示 0；
+# 中间一度改成 tab 版同样匹配不到。现用 grep -o 直接抠出 "包ID (仓库)"，与 locale 无关。
+UPDATE_LIST=$(pkcon get-updates 2>/dev/null | grep -oE "[^ ]+ \([a-zA-Z0-9_.:+/-]+\)$")
 COUNT=$(echo "$UPDATE_LIST" | grep -vc "^$")
 
 # 2. 判断内核更新
