@@ -1,6 +1,6 @@
 #!/bin/bash
-# sync-waybar.sh — 从 Waybar 配色生成 fcitx5 皮肤
-# 用法: bash sync-waybar.sh [--install]
+# sync-color.sh — 从 Waybar 配色生成 fcitx5 皮肤
+# 用法: bash sync-color.sh [--install]
 #   默认在脚本所在目录生成 hud-paper / hud-paper-dark
 #   --install 则额外安装到 ~/.local/share/fcitx5/themes/ 并重启 fcitx5
 set -euo pipefail
