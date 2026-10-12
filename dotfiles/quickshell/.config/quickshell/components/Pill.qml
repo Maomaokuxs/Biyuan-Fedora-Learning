@@ -52,7 +52,7 @@ Rectangle {
     }
     onXChanged: updateAnchor()
     onWidthChanged: updateAnchor()
-    Component.onCompleted: { updateAnchor(); root.armReveal(); }
+    Component.onCompleted: { updateAnchor(); }
     // 静态 pill（铃铛这种宽度常年不变的）事件钩子只在启动瞬间触发，
     // 那时窗口未就绪，锚点恒为 0，卡片飞左缘。1 秒刷一次兜底，
     // mapToItem 纯坐标换算，开销忽略不计。
@@ -68,53 +68,17 @@ Rectangle {
     // forceHidden：外部开关（显隐 flag）直控显隐，不等轮询回执。
     property bool shown: pillText !== "" && !forceHidden
     property bool forceHidden: false
-    // 依次出场：按兄弟顺序排号，一格 90ms，从左往右一个一个冒出来。
-    // 用序号不用 x——收起时全挤在左边，x 全约等于 0 排不出顺位。
-    // 首格约 0.1s 即现（跟手），整栏约 2 秒走完；数据没到的 shown 为 false
-    // 自然排后面。出场只走一次，文本更新不重排。
-    property bool revealed: false
-    function siblingIndex() {
-        try {
-            var kids = parent ? parent.children : null;
-            if (!kids)
-                return 0;
-            for (var i = 0; i < kids.length; i++) {
-                if (kids[i] === root)
-                    return i;
-            }
-        } catch (e) {}
-        return 0;
-    }
-    function armReveal() {
-        if (root.revealed || !root.shown)
-            return;
-        revealTimer.interval = root.siblingIndex() * 55;
-        revealTimer.restart();
-    }
-    Timer {
-        id: revealTimer
-        repeat: false
-        onTriggered: root.revealed = true
-    }
-    onShownChanged: {
-        if (root.shown)
-            root.armReveal();
-        else
-            root.revealed = false;
-    }
     // 固定宽度（>0 生效）：内容变化不改尺寸，锚定它的浮窗就不会跳。
     // 给铃铛这种计数忽有忽无的用。
     property real fixedWidth: 0
     property real contentW: fixedWidth > 0 ? fixedWidth : label.implicitWidth + 20
-    property real animW: (shown && revealed) ? contentW : 0
-    // 启动门控：加载期直接到位，门开后才播动画（见 UiState.animReady）。
-    // 收展跟手：OutCubic 起步快落地柔，宽 300ms + 透明 200ms，
-    // 全组同一起点同节奏，自然齐出齐收
+    property real animW: shown ? contentW : 0
+    // 显隐动画：门控只管加载期，运行时交互保留收展动画
     Behavior on animW { enabled: UiState.animReady; NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
     Behavior on opacity { enabled: UiState.animReady; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
     visible: opacity > 0.01
-    opacity: (shown && revealed) ? 1 : 0
+    opacity: shown ? 1 : 0
     height: 32
     width: contentW
     Layout.preferredWidth: animW

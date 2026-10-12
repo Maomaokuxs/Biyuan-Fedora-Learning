@@ -56,9 +56,9 @@ ShellRoot {
             Theme { id: cardTheme }
 
             anchors { top: true; left: true }
-            margins { top: 52; left: ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.media.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.media.w / 2 }
-            implicitWidth: 360
-            implicitHeight: 132
+            margins { top: 42; left: ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.media.anchor] || {})[modelData.name] || 0) - 95 }
+            implicitWidth: 320
+            implicitHeight: 300
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
@@ -285,6 +285,7 @@ ShellRoot {
 
             id: dockWin
             property bool dockHidden: true
+            property bool paletteTimeout: false
             // 最近一次 dock 交互时间戳：点击会导致窗口重排、hover 抖动，
             // 保护期内即使 hover 闪断也不收，保证可连续点两下。
             property double lastDockInteract: 0
@@ -309,6 +310,12 @@ ShellRoot {
                     else dockWin.dockHidden = true;
                 }
             }
+
+            // 内容层：启动淡入（与顶栏同门控），PanelWindow 本身无 opacity 属性
+            Item {
+                anchors.fill: parent
+                opacity: (Comp.UiState.animReady && (Comp.PaletteState.blob !== "" || dockWin.paletteTimeout)) ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: 350; easing.type: Easing.OutCubic } }
 
             // 背景跟主题 BG（夜间近黑），不透明度保留悬停反馈。
             Rectangle {
@@ -360,6 +367,13 @@ ShellRoot {
                     hideTimer.stop();
                     dockWin.dockHidden = false;
                 }
+            }
+            } // 内容层
+
+            Timer {
+                interval: 5000
+                running: true
+                onTriggered: dockWin.paletteTimeout = true
             }
         }
     }

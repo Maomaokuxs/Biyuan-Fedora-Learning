@@ -19,8 +19,15 @@ RowLayout {
     property bool isExternal: screenName === "HDMI-A-1"
     spacing: 2
 
-    // 整栏级入场：门开后淡入一次，加载期各 pill 静默就位不逐个乱动
-    opacity: Comp.UiState.animReady ? 1 : 0
+    // 整栏一次性淡入：等调色板就位后再现身，避免先以 fallback 色淡入再跳变；
+    // 5 秒兜底（无调色板文件时用 fallback 色直接显示）
+    property bool paletteTimeout: false
+    Timer {
+        interval: 5000
+        running: true
+        onTriggered: root.paletteTimeout = true
+    }
+    opacity: (Comp.UiState.animReady && (Comp.PaletteState.blob !== "" || root.paletteTimeout)) ? 1 : 0
     Behavior on opacity { NumberAnimation { duration: 350; easing.type: Easing.OutCubic } }
 
     // 显隐开关走 BarState 单相位（flag 与文本同一次产出，动画单波齐出）
@@ -102,18 +109,6 @@ RowLayout {
         theme: root.theme; screenName: root.screenName
     }
     BarMod.LevelMeter { theme: root.theme; screenName: root.screenName }
-    Comp.MprisButton {
-        normalBg: theme.mediaBg; normalFg: theme.fg
-        mode: "prev"; musicHidden: Comp.BarState.flagM || Comp.BarState.flagT
-    }
-    Comp.MprisButton {
-        normalBg: theme.mediaBg; normalFg: theme.fg
-        mode: "toggle"; musicHidden: Comp.BarState.flagM || Comp.BarState.flagT
-    }
-    Comp.MprisButton {
-        normalBg: theme.mediaBg; normalFg: theme.fg
-        mode: "next"; musicHidden: Comp.BarState.flagM || Comp.BarState.flagT
-    }
     Comp.Pill {
         normalBg: theme.mediaBg; normalFg: theme.fg
         pillText: Comp.BarState.lyricT
@@ -266,6 +261,7 @@ RowLayout {
         function shQ(s) {
             return "'" + String(s || "").replace(/'/g, "'\\''") + "'";
         }
+
         Behavior on animW { enabled: Comp.UiState.animReady; NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
         Behavior on opacity { enabled: Comp.UiState.animReady; NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
 

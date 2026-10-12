@@ -794,13 +794,12 @@ fcitx_full_reload() {
 }
 FCITX_CONF="$HOME/.config/fcitx5/conf/classicui.conf"
 if [ -f "$FCITX_CONF" ]; then
-    FCITX_THEME="hud-paper"
-    $THEME_NIGHT && FCITX_THEME="hud-paper-dark"
-    sed -i "s/^Theme=.*/Theme=$FCITX_THEME/" "$FCITX_CONF"
-    sed -i "s/^DarkTheme=.*/DarkTheme=$FCITX_THEME/" "$FCITX_CONF"
-    sed -i 's/^UseDarkTheme=.*/UseDarkTheme=False/' "$FCITX_CONF"
+    # fcitx5 跟随系统深浅色自动切换，脚本只确保主题名正确，不再按昼夜手动指定
+    sed -i 's/^Theme=.*/Theme=hud-paper/' "$FCITX_CONF"
+    sed -i 's/^DarkTheme=.*/DarkTheme=hud-paper-dark/' "$FCITX_CONF"
+    sed -i 's/^UseDarkTheme=.*/UseDarkTheme=True/' "$FCITX_CONF"
 fi
-FCITX_SYNC="${FCITX_SYNC:-$HOME/.config/quickshell/scripts/fcitx5/sync-waybar.sh}"
+FCITX_SYNC="${FCITX_SYNC:-$HOME/.config/quickshell/scripts/fcitx5/sync-color.sh}"
 if [ -x "$FCITX_SYNC" ]; then
     # 9>&-：断掉锁 fd 的继承。setsid 起的 fcitx5 是长驻进程，
     # 不带走 fd 9 就永久占锁（2026-09-21 实测堵死 20+ 实例）。
