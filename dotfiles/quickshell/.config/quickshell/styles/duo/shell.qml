@@ -78,6 +78,7 @@ ShellRoot {
                     lab.cAccent = m.ACCENT;
                 if (m.MUTED)
                     lab.cMuted = m.MUTED;
+                lab.paletteLoaded = true;
             } catch (e) {}
         }
         // 聚合文本：开关组＋歌词＋亮度＋左侧小工具
@@ -92,6 +93,7 @@ ShellRoot {
         property string pickT: ""
         property string clipT: ""
         property string screenT: ""
+        property bool paletteLoaded: false
         property bool recording: false
         property bool recBlink: true
         Process {
@@ -472,6 +474,7 @@ ShellRoot {
         model: Quickshell.screens
         PanelWindow {
             id: barWin
+            property bool paletteTimeout: false
             required property var modelData
             screen: modelData
             // 内外屏分流（和线上 Bar 同口径）：外屏亮度走 ddc
@@ -486,6 +489,13 @@ ShellRoot {
             exclusiveZone: 46
             implicitHeight: 46
             color: "transparent"
+
+            // 内容层：启动淡入（等调色板就位），PanelWindow 本身无 opacity 属性
+            Item {
+                id: barContent
+                anchors.fill: parent
+                opacity: (lab.paletteLoaded || barWin.paletteTimeout) ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: 350; easing.type: Easing.OutCubic } }
 
             // 过渡 veil：调色板变化时，两道 accent 光带从两边向中间扫过会合后淡出
             // （和 800ms 底色交叉淡化叠加，更迭感更丰富）
@@ -542,6 +552,7 @@ ShellRoot {
                         text: "❀"; font.pixelSize: 17
                         font.family: lab.font
                         color: launchHover.containsMouse ? lab.cFg : lab.cAccent
+                        Behavior on color { ColorAnimation { duration: 300; easing.type: Easing.InOutQuad } }
                         anchors.verticalCenter: parent.verticalCenter
                         MouseArea {
                             id: launchHover
@@ -1017,6 +1028,12 @@ ShellRoot {
                 }
             }
         }
+                Timer {
+                    interval: 5000
+                    running: true
+                    onTriggered: barWin.paletteTimeout = true
+                }
+            } // barContent
     }
 
     Variants {

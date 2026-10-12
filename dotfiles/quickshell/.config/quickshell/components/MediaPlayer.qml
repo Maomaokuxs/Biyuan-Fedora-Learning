@@ -1,194 +1,231 @@
 import QtQuick
-import Quickshell.Services.Mpris
 
-// 安卓风格播放卡·透明版：无背景色，直接衬在壁纸上（配色由 hellwal 保证对比），
-// 风格对齐顶栏 pill。布局保证塞进 360x132：封面 96 + 右列（标题/艺人/进度/三键）。
+// 音乐详情抽屉（2026-10-10）：从顶栏胶囊向下展开，显示详细信息。
+// 纵向展开动画（scaleY + 淡入），transformOrigin 顶部。
 Item {
     id: root
     property var theme
     signal requestClose
 
     property var player: MprisSelect.pick()
+    property string lyric: BarState.lyricT
+    property string lyricClass: BarState.lyricC
 
-    width: 360
-    height: 132
-    implicitWidth: 360
-    implicitHeight: 132
-
-    // 本地进度：播放时 Timer 累加，拖动时直写 player.position。
-    // len 用直接绑定：Mpris 各属性异步分批到达，信号易错过，绑定由引擎跟踪。
     property double pos: 0
     property double len: {
         var p = root.player;
-        if (!p)
-            return 0;
-        if (p.lengthSupported && p.length > 0)
-            return p.length;
+        if (!p) return 0;
+        if (p.lengthSupported && p.length > 0) return p.length;
         if (p.metadata) {
             var ml = p.metadata["mpris:length"];
-            if (ml > 0)
-                return ml / 1000000;
+            if (ml > 0) return ml / 1000000;
         }
         return 0;
     }
-
-    function fmt(s) {
-        s = Math.max(0, Math.floor(s || 0));
-        return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
-    }
+    property double ratio: root.len > 0 ? Math.min(1, root.pos / root.len) : 0
     function syncPos() {
         var p = root.player;
         root.pos = p ? (p.position || 0) : 0;
     }
-
     Timer {
         interval: 500
         running: root.visible && root.player && root.player.isPlaying
         repeat: true
         onTriggered: {
             root.pos += 0.5;
-            if (root.len > 0 && root.pos > root.len)
-                root.pos = root.len;
+            if (root.len > 0 && root.pos > root.len) root.pos = root.len;
         }
     }
     Connections {
         target: root.player
         function onTrackTitleChanged() { root.syncPos(); }
         function onPositionChanged() {
-            // 外部 seek（非本卡拖动）时跟随；新歌从头播差异大也会自动纠正
             if (root.player && Math.abs(root.player.position - root.pos) > 1.5)
                 root.pos = root.player.position;
         }
     }
-    Component.onCompleted: root.syncPos()
 
-    // 底色与壁纸选择器一致：theme.bg 实底 + muted 细边，内容收进裁剪
+    width: 320
+    height: 300
+    implicitWidth: 320
+    implicitHeight: 300
+
+    // 向下展开动画
+    property bool expanded: false
+    scale: expanded ? 1 : 0.92
+    opacity: expanded ? 1 : 0
+    // 用 y 位移模拟从胶囊垂下
+    y: expanded ? 0 : -12
+    Behavior on scale { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+    Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+    Behavior on y { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+    Component.onCompleted: { root.syncPos(); expanded = true; }
+    transformOrigin: Item.Top
+
     Rectangle {
         anchors.fill: parent
-        radius: 20
+        radius: 18
         color: root.theme.bg
         border.color: root.theme.muted
         border.width: 1
         clip: true
 
-        // ✕ 悬浮右上（标题行给它留 20px）
+        // ✕ 关闭
         Text {
             anchors.top: parent.top
             anchors.right: parent.right
-            anchors.margins: 6
+            anchors.margins: 10
             text: "✕"
             font.pixelSize: 12
             color: root.theme.muted
+            opacity: 0.7
+            z: 2
             MouseArea {
                 anchors.fill: parent
-                anchors.margins: -6
+                anchors.margins: -8
+                hoverEnabled: true
+                onEntered: parent.opacity = 1
+                onExited: parent.opacity = 0.7
                 onClicked: root.requestClose()
             }
         }
 
-    Row {
-        anchors.fill: parent
-        anchors.margins: 12
-        spacing: 8
-
-        // 封面
-        Rectangle {
-            width: 96; height: 96
-            anchors.verticalCenter: parent.verticalCenter
-            radius: 14
-            color: root.theme.accent
-            clip: true
-            Image {
-                anchors.fill: parent
-                source: (root.player && root.player.trackArtUrl) || ""
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: false
-                smooth: true
-                mipmap: true
-                visible: status === Image.Ready
-            }
-                Text {
-                    anchors.centerIn: parent
-                    text: Icons.coverFallback
-                font.family: root.theme.fontFamily
-                color: root.theme.fg
-                visible: !root.player || !root.player.trackArtUrl
-            }
-        }
-
-        // 右列：标题/艺人/进度/三键，总高 20+13+22+34+3*3=98 ≤ 108
         Column {
-            width: parent.width - 96 - 8
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: 3
+            anchors.fill: parent
+            anchors.margins: 16
+            spacing: 10
 
-            Text {
-                width: parent.width - 20
-                text: (root.player && root.player.trackTitle) || "无标题"
-                font.family: root.theme.fontFamily
-                font.pixelSize: 15
-                font.bold: true
-                color: root.theme.fg
-                elide: Text.ElideRight
-                maximumLineCount: 1
+            // 封面 + 基本信息
+            Row {
+                width: parent.width
+                spacing: 12
+                Rectangle {
+                    width: 72; height: 72
+                    radius: 10
+                    color: root.theme.accent
+                    clip: true
+                    Image {
+                        anchors.fill: parent
+                        source: (root.player && root.player.trackArtUrl) || ""
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        cache: false
+                        smooth: true
+                        mipmap: true
+                        visible: status === Image.Ready
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        text: Icons.coverFallback
+                        font.family: root.theme.fontFamily
+                        font.pixelSize: 24
+                        color: root.theme.fg
+                        visible: !root.player || !root.player.trackArtUrl
+                    }
+                }
+                Column {
+                    width: parent.width - 72 - 12 - 20
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 3
+                    Text {
+                        width: parent.width
+                        text: (root.player && root.player.trackTitle) || "无标题"
+                        font.family: root.theme.fontFamily
+                        font.pixelSize: 15
+                        font.bold: true
+                        color: root.theme.fg
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+                    Text {
+                        width: parent.width
+                        text: (root.player && root.player.trackArtist) || ""
+                        font.family: root.theme.fontFamily
+                        font.pixelSize: 12
+                        color: root.theme.muted
+                        elide: Text.ElideRight
+                        visible: text !== ""
+                    }
+                    Text {
+                        width: parent.width
+                        text: {
+                            var p = root.player;
+                            if (!p || !p.metadata) return "";
+                            var al = p.metadata["xesam:album"] || "";
+                            return al;
+                        }
+                        font.family: root.theme.fontFamily
+                        font.pixelSize: 11
+                        color: root.theme.muted
+                        opacity: 0.8
+                        elide: Text.ElideRight
+                        visible: text !== ""
+                    }
+                }
             }
-            Text {
-                width: parent.width - 20
-                text: (root.player && root.player.trackArtist) || ""
-                font.family: root.theme.fontFamily
-                font.pixelSize: 12
-                color: root.theme.muted
-                elide: Text.ElideRight
-                maximumLineCount: 1
-                visible: text !== ""
+
+            // 歌词
+            Rectangle {
+                width: parent.width
+                height: 64
+                radius: 10
+                color: Qt.alpha(root.theme.muted, 0.12)
+                Text {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    text: root.lyric || "♪"
+                    font.family: root.theme.fontFamily
+                    font.pixelSize: 15
+                    font.bold: true
+                    color: root.theme.fg
+                    elide: Text.ElideRight
+                    maximumLineCount: 2
+                    wrapMode: Text.WordWrap
+                    verticalAlignment: Text.AlignVCenter
+                    horizontalAlignment: Text.AlignHCenter
+                }
             }
 
             // 进度条
             Item {
                 width: parent.width
                 height: 20
-                property double ratio: root.len > 0 ? Math.min(1, root.pos / root.len) : 0
-                Text {
-                    id: curT
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    text: root.fmt(root.pos)
-                    font.pixelSize: 10
-                    color: root.theme.muted
-                    font.family: root.theme.fontFamily
-                }
-                Text {
-                    id: totT
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    text: root.fmt(root.len)
-                    font.pixelSize: 10
-                    color: root.theme.muted
-                    font.family: root.theme.fontFamily
-                }
                 Rectangle {
                     id: track
-                    anchors.bottom: parent.bottom
+                    anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
-                    height: 5
-                    radius: 2.5
-                    color: root.theme.muted
-                    opacity: 0.5
+                    height: 4
+                    radius: 2
+                    color: Qt.alpha(root.theme.muted, 0.3)
                     Rectangle {
-                        width: parent.width * parent.parent.ratio
+                        width: parent.width * root.ratio
                         height: parent.height
-                        radius: 2.5
-                        color: root.theme.fg
-                        Behavior on width { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                        radius: 2
+                        color: root.theme.accent
+                        Behavior on width { NumberAnimation { duration: 200 } }
                     }
-                    Rectangle {
-                        x: parent.width * parent.parent.ratio - 5
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 10; height: 10; radius: 5
-                        color: root.theme.fg
-                        Behavior on x { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                }
+                Text {
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    text: {
+                        var s = Math.max(0, Math.floor(root.pos));
+                        return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
                     }
+                    font.pixelSize: 10
+                    color: root.theme.muted
+                    font.family: root.theme.fontFamily
+                }
+                Text {
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    text: {
+                        var s = Math.max(0, Math.floor(root.len));
+                        return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+                    }
+                    font.pixelSize: 10
+                    color: root.theme.muted
+                    font.family: root.theme.fontFamily
                 }
                 MouseArea {
                     anchors.fill: parent
@@ -199,94 +236,69 @@ Item {
                         var r = Math.max(0, Math.min(1, m.x / track.width));
                         var t = r * root.len;
                         root.pos = t;
-                        if (root.player)
-                            root.player.position = t;
+                        if (root.player) root.player.position = t;
                     }
                 }
             }
 
-            // 控制行：上曲/播放/下曲三键均分
-                // 控制组：以进度条中点为中心聚拢，三个高亮圆等距排布
-                // 控制组：三键同尺寸圆（36），等分铺满，以进度条中点为中心
-                Row {
-                    width: parent.width
+            // 控制键
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 16
+                Repeater {
+                    model: [
+                        { icon: Icons.prev, act: "prev" },
+                        { icon: "", act: "play" },
+                        { icon: Icons.next, act: "next" }
+                    ]
                     Item {
+                        required property var modelData
                         property bool hovered: false
-                        width: parent.width / 3; height: 40
+                        width: modelData.act === "play" ? 44 : 36
+                        height: 36
                         Rectangle {
                             anchors.centerIn: parent
-                            width: 22; height: 22; radius: 11
-                            color: parent.hovered ? Qt.lighter(root.theme.accent, 1.12) : root.theme.accent
+                            width: modelData.act === "play" ? 40 : 32
+                            height: modelData.act === "play" ? 40 : 32
+                            radius: modelData.act === "play" ? 20 : 16
+                            color: modelData.act === "play" ? root.theme.accent
+                                : (parent.hovered ? Qt.alpha(root.theme.fg, 0.15) : Qt.alpha(root.theme.fg, 0.07))
                             Behavior on color { ColorAnimation { duration: 120 } }
                         }
                         Text {
                             anchors.centerIn: parent
-                            text: Icons.prev
-                            font.pixelSize: 12
+                            text: modelData.act === "play"
+                                ? ((root.player && root.player.isPlaying) ? Icons.pause : Icons.play)
+                                : modelData.icon
+                            font.pixelSize: modelData.act === "play" ? 16 : 13
+                            font.bold: true
                             font.family: root.theme.fontFamily
-                            color: root.theme.fg
-                            opacity: (root.player && root.player.canGoPrevious) ? 1 : 0.3
+                            color: modelData.act === "play" ? root.theme.bg : root.theme.fg
+                            opacity: {
+                                if (modelData.act === "prev") return (root.player && root.player.canGoPrevious) ? 1 : 0.3;
+                                if (modelData.act === "next") return (root.player && root.player.canGoNext) ? 1 : 0.3;
+                                return 1;
+                            }
                         }
                         MouseArea {
                             anchors.fill: parent
                             hoverEnabled: true
                             onEntered: parent.hovered = true
                             onExited: parent.hovered = false
-                            onClicked: { if (root.player && root.player.canGoPrevious) root.player.previous(); }
-                        }
-                    }
-                    Item {
-                        property bool hovered: false
-                        width: parent.width / 3; height: 40
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 36; height: 36; radius: 18
-                            color: parent.hovered ? Qt.lighter(root.theme.accent, 1.12) : root.theme.accent
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                        }
-                        Text {
-                            anchors.centerIn: parent
-                            text: (root.player && root.player.isPlaying) ? Icons.pause : Icons.play
-                            font.pixelSize: 16
-                            font.family: root.theme.fontFamily
-                            color: root.theme.fg
-                            opacity: 1
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: parent.hovered = true
-                            onExited: parent.hovered = false
-                            onClicked: { if (root.player && root.player.canTogglePlaying) root.player.togglePlaying(); }
-                        }
-                    }
-                    Item {
-                        property bool hovered: false
-                        width: parent.width / 3; height: 40
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: 22; height: 22; radius: 11
-                            color: parent.hovered ? Qt.lighter(root.theme.accent, 1.12) : root.theme.accent
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                        }
-                        Text {
-                            anchors.centerIn: parent
-                            text: Icons.next
-                            font.pixelSize: 12
-                            font.family: root.theme.fontFamily
-                            color: root.theme.fg
-                            opacity: (root.player && root.player.canGoNext) ? 1 : 0.3
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: parent.hovered = true
-                            onExited: parent.hovered = false
-                            onClicked: { if (root.player && root.player.canGoNext) root.player.next(); }
+                            onClicked: {
+                                var pl = root.player;
+                                if (!pl) return;
+                                if (modelData.act === "prev" && pl.canGoPrevious) pl.previous();
+                                else if (modelData.act === "next" && pl.canGoNext) pl.next();
+                                else if (modelData.act === "play") {
+                                    if (pl.isPlaying) { if (pl.canTogglePlaying) pl.togglePlaying(); else if (pl.canPause) pl.pause(); }
+                                    else { if (pl.canPlay) pl.play(); else if (pl.canTogglePlaying) pl.togglePlaying(); }
+                                }
+                            }
                         }
                     }
                 }
-                }
+            }
         }
     }
-    }
+}

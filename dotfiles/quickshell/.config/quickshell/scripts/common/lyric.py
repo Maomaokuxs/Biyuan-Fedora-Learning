@@ -4,9 +4,28 @@ import json, base64, re, subprocess, sys, time, os, urllib.request, urllib.parse
 
 CACHE = "/tmp/waybar_lyric.json"
 
+_pc_player = None
+def _pick_player():
+    global _pc_player
+    if _pc_player:
+        return ["--player", _pc_player]
+    try:
+        r = subprocess.run(["playerctl", "--list-all"], capture_output=True, text=True, timeout=3)
+        players = [x.strip() for x in r.stdout.strip().splitlines() if x.strip()]
+        for pl in players:
+            r2 = subprocess.run(["playerctl", "--player", pl, "status"], capture_output=True, text=True, timeout=3)
+            if r2.stdout.strip() == "Playing":
+                _pc_player = pl
+                return ["--player", pl]
+        if players:
+            return ["--player", players[0]]
+    except Exception:
+        pass
+    return []
+
 def playerctl(args):
     try:
-        r = subprocess.run(["playerctl", *args], capture_output=True, text=True, timeout=3)
+        r = subprocess.run(["playerctl", *_pick_player(), *args], capture_output=True, text=True, timeout=3)
         return r.stdout.strip() if r.returncode == 0 else ""
     except Exception:
         return ""
@@ -34,20 +53,23 @@ def get_hash(title, artist, seconds):
     return d["data"]["lists"][0].get("FileHash")
 
 def get_lrc(hash_, title, seconds):
-    url = "http://lyrics.kugou.com/search?" + urllib.parse.urlencode(
-        {"ver": 1, "man": "yes", "client": "pc", "lrctxt": 1,
-         "keyword": title, "hash": hash_, "timelength": seconds})
-    d = http_json(url)
-    if not d or not d.get("candidates"):
+    try:
+        url = "http://lyrics.kugou.com/search?" + urllib.parse.urlencode(
+            {"ver": 1, "man": "yes", "client": "pc", "lrctxt": 1,
+             "keyword": title, "hash": hash_, "timelength": seconds})
+        d = http_json(url)
+        if not d or not d.get("candidates"):
+            return None
+        c = d["candidates"][0]
+        dl = "http://lyrics.kugou.com/download?" + urllib.parse.urlencode(
+            {"ver": 1, "client": "pc", "fmt": "lrc", "charset": "utf8",
+             "id": c["id"], "accesskey": c["accesskey"]})
+        d2 = http_json(dl)
+        if not d2 or not d2.get("content"):
+            return None
+        return base64.b64decode(d2["content"]).decode("utf-8", errors="ignore")
+    except Exception:
         return None
-    c = d["candidates"][0]
-    dl = "http://lyrics.kugou.com/download?" + urllib.parse.urlencode(
-        {"ver": 1, "client": "pc", "fmt": "lrc", "charset": "utf8",
-         "id": c["id"], "accesskey": c["accesskey"]})
-    d2 = http_json(dl)
-    if not d2 or not d2.get("content"):
-        return None
-    return base64.b64decode(d2["content"]).decode("utf-8", errors="ignore")
 
 TS_RE = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
 def parse_lrc(lrc):
@@ -79,8 +101,12 @@ def main():
     status = playerctl(["status"])
     pos_raw = playerctl(["position"])
 
-    if not title or status != "Playing":
+    if not title:
         print(json.dumps({"text": "♪", "class": "idle", "tooltip": "未在播放"}))
+        return
+    if status != "Playing":
+        # 暂停/停止但有曲目：显示歌名而非 ♪
+        print(json.dumps({"text": title[:20], "class": "paused", "tooltip": f"{title} - {artist}\n已暂停"}))
         return
 
     try:
