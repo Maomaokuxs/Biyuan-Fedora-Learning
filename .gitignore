@@ -51,3 +51,8 @@ dotfiles/quickshell/.config/quickshell/scripts/fcitx5/hud-paper-dark/
 
 # backup
 *.bak-*
+
+# Backup files
+*.bak
+*.bak-*
+*.bak.*
