@@ -732,6 +732,19 @@ binds {
       open-floating true
   }
 
+  // ab-download-manager — 设置弹窗悬浮
+  window-rule {
+      match app-id="com-abdownloadmanager-desktop-AppKt" title="^设置$"
+      open-floating true
+  }
+
+  // babry — 截图时全屏显示
+  window-rule {
+      match app-id=r#"^babry$"#
+      open-fullscreen true
+      open-focused true
+  }
+
   // kitty — Kitty 终端
   window-rule {
       match app-id="kitty"
