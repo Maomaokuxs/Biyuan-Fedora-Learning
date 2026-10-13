@@ -659,7 +659,7 @@ ShellRoot {
                             anchors.verticalCenter: parent.verticalCenter
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: lab.runCmd(["bash", "-c", "pkill gammastep && notify-send 护眼 已关闭 || (gammastep -O 4500 & notify-send 护眼 已开启)"]);
+                                onClicked: lab.runCmd(["bash", Quickshell.env("HOME") + "/.config/quickshell/scripts/common/gamma-toggle.sh"]);
                             }
                         }
                         Text {
