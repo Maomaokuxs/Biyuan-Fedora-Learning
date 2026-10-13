@@ -75,7 +75,7 @@ RowLayout {
         normalBg: theme.deviceBg; normalFg: theme.fg
         forceHidden: Comp.BarState.flagL
         pillText: Comp.BarState.gammaT
-        clickLeft: "bash -c 'pkill gammastep && notify-send 护眼 已关闭 || (gammastep -O 4500 & notify-send 护眼 已开启)'"
+        clickLeft: "bash " + Comp.Exec.commonDir + "/gamma-toggle.sh"
         onLeftClicked: Comp.BarState.refreshOne("gamma", "bash " + Comp.Exec.commonDir + "/gammastep.sh")
     }
     Comp.Pill {
