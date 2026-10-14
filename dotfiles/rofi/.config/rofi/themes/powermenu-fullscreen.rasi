@@ -1,0 +1,68 @@
+/* 引入全局动态调色板 */
+@import "~/.cache/by-mgr/hellwal/color-rofi.rasi"
+
+* {
+    background-color: transparent;
+    text-color: @fg;
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+    font: "JetBrainsMono Nerd Font 14";
+}
+
+/* ==========================================
+ * 1. 窗口层：全屏覆盖，半透明（由 niri 合成器做模糊）
+ * ========================================== */
+window {
+    fullscreen: true;
+    background-color: @fg;
+    padding: 0px;
+}
+
+/* ==========================================
+ * 2. 主容器：用 padding 框出居中区域
+ *    上下 35% + 左右 40% = 中间 20% 宽的区域
+ * ========================================== */
+mainbox {
+    orientation: vertical;
+    background-color: transparent;
+    children: [ listview ];
+    padding: 30% 45% 30% 45%;
+}
+
+/* 隐藏输入栏 */
+inputbar {
+    enabled: false;
+}
+
+/* ==========================================
+ * 3. 电源按钮区：垂直列表，填满 padding 框出的区域
+ * ========================================== */
+listview {
+    layout: vertical;
+    spacing: 10px;
+    lines: 6;
+    scrollbar: false;
+    cycle: false;
+}
+
+/* 单个按钮 */
+element {
+    padding: 12px 20px;
+    border-radius: 8px;
+    background-color: transparent;
+    text-color: @bg;
+    cursor: pointer;
+}
+
+element selected {
+    background-color: @accent;
+    text-color: @fg;
+}
+
+element-text {
+    vertical-align: 0.5;
+    horizontal-align: 0.5;
+    text-color: inherit;
+    font: "JetBrainsMono Nerd Font 15";
+}

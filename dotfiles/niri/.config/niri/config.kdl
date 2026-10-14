@@ -40,9 +40,9 @@ input {
         // dwt
         // dwtp
         // drag false
-        // drag-lock
+        drag-lock
         natural-scroll
-        // accel-speed 0.2
+        accel-speed 0.5
         // accel-profile "flat"
         // scroll-method "two-finger"
         // disabled-on-external-mouse
@@ -586,6 +586,10 @@ binds {
     // Windows in this column will appear as vertical tabs,
     // rather than stacked on top of each other.
     Mod+W { toggle-column-tabbed-display; }
+
+    // ZZZ 斜向壁纸选择器：Mod+Shift+W 直达 quickshell 独立壁纸窗口（IPC 无参）。
+    // 聚焦屏由 quickshell 内部 Process 查 `niri msg focused-output`（本 quickshell 版本不支持 IPC 函数参数类型注解）。
+    Mod+Shift+W { spawn-sh "quickshell ipc -p /home/biyuan/.config/quickshell call wallpaper openWallpaper"; }
 
     // Actions to switch layouts.
     // Note: if you uncomment these, make sure you do NOT have
