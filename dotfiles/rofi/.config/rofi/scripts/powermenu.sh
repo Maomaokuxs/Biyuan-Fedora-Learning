@@ -4,9 +4,6 @@
 # Rofi 极简电源菜单 (Niri / Fedora 专属)
 # ==========================================
 
-# 1. 获取系统运行时间，作为左侧面板的展示信息
-UPTIME=$(uptime -p | sed -e 's/up //g')
-HOST_INFO=" $USER |  $UPTIME"
 
 # 2. 定义 6 个控制按钮的图标与文字 (使用 Nerd Fonts)
 LOCK=" Lock"
@@ -17,11 +14,24 @@ REBOOT="󰜉 Reboot"
 SHUTDOWN="󰐥 Poweroff"
 
 # 3. 呼出 Rofi 面板
-# 使用 -selected-row 0 默认高亮锁屏键，防止误触关机
-SELECTED=$(echo -e "$LOCK\n$SUSPEND\n$HIBERNATE\n$LOGOUT\n$REBOOT\n$SHUTDOWN" | \
-           rofi -dmenu -i -p "$HOST_INFO" \
-           -theme ~/.config/rofi/themes/powermenu.rasi \
-           -selected-row 0)
+# 读取上次选择，默认高亮上次用的菜单；无记录则默认 Lock
+LAST_FILE="$HOME/.cache/rofi-powermenu-last"
+LAST=$(cat "$LAST_FILE" 2>/dev/null || echo "$LOCK")
+case "$LAST" in
+    "$LOCK") SEL_ROW=0 ;;
+    "$SUSPEND") SEL_ROW=1 ;;
+    "$HIBERNATE") SEL_ROW=2 ;;
+    "$SHUTDOWN") SEL_ROW=3 ;;
+    "$REBOOT") SEL_ROW=4 ;;
+    "$LOGOUT") SEL_ROW=5 ;;
+    *) SEL_ROW=0 ;;
+esac
+SELECTED=$(echo -e "$LOCK\n$SUSPEND\n$HIBERNATE\n$SHUTDOWN\n$REBOOT\n$LOGOUT" | \
+           rofi -dmenu -i \
+           -theme ~/.config/rofi/themes/powermenu-fullscreen.rasi \
+           -selected-row $SEL_ROW)
+# 记录本次选择
+[ -n "$SELECTED" ] && echo "$SELECTED" > "$LAST_FILE"
 
 # 4. 执行对应操作
 
