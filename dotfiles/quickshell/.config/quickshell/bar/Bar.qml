@@ -41,72 +41,26 @@ RowLayout {
     }
     BarMod.Workspaces { theme: root.theme; screenName: root.screenName }
 
-    // 左侧工具组（waybar_left_hidden 折叠）：文本走共享聚合 BarState，单相位同起同落
-    Comp.Pill {
-        normalBg: (Comp.BarState.recC === "recording" || Comp.BarState.recC === "kernel" || Comp.BarState.recC === "many" || Comp.BarState.recC === "inhibited") ? theme.clockBg : theme.accent
-        normalFg: (Comp.BarState.recC === "recording" || Comp.BarState.recC === "kernel" || Comp.BarState.recC === "many" || Comp.BarState.recC === "inhibited") ? theme.clockFg : theme.fg
+    // 左侧工具组：8 图标合并到一个胶囊（录制/截图/取色/剪贴板/护眼/主题/壁纸/显示器）
+    Comp.ToolsGroup {
+        theme: root.theme
+        screenName: root.screenName
         forceHidden: Comp.BarState.flagL
-        pillText: Comp.BarState.recT
-        clickLeft: "~/.config/rofi/scripts/recorder.sh"
-        clickRight: "pkill -INT -f gpu-screen-recorder"
-        onLeftClicked: Comp.BarState.refresh()
-        onRightClicked: Comp.BarState.refresh()
-    }
-    Comp.Pill {
-        normalBg: theme.accent; normalFg: theme.fg
-        forceHidden: Comp.BarState.flagL
-        pillText: Comp.BarState.shotT
-        clickLeft: "bash " + Comp.Exec.commonDir + "/screenshot.sh"
-    }
-    Comp.Pill {
-        normalBg: theme.accent; normalFg: theme.fg
-        forceHidden: Comp.BarState.flagL
-        pillText: Comp.BarState.pickT
-        clickLeft: "bash " + Comp.Exec.commonDir + "/pick-color.sh"
-    }
-    Comp.Pill {
-        normalBg: theme.accent; normalFg: theme.fg
-        forceHidden: Comp.BarState.flagL
-        pillText: Comp.BarState.clipT
-        clickLeft: "copyq toggle"
-        clickRight: "copyq eval \"clear()\" 2>/dev/null; notify-send \"剪贴板\" \"已清空\""
-    }
-    Comp.Pill {
-        normalBg: theme.deviceBg; normalFg: theme.fg
-        forceHidden: Comp.BarState.flagL
-        pillText: Comp.BarState.gammaT
-        clickLeft: "bash " + Comp.Exec.commonDir + "/gamma-toggle.sh"
-        onLeftClicked: Comp.BarState.refreshOne("gamma", "bash " + Comp.Exec.commonDir + "/gammastep.sh")
-    }
-    Comp.Pill {
-        normalBg: theme.deviceBg; normalFg: theme.fg
-        forceHidden: Comp.BarState.flagL
-        pillText: Comp.BarState.themeT
-        clickLeft: "bash ~/.config/niri/scripts/toggle-theme.sh"
-        onLeftClicked: Comp.BarState.refresh()
-    }
-    // 壁纸选择器：静态图标，无轮询，零开销；左键开 overlay 浮窗
-    Comp.Pill {
-        normalBg: theme.deviceBg; normalFg: theme.fg
-        anchorKey: "wallAnchorX"
-        anchorScreen: root.screenName
-        forceHidden: Comp.BarState.flagL
-        pillText: Comp.Icons.wallpaper
-        textSize: 15
-        onLeftClicked: Comp.UiState.toggleWall(root.screenName)
-    }
-    Comp.Pill {
-        normalBg: theme.deviceBg; normalFg: theme.fg
-        forceHidden: Comp.BarState.flagL
-        pillText: Comp.BarState.screenT
-        clickLeft: "bash " + Comp.Exec.commonDir + "/screen.sh menu"
-        onLeftClicked: Comp.BarState.refresh()
+        barState: Comp.BarState
+        exec: Comp.Exec
+        uiState: Comp.UiState
+        icons: Comp.Icons
     }
 
     // 媒体组（原生 Mpris，语义与 music.py / mpris 控制一致）
     Comp.MusicInfo {
         normalBg: theme.mediaBg; normalFg: theme.fg
         theme: root.theme; screenName: root.screenName
+        // 右键：音乐总开关，隐藏音律+歌词（与歌词右键一致）
+        onRightClicked: {
+            Comp.Exec.sh("bash " + Comp.Exec.commonDir + "/toggle-music.sh");
+            Comp.BarState.refresh();
+        }
     }
     BarMod.LevelMeter { theme: root.theme; screenName: root.screenName }
     Comp.Pill {
@@ -343,7 +297,7 @@ RowLayout {
         anchorScreen: root.screenName
         pillText: Comp.Icons.sliders
         textSize: 15
-        onLeftClicked: Comp.UiState.toggleCC(root.screenName)
+        onLeftClicked: Comp.UiState.toggleSidebar(root.screenName)
     }
     Comp.Pill {
         normalBg: theme.frameBg; normalFg: theme.fg
