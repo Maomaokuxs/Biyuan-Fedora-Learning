@@ -473,6 +473,15 @@ echo "   中央色彩数据库 -> $PALETTE_FILE"
 echo "正在为各应用分发色彩配置..."
 source "$PALETTE_FILE"
 
+# --- GTK (hud-breeze): colors generated from the central palette ---
+if [ -x "$HOME/.config/niri/scripts/theme-gtk-sync.py" ]; then
+    if [ "$THEME_NIGHT" = true ]; then
+        "$HOME/.config/niri/scripts/theme-gtk-sync.py" --dark || true
+    else
+        "$HOME/.config/niri/scripts/theme-gtk-sync.py" --light || true
+    fi
+fi
+
 # --- A. Niri (color-niri.kdl) ---
 # 边框走 ACCENT；阴影用深黑固定色压出厚重感，不再随主题变；
 # 主配置只留几何（on/softness/spread/offset），颜色全走这里，避免重复定义覆盖。
