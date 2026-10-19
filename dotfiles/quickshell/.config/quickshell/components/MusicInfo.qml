@@ -53,10 +53,6 @@ Rectangle {
     Component.onCompleted: {
         root.shown = root.hasPlayer;
         root.syncPos();
-        if (theme) {
-            if (normalBg === "#998c8c" && theme.mediaBg) normalBg = theme.mediaBg;
-            if (normalFg === "#6a442f" && theme.fg) normalFg = theme.fg;
-        }
         updateAnchor();
     }
 
@@ -208,6 +204,8 @@ Rectangle {
                     Connections {
                         target: root
                         function onRatioChanged() { ring.requestPaint(); }
+                        function onNormalFgChanged() { ring.requestPaint(); }
+                        function onNormalBgChanged() { ring.requestPaint(); }
                     }
                 }
                 Rectangle {
