@@ -39,7 +39,7 @@
 │   │   ├── config.kdl / keybinds.kdl / niri-outputs.kdl
 │   ├── plasma-apply-colorscheme/.local/bin/plasma-apply-colorscheme
 │   ├── quickshell/.config/quickshell
-│   │   ├── bar/ (5 个) / components/ (24 个) / dock/Dock.qml
+│   │   ├── bar/ (5 个) / components/ (32 个) / dock/Dock.qml
 │   │   ├── scripts/ (common/ 等)
 │   │   ├── styles/duo/shell.qml
 │   │   └── shell.qml / Theme.qml
@@ -111,7 +111,12 @@
 `components/Exec/Icons.qml` 路径与图标常量；`components/Audio/Battery/BluetoothPill.qml` 设备 pills；
 `components/MprisButton/MprisSelect/MediaPlayer/MusicInfo.qml` 媒体 pills；
 `components/VolCard/BriCard/SliderBar.qml` 控制卡；`components/VizCard.qml` 可视化卡；
-`components/WallpaperCard.qml` 壁纸卡；`components/ControlCenter.qml` 控制中心浮窗；
+`components/ControlCenter.qml` 控制中心浮窗；
+`components/SettingsSidebar.qml` 设置边栏（右侧滑出）；`components/QuickToggles.qml` 快捷开关组（Wi-Fi/蓝牙/勿扰/护眼/飞行）；
+`components/ToolsGroup.qml` 顶栏工具组；`components/SidebarMusicCard.qml` 边栏音乐卡；
+`components/SidebarWallpaperCard.qml` 边栏壁纸卡；`components/BrightnessRow.qml` 亮度行；
+`components/SegmentBar.qml` 分段条；`components/WallpaperPicker.qml` 壁纸选择器；
+`components/WallpaperPreview.qml` 壁纸预览；
 `components/NotifCenter/Notifs/Toasts.qml` 通知中心三件套；`dock/Dock.qml` 底部浮动 dock；
 `scripts/dock-ensure-stash/minimize/restore/state.sh` 窗口收纳四件套；
 `scripts/common/` 跨栏复用脚本（与 waybar 同名功能一致，`weather.py` 逐字同步）；
@@ -135,3 +140,44 @@
 `waypaper/config.ini` 壁纸源+换后回调取色；`xdg-desktop-portal/portals.conf` 文件选择走 KDE 门户；
 `plasma-apply-colorscheme` 非 KDE 下的配色兼容脚本；`by-mgr/templates/` 配置模板；
 `by-mgr/weather.conf` 天气地点编码（本地持久化，不进仓库）。
+
+## 全仓库依赖关系
+
+```mermaid
+flowchart TD
+    subgraph 壁纸与主题管线
+        WP[waypaper<br/>壁纸源] --> TS[theme-sync.sh<br/>配色中枢]
+        TS --> QS[quickshell<br/>顶栏/dock/边栏]
+        TS --> WB[waybar<br/>备用顶栏]
+        TS --> RF[rofi<br/>启动器/菜单]
+        TS --> KT[kitty<br/>终端]
+        TS --> GTK[gtk/qt<br/>应用主题]
+        TS --> FX[fcitx5<br/>输入法皮肤]
+        TS --> MK[mako<br/>通知样式]
+    end
+
+    subgraph 窗口管理
+        NR[niri<br/>窗口管理器] --> QS
+        NR --> TS
+    end
+
+    subgraph 管理工具
+        BM[by-mgr<br/>配置管理] --> NR
+        BM --> TS
+        BM --> WP
+    end
+
+    subgraph quickshell内部
+        QS --> SSB[SettingsSidebar<br/>设置边栏]
+        QS --> TOG[QuickToggles<br/>快捷开关]
+        QS --> TGP[ToolsGroup<br/>工具组]
+        QS --> WPK[WallpaperPicker<br/>壁纸选择器]
+        SSB --> TOG
+        WPK --> TS
+    end
+
+    classDef core fill:#f9f,stroke:#333,stroke-width:2px
+    classDef app fill:#bfb,stroke:#333
+    class TS,NR core
+    class QS,WB,RF,KT app
+```
