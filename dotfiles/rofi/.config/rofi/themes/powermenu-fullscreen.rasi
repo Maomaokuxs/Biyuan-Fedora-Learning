@@ -15,7 +15,7 @@
  * ========================================== */
 window {
     fullscreen: true;
-    background-color: @fg;
+    background-color: @bg;
     padding: 0px;
 }
 
@@ -51,7 +51,7 @@ element {
     padding: 12px 20px;
     border-radius: 8px;
     background-color: transparent;
-    text-color: @bg;
+    text-color: @fg;
     cursor: pointer;
 }
 
