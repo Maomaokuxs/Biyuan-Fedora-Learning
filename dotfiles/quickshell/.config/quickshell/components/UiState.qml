@@ -26,6 +26,15 @@ QtObject {
     // 控制中心
     property bool ccOpen: false
     property string ccScreen: ""
+    // 设置边栏（C 精修版，新增，不动原弹窗文件）：滑块 pill 左键走 sidebar，替换原控制中心入口
+    property bool sidebarOpen: false
+    property string sidebarScreen: ""
+    property bool sidebarWallpaper: false
+    // ZZZ 斜向壁纸选择器（独立窗口，居中 960×600）：Mod+Shift+W / 边栏壁纸行打开
+    property bool wallpaperPickerOpen: false
+    property string wallpaperPickerScreen: ""
+    // 壁纸过渡（awww 真实类型），与 Pill 波形用的 transitionStyle 分开，落盘 ~/.cache/by-mgr/wallpaper-transition
+    property string wallpaperTransition: "fade"
     // 锚点按屏分键：双栏下两边 pill 同时上报，单全局值会被盖掉错乱。
     // 结构 {key: {screenName: x}}，整体重赋以触发绑定。
     property var anchorMap: ({})
@@ -105,6 +114,12 @@ QtObject {
             root.notifOpen = false;
         if (except !== "cc")
             root.ccOpen = false;
+        if (except !== "sidebar") {
+            root.sidebarOpen = false;
+            root.sidebarWallpaper = false;
+        }
+        if (except !== "wallpicker")
+            root.wallpaperPickerOpen = false;
     }
 
     function toggleNotif(screenName: string) {
@@ -179,6 +194,27 @@ QtObject {
             root.ccScreen = screenName;
             root.ccOpen = true;
             root.closeOthers("cc");
+        }
+    }
+
+    function toggleSidebar(screenName: string) {
+        if (root.sidebarOpen && root.sidebarScreen === screenName) {
+            root.sidebarOpen = false;
+            root.sidebarWallpaper = false;
+        } else {
+            root.sidebarScreen = screenName;
+            root.sidebarOpen = true;
+            root.closeOthers("sidebar");
+        }
+    }
+
+    function toggleWallpaperPicker(screenName: string) {
+        if (root.wallpaperPickerOpen && root.wallpaperPickerScreen === screenName) {
+            root.wallpaperPickerOpen = false;
+        } else {
+            root.wallpaperPickerScreen = screenName;
+            root.wallpaperPickerOpen = true;
+            root.closeOthers("wallpicker");
         }
     }
 

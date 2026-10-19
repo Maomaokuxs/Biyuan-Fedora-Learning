@@ -1,6 +1,7 @@
 //@ pragma UseQApplication
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import "./bar" as BarMod
 import "./dock" as DockMod
@@ -10,6 +11,45 @@ import "./components" as Comp
 // 运行：quickshell -p <本目录>（如 ~/.config/quickshell）
 // 脚本路径全部经 Exec.scriptDir（= Quickshell.configDir）拼接，不写死个人路径。
 ShellRoot {
+    // IPC：Mod+Shift+W 直达壁纸选择器（niri 绑定调 quickshell ipc call wallpaper openWallpaper）。
+    // 本 quickshell 版本 QML 解析器不支持函数参数类型注解，IPC 带参会报 QVariant 无法跨 IPC，
+    // 故用无参函数 + 内部 Process 查 `niri msg focused-output`（quickshell 由 niri 拉起，自带 NIRI_SOCKET）。
+    // 查不到/不在屏列表里时回落主屏。
+    IpcHandler {
+        target: "wallpaper"
+        function openWallpaper(): void {
+            focusQuery.running = true;
+        }
+    }
+    Process {
+        id: focusQuery
+        command: ["bash", "-c", "niri msg focused-output 2>/dev/null | grep -m1 -oP '\\(\\K[^)]+' | head -1"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var s = this.text.trim();
+                var ok = false;
+                for (var i = 0; i < Quickshell.screens.length; i++) {
+                    if (Quickshell.screens[i].name === s) { ok = true; break; }
+                }
+                if (!ok) {
+                    for (var j = 0; j < Quickshell.screens.length; j++) {
+                        if (Quickshell.screens[j].isMainScreen) { s = Quickshell.screens[j].name; break; }
+                    }
+                }
+                if (s === "")
+                    s = Quickshell.screens[0].name;
+                Comp.UiState.toggleWallpaperPicker(s);
+            }
+        }
+    }
+
+    // 护眼模式持久化恢复：启动时读 ~/.cache/by-mgr/gammastep-on，为 1 则恢复开启。
+    // 脚本内部 sleep 5 后台执行，不卡启动关键路径；已开则不重复起。
+    Process {
+        command: ["bash", Comp.Exec.commonDir + "/gammastep-restore.sh"]
+        running: true
+    }
+
     // 注意：Variants delegate 是隔离作用域，外层 id 直接引用会 undefined，
     // 故每个 PanelWindow 内各自实例化 Theme。
     Variants {
@@ -215,34 +255,6 @@ ShellRoot {
         }
     }
 
-    // 壁纸选择器 overlay：锚到壁纸 pill 下方
-    Variants {
-        model: Quickshell.screens
-        PanelWindow {
-            required property var modelData
-            screen: modelData
-            visible: Comp.UiState.wallOpen && modelData.name === Comp.UiState.wallScreen
-
-            Theme { id: wallTheme }
-
-            anchors { top: true; left: true }
-            margins { top: 52; left: ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.wall.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.wall.w / 2 }
-            implicitWidth: 560
-            implicitHeight: 480
-            color: "transparent"
-            exclusionMode: ExclusionMode.Ignore
-            WlrLayershell.layer: WlrLayer.Overlay
-            // 壁纸窗要吃方向键/回车/Esc，独占键盘（关窗即归还）
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-
-            Comp.WallpaperCard {
-                anchors.fill: parent
-                theme: wallTheme
-                onRequestClose: Comp.UiState.wallOpen = false
-            }
-        }
-    }
-
     // 控制中心 overlay：标签页 + 滑杆 + 开关（rofi 做不了的三件套）。
     // 锚 pill 中心，左右缘钳制（VizCard 同款：直接下标 + Math 钳位，不包方法）。
     Variants {
@@ -267,6 +279,106 @@ ShellRoot {
                 anchors.fill: parent
                 theme: ccTheme
                 onRequestClose: Comp.UiState.ccOpen = false
+            }
+        }
+    }
+
+    // 设置边栏 C 精修版 overlay（新增，原 6 个 overlay 全部保留）：
+    // 右侧临时滑出，窄态 460 / 壁纸态 760，宽动画 250ms。滑块 pill 左键走边栏，替换原控制中心入口。
+    // 点击空白关闭：背景与卡片同窗（背景 MouseArea 在卡片之前声明，QML 顺序保证卡片在上），
+    // 不再用独立全屏背景窗——独立背景窗在 niri 里会盖到边栏上，吃掉边栏内点击
+    // （点壁纸行反而关边栏、“壁纸窗口无法进入”的回归根因，2026-10-14 修）。
+    Variants {
+        model: Quickshell.screens
+        PanelWindow {
+            required property var modelData
+            screen: modelData
+            visible: Comp.UiState.sidebarOpen && modelData.name === Comp.UiState.sidebarScreen
+
+            Theme { id: sidebarTheme }
+
+            // 全屏（顶留 46 不遮顶栏）：背景点空白 + 卡片同窗
+            anchors { top: true; left: true; right: true; bottom: true }
+            margins { top: 46; left: 0; right: 0; bottom: 0 }
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.layer: WlrLayer.Overlay
+            // 独占键盘以接 Esc（壁纸卡同款）；关边栏即归还
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+
+            // 背景：点空白关闭。声明在卡片之前，卡片在上，点卡片/滑杆不会误触。
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    Comp.UiState.sidebarOpen = false;
+                    Comp.UiState.sidebarWallpaper = false;
+                }
+            }
+
+            // 卡片：右侧滑出
+            Item {
+                id: sidebarWrap
+                anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
+                anchors.topMargin: 6
+                anchors.rightMargin: 12
+                anchors.bottomMargin: 12
+                width: Comp.UiState.sidebarWallpaper ? 760 : 460
+                Behavior on width { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
+                focus: true
+                // 入场：从右侧滑入（Translate，不与 width 动画抢 x）
+                property real slideIn: Comp.UiState.sidebarOpen ? 0 : 1
+                Behavior on slideIn { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                transform: Translate { x: sidebarWrap.slideIn * (sidebarWrap.width + 12) }
+                // Esc：壁纸态先回窄态，再 Esc 关闭，与 ← 返回一致
+                Keys.onEscapePressed: {
+                    if (Comp.UiState.sidebarWallpaper)
+                        sidebarContent.exitWallpaper();
+                    else {
+                        Comp.UiState.sidebarOpen = false;
+                        Comp.UiState.sidebarWallpaper = false;
+                    }
+                }
+
+                Comp.SettingsSidebar {
+                    id: sidebarContent
+                    anchors.fill: parent
+                    theme: sidebarTheme
+                    onRequestClose: {
+                        Comp.UiState.sidebarOpen = false;
+                        Comp.UiState.sidebarWallpaper = false;
+                    }
+                }
+            }
+        }
+    }
+
+    // 极简壁纸选择器 overlay（独立居中窗口，不进边栏，不叠层，不全屏）：
+    // 900×600 居中窗口（组件内 Theme.bg 背景，圆角 16），不铺壁纸全屏（防头晕）。
+    Variants {
+        model: Quickshell.screens
+        PanelWindow {
+            required property var modelData
+            screen: modelData
+            visible: Comp.UiState.wallpaperPickerOpen && modelData.name === Comp.UiState.wallpaperPickerScreen
+
+            Theme { id: zzzTheme }
+
+            property real winW: Math.min(900, (modelData.width || 900) * 0.9)
+            property real winH: Math.min(600, (modelData.height || 600) * 0.9)
+            anchors { top: true; left: true }
+            margins { top: ((modelData.height || 600) - winH) / 2; left: ((modelData.width || 900) - winW) / 2 }
+            implicitWidth: winW
+            implicitHeight: winH
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.layer: WlrLayer.Overlay
+            // 壁纸窗要吃方向键/回车/Esc/滚轮，独占键盘（关窗即归还，壁纸卡同款）
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+
+            Comp.WallpaperPicker {
+                anchors.fill: parent
+                theme: zzzTheme
+                onRequestClose: Comp.UiState.wallpaperPickerOpen = false
             }
         }
     }
