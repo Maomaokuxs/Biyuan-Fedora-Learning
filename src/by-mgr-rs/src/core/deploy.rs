@@ -49,7 +49,7 @@ pub fn deploy_cli_quiet(cfg: &AppConfig, mode: DeployMode) -> Result<String> {
     let out = std::process::Command::new("bash")
         .arg(&path)
         .arg(arg)
-        .env("BY_MGR_QUIET", "1")
+        .env("BY_MGR_QUIET", "1").env("BY_MGR_REPO", &cfg.repo_dir)
         .output()?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);

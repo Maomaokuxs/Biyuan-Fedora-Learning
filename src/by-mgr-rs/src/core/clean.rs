@@ -22,7 +22,7 @@ pub fn clean_cli_quiet(cfg: &AppConfig, keep: Option<usize>, days: Option<u64>) 
     };
     let path = cfg.lib_path("clean.sh");
     let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    let out = std::process::Command::new("bash").arg(&path).args(&args_ref).env("BY_MGR_QUIET", "1").output()?;
+    let out = std::process::Command::new("bash").arg(&path).args(&args_ref).env("BY_MGR_QUIET", "1").env("BY_MGR_REPO", &cfg.repo_dir).output()?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     if !out.status.success() {

@@ -10,7 +10,7 @@ pub fn ota_quiet(cfg: &AppConfig) -> Result<String> {
     let path = cfg.lib_path("ota.sh");
     let out = std::process::Command::new("bash")
         .arg(&path)
-        .env("BY_MGR_QUIET", "1")
+        .env("BY_MGR_QUIET", "1").env("BY_MGR_REPO", &cfg.repo_dir)
         .output()?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);

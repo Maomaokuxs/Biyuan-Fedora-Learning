@@ -27,7 +27,7 @@ pub fn run_lib(cfg: &AppConfig, script: &str, args: &[&str]) -> Result<()> {
     if !path.is_file() {
         return Err(anyhow!("lib 脚本缺失: {}", path.display()));
     }
-    let status = Command::new("bash").arg(&path).args(args).status()?;
+    let status = Command::new("bash").arg(&path).args(args).env("BY_MGR_REPO", &cfg.repo_dir).status()?;
     if !status.success() {
         return Err(anyhow!("{} 执行失败 (exit {:?})", script, status.code()));
     }
