@@ -3,7 +3,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
 
-// 极简壁纸选择器 — 只三件：左/中大预览 + 右选图列 + 下配色预览。
+// 壁纸选择器：左大预览 + 可拖竖线 + 右缩略图网格（1~3 列随宽） + 下配色预览。
+// 竖线可拖：往左拖网格变宽、列数变多，拖到 0 预览消失变纯网格；位置持久化到 ~/.cache/by-mgr/qs-picker-split。
 // 外壳 900×600 居中，背景 Theme.bg（跟随配色，不全屏、不透明窗、不写死深棕）。
 // 顶栏只留标题 + ✕。无过渡面板、无收藏/随机/应用主按钮、无上一下张、无徽标/说明。
 // 过渡用原来默认 awww --transition-type random，UI 不选。
@@ -29,6 +30,11 @@ Item {
     // 每个壁纸的信息：name -> {w, h, size}，由 infoProc 批量 file+stat 填充，失败则只显示名字
     property var infoMap: ({})
 
+    // 可拖竖线：左侧预览区宽度（-1 = 未初始化用默认）；splitEff 为钳制后的生效值
+    property real splitW: -1
+    readonly property real splitMax: Math.max(0, mainArea.width - 232)
+    readonly property real splitEff: root.splitW < 0 ? Math.max(0, mainArea.width - 240) : Math.max(0, Math.min(root.splitW, root.splitMax))
+
     // 配色预览（跟随选中壁纸，不读 global-palette.env）：空 = 未算出，UI 回落 Theme 色
     property var previewPalette: ({})
     property var paletteCache: ({})
@@ -39,6 +45,9 @@ Item {
 
     function shQuote(s) {
         return "'" + String(s || "").replace(/'/g, "'\"'\"'") + "'";
+    }
+    function saveSplit() {
+        Exec.sh("printf '%s' " + Math.round(root.splitEff) + " > ~/.cache/by-mgr/qs-picker-split");
     }
     function filePath(url) {
         return String(url || "").replace(/^file:\/\//, "");
@@ -211,7 +220,10 @@ Item {
             root.forceActiveFocus();
         }
     }
-    Component.onCompleted: root.refreshAll()
+    Component.onCompleted: {
+        root.refreshAll();
+        splitProc.running = true;
+    }
 
     Process {
         id: lsProc
@@ -233,6 +245,17 @@ Item {
         command: ["bash", "-c", "cat ~/.cache/by-mgr/last-wallpaper 2>/dev/null"]
         stdout: StdioCollector {
             onStreamFinished: { root.current = this.text.trim(); root.snapToCurrent(); }
+        }
+    }
+    // 上次拖拽的竖线位置（整数 px）：读到合法值才用（splitEff 负责钳制到当前窗口范围），否则 splitW 保持 -1 用默认
+    Process {
+        id: splitProc
+        command: ["bash", "-c", "cat ~/.cache/by-mgr/qs-picker-split 2>/dev/null"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var v = parseInt(this.text.trim(), 10);
+                if (!isNaN(v) && v >= 0) root.splitW = v;
+            }
         }
     }
     // 批量取分辨率 + 大小：find + file + stat，一次输出 name|w|h|size
@@ -269,10 +292,14 @@ Item {
 
     focus: true
     Keys.onPressed: (event) => {
-        if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
+        if (event.key === Qt.Key_Left) {
             root.tryStep(-1); event.accepted = true;
-        } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
+        } else if (event.key === Qt.Key_Right) {
             root.tryStep(1); event.accepted = true;
+        } else if (event.key === Qt.Key_Up) {
+            root.tryStep(-grid.cols); event.accepted = true;
+        } else if (event.key === Qt.Key_Down) {
+            root.tryStep(grid.cols); event.accepted = true;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
             root.applySelected(); event.accepted = true;
         } else if (event.key === Qt.Key_Escape) {
@@ -331,17 +358,19 @@ Item {
             anchors { top: header.bottom; left: parent.left; right: parent.right; bottom: paletteBar.top }
             anchors.leftMargin: 16; anchors.rightMargin: 16; anchors.topMargin: 4; anchors.bottomMargin: 8
 
-            // 左：大预览 + 名字 + 信息
+            // 左：大预览 + 名字 + 信息（宽度 = splitEff，竖线拖到 0 时整体隐藏）
             Item {
                 id: previewArea
-                anchors { top: parent.top; left: parent.left; bottom: parent.bottom; right: listArea.left }
-                anchors.rightMargin: 12
+                anchors { top: parent.top; left: parent.left; bottom: parent.bottom }
+                width: root.splitEff
+                visible: root.splitEff > 0
+                clip: true
 
                 // 大预览：UI 与动效隔离（WallpaperPreview 组件），左→右裁剪揭示
                 Item {
                     id: flipWrap
                     anchors { top: parent.top; left: parent.left; right: parent.right }
-                    height: parent.height - 52
+                    height: root.splitEff >= 200 ? parent.height - 52 : parent.height
                     clip: true
 
                     // 轻阴影（在预览卡后，静态，非动画）
@@ -361,6 +390,7 @@ Item {
                     id: previewName
                     anchors { top: flipWrap.bottom; left: parent.left; right: parent.right }
                     anchors.topMargin: 8
+                    visible: root.splitEff >= 200
                     text: {
                         var it = root.displayItem();
                         return it ? it.name : "";
@@ -371,42 +401,39 @@ Item {
                 Text {
                     anchors { top: previewName.bottom; left: parent.left; right: parent.right }
                     anchors.topMargin: 2
+                    visible: root.splitEff >= 200
                     text: root.infoTextFor(root.selectedIndex)
                     font.family: root.theme.fontFamily; font.pixelSize: 12; color: root.theme.muted
                     elide: Text.ElideRight
                 }
             }
 
-            // 右：壁纸选择竖列
+            // 右：壁纸缩略图网格（列数随自身宽度：<360 一列 / <660 两列 / 否则三列）
             Item {
-                id: listArea
-                anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
-                width: 220
-                Text {
-                    id: listTitle
-                    anchors { top: parent.top; left: parent.left }
-                    text: "壁纸"
-                    font.family: root.theme.fontFamily; font.pixelSize: 12; font.bold: true; color: root.theme.muted
-                }
-                ListView {
-                    id: listView
-                    anchors { top: listTitle.bottom; left: parent.left; right: parent.right; bottom: parent.bottom }
-                    anchors.topMargin: 6
+                id: gridArea
+                anchors { top: parent.top; bottom: parent.bottom }
+                x: root.splitEff + 24
+                width: parent.width - root.splitEff - 24
+
+                GridView {
+                    id: grid
+                    anchors.fill: parent
                     clip: true
-                    spacing: 8
                     model: root.wallFiles
                     currentIndex: root.selectedIndex
                     highlightFollowsCurrentItem: true
+                    readonly property int cols: width < 360 ? 1 : (width < 660 ? 2 : 3)
+                    cellWidth: Math.floor(width / cols)
+                    cellHeight: Math.round((cellWidth - 12) * 9 / 16 + 12)
                     delegate: Item {
                         required property var modelData
                         required property int index
-                        width: listView.width
-                        height: 96
+                        width: grid.cellWidth
+                        height: grid.cellHeight
                         // 缩略图：小图用 thumb（已够），不放大
                         ClippingRectangle {
-                            id: thumbClip
-                            anchors { top: parent.top; left: parent.left; right: parent.right }
-                            height: 88
+                            anchors.fill: parent
+                            anchors.margins: 6
                             radius: 8
                             color: root.theme.mediaBg
                             border.width: (index === root.selectedIndex) ? 3 : 0
@@ -433,8 +460,45 @@ Item {
                         }
                     }
                     onCurrentIndexChanged: {
-                        if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain);
+                        if (currentIndex >= 0) positionViewAtIndex(currentIndex, GridView.Contain);
                     }
+                }
+            }
+
+            // 中：可拖拽竖线（线居预览/列表空隙正中 splitEff+12；热区 14px 以线为中心）
+            Item {
+                id: divider
+                x: root.splitEff + 2
+                width: 20
+                anchors { top: parent.top; bottom: parent.bottom }
+
+                Rectangle {
+                    anchors { top: parent.top; bottom: parent.bottom }
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 2
+                    color: Qt.alpha(root.theme.muted, 0.35)
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 6; height: 36; radius: 3
+                    color: Qt.alpha(root.theme.muted, 0.6)
+                }
+                MouseArea {
+                    anchors { top: parent.top; bottom: parent.bottom }
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 14
+                    cursorShape: Qt.SizeHorCursor
+                    property real grabDelta: 0
+                    onPressed: (mouse) => {
+                        var p = mapToItem(mainArea, mouse.x, mouse.y);
+                        grabDelta = (root.splitEff + 12) - p.x;
+                    }
+                    onPositionChanged: (mouse) => {
+                        if (!pressed) return;
+                        var p = mapToItem(mainArea, mouse.x, mouse.y);
+                        root.splitW = Math.max(0, Math.min(p.x + grabDelta - 12, root.splitMax));
+                    }
+                    onReleased: root.saveSplit()
                 }
             }
         }
