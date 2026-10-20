@@ -22,13 +22,24 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// 创建快照
-    Snapshot,
+    Snapshot {
+        /// 快照备注 (-m)
+        #[arg(short = 'm', long = "message")]
+        message: Option<String>,
+    },
     /// 列出快照
     List,
     /// 历史还原
     Restore {
         /// 快照标识: last/-1/编号/时间戳 (YYYYMMDD_HHMMSS)
         target: Option<String>,
+    },
+    /// 给快照设置/修改备注
+    Note {
+        /// 快照标识: 编号/时间戳/last
+        target: String,
+        /// 备注内容
+        message: String,
     },
     /// 清理快照
     Clean {
@@ -84,27 +95,39 @@ fn main() -> Result<()> {
     let cfg = AppConfig::discover()?;
 
     match cli.command.unwrap() {
-        Commands::Snapshot => core::snapshot::snapshot_cli(&cfg)?,
+        Commands::Snapshot { message } => {
+            core::snapshot::snapshot_cli(&cfg, message.as_deref())?
+        }
         Commands::List => {
-            let mut list: Vec<_> = std::fs::read_dir(&cfg.backup_root)
-                .map(|it| {
-                    it.flatten()
-                        .filter(|e| e.path().is_dir())
-                        .map(|e| e.path())
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            list.sort();
-            list.reverse();
+            let list = core::snapshot::snapshot_dirs(&cfg);
             if list.is_empty() {
                 println!("（无快照）");
             } else {
-                println!(" {:<4} {}", "编号", "时间");
-                println!(" ---- ----");
+                println!(" {:<4} {:<17} {}", "编号", "时间", "备注");
+                println!(" ---- ----------------- ----");
                 for (i, p) in list.iter().enumerate() {
-                    println!(" {:<4} {}", i + 1, p.file_name().unwrap().to_string_lossy());
+                    let note = core::snapshot::read_note(p)
+                        .filter(|n| !n.is_empty())
+                        .map(|n| {
+                            if n.chars().count() > 30 {
+                                format!("{}…", n.chars().take(30).collect::<String>())
+                            } else {
+                                n
+                            }
+                        })
+                        .unwrap_or_else(|| "-".to_string());
+                    println!(
+                        " {:<4} {:<17} {}",
+                        i + 1,
+                        p.file_name().unwrap().to_string_lossy(),
+                        note
+                    );
                 }
             }
+        }
+        Commands::Note { target, message } => {
+            let name = core::snapshot::set_note(&cfg, &target, &message)?;
+            println!("✅ {} 的备注已更新: {}", name, message);
         }
         Commands::Restore { target } => core::restore::restore_cli(&cfg, target)?,
         Commands::Clean { keep, days } => core::clean::clean_cli(&cfg, keep, days)?,
@@ -132,7 +155,8 @@ fn print_help() {
     println!("用法: by-mgr [COMMAND] [--text]");
     println!();
     println!("命令:");
-    println!("  snapshot              创建快照");
+    println!("  snapshot [-m 备注]      创建快照");
+    println!("  note <编号> <备注>       给快照设置/修改备注");
     println!("  list                  列出快照");
     println!("  restore [TARGET]      历史还原 (last/-1/编号/时间戳)");
     println!("  clean -k <N> | -d <天数>  清理快照");
