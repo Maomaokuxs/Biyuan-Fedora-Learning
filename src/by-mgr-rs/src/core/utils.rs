@@ -62,6 +62,38 @@ pub fn copy_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// 显示宽度（CJK 等全角字符算 2 列），供表格对齐
+pub fn display_width(s: &str) -> usize {
+    s.chars()
+        .map(|c| {
+            let u = c as u32;
+            if (0x1100..=0x115F).contains(&u)
+                || (0x2E80..=0xA4CF).contains(&u)
+                || (0xAC00..=0xD7A3).contains(&u)
+                || (0xF900..=0xFAFF).contains(&u)
+                || (0xFE30..=0xFE4F).contains(&u)
+                || (0xFF00..=0xFF60).contains(&u)
+                || (0xFFE0..=0xFFE6).contains(&u)
+                || (0x20000..=0x3FFFD).contains(&u)
+            {
+                2
+            } else {
+                1
+            }
+        })
+        .sum()
+}
+
+/// 按显示宽度把字符串补空格到 w 列
+pub fn pad_display(txt: &str, w: usize) -> String {
+    let dw = display_width(txt);
+    if dw >= w {
+        txt.to_string()
+    } else {
+        format!("{}{}", txt, " ".repeat(w - dw))
+    }
+}
+
 pub fn is_empty_dir(p: &Path) -> bool {
     if !p.is_dir() {
         return false;

@@ -37,7 +37,7 @@ case "$1" in
             else
                 echo "删除 $((i+1))/$remove_count: $(basename "${time_list[i]}")" >> "$LOG_FILE"
             fi
-            rm -rf "${time_list[i]}" 2>>"$LOG_FILE" || true
+            trash_move "${time_list[i]}"
         done
         if [ -z "${BY_MGR_QUIET:-}" ]; then
             echo -e "${GREEN}✅ 已清理 $remove_count 个旧快照，保留 $keep 个。${NC}" | tee -a "$LOG_FILE"
@@ -60,7 +60,7 @@ case "$1" in
                 else
                     echo "删除 $s" >> "$LOG_FILE"
                 fi
-                rm -rf "$s" 2>>"$LOG_FILE" || true
+                trash_move "$s"
                 del_count=$((del_count+1))
             fi
         done

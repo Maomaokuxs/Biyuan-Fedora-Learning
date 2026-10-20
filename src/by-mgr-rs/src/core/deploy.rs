@@ -85,7 +85,7 @@ pub fn init_local_share(cfg: &AppConfig) -> Result<()> {
         let src = cfg.repo_dir.join(name);
         let dst_path = dst.join(name);
         if src.is_dir() {
-            let _ = std::fs::remove_dir_all(&dst_path);
+            let _ = crate::core::trash::trash_move(cfg, &dst_path, "deploy");
             crate::core::utils::copy_recursive(&src, &dst_path)?;
         }
     }
@@ -95,18 +95,26 @@ pub fn init_local_share(cfg: &AppConfig) -> Result<()> {
     let _ = std::fs::create_dir_all(home.join(".config/by-mgr/templates"))?;
     let src_tpl = cfg.repo_dir.join("dotfiles/by-mgr/.config/by-mgr/templates");
     if src_tpl.is_dir() {
-        for entry in std::fs::read_dir(&src_tpl).unwrap().filter_map(|e| e.ok()) {
-            let _ = std::fs::copy(entry.path(), home.join(".config/by-mgr/templates").join(entry.file_name()));
+        if let Ok(rd) = std::fs::read_dir(&src_tpl) {
+            for entry in rd.filter_map(|e| e.ok()) {
+                let _ = std::fs::copy(
+                    entry.path(),
+                    home.join(".config/by-mgr/templates").join(entry.file_name()),
+                );
+            }
         }
     }
     // 同步当前二进制为实体文件（非软链，删仓后仍可用）
+    // bin 已是软链（如链接到仓库构建产物）时跳过，避免冲掉链接
     let bin_dst = home.join(".local/bin/by-mgr");
-    if let Ok(exe) = std::env::current_exe() {
-        let exe_real = exe.canonicalize().unwrap_or(exe.clone());
-        let _ = std::fs::create_dir_all(bin_dst.parent().unwrap());
-        let _ = std::fs::remove_file(&bin_dst);
-        let _ = std::fs::copy(&exe_real, &bin_dst);
-        let _ = std::process::Command::new("chmod").arg("+x").arg(&bin_dst).status();
+    if !bin_dst.is_symlink() {
+        if let Ok(exe) = std::env::current_exe() {
+            let exe_real = exe.canonicalize().unwrap_or(exe.clone());
+            let _ = std::fs::create_dir_all(bin_dst.parent().unwrap());
+            let _ = crate::core::trash::trash_move(cfg, &bin_dst, "deploy");
+            let _ = std::fs::copy(&exe_real, &bin_dst);
+            let _ = std::process::Command::new("chmod").arg("+x").arg(&bin_dst).status();
+        }
     }
     Ok(())
 }

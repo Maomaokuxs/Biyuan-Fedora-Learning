@@ -1,4 +1,5 @@
 pub mod snapshot;
+pub mod trash;
 pub mod restore;
 pub mod clean;
 pub mod deploy;

@@ -67,11 +67,13 @@ replenish() {
     [ -f "$src" ] || { echo "未找到清单 $src" >&2; exit 1; }
     local enabled
     enabled=$(dnf repolist --enabled 2>/dev/null || true)
+    local enabled_ids
+    enabled_ids=$(echo "$enabled" | tail -n +2 | awk '{print $1}')
     while IFS= read -r t; do
         t=$(echo "$t" | xargs)
         [[ -z "$t" || "$t" == \#* ]] && continue
         kind=$(echo "$t" | awk '{print $1}'); id=$(echo "$t" | awk '{print $2}')
-        echo "$enabled" | grep -q "$id" && continue
+        echo "$enabled_ids" | grep -qxF "$id" && continue
         if [ -z "${BY_MGR_QUIET:-}" ]; then
             echo ">> 补齐 $kind $id"
         else

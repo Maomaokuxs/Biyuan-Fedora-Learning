@@ -5,7 +5,7 @@ SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 source "$SCRIPT_DIR/utils.sh"
 RAW_URL="https://raw.githubusercontent.com/Maomaokuxs/Biyuan-Fedora-Learning/main/scripts/by-mgr"
 SELF_PATH="$REPO_DIR/scripts/by-mgr"
-TMP_FILE="/tmp/by-mgr-latest"
+TMP_FILE=$(mktemp /tmp/by-mgr-latest.XXXXXX)
 BIN_DST="$HOME/.local/bin/by-mgr"
 LOG_FILE="$LOG_DIR/ota.log"
 mkdir -p "$LOG_DIR"

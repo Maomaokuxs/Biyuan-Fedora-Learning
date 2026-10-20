@@ -9,11 +9,16 @@ echo "[$(date +%H:%M:%S)] snapshot START dotfiles=$DOTFILES_DIR" > "$LOG_FILE"
 
 date_tag=$(date +%Y%m%d_%H%M%S)
 current_backup_dir="$BACKUP_ROOT/$date_tag"
+while [ -e "$current_backup_dir" ]; do
+    sleep 1
+    date_tag=$(date +%Y%m%d_%H%M%S)
+    current_backup_dir="$BACKUP_ROOT/$date_tag"
+done
 mkdir -p "$current_backup_dir"
 backed_any=false
 # 仅输出 文件 -> 目录 精简信息，供 TUI 状态栏显示
 # 清理历史遗留的 waybar 桥接软链（防 stow absolute symlink 冲突）
-[ -d "$DOTFILES_DIR/waybar/.cache" ] && rm -rf "$DOTFILES_DIR/waybar/.cache" 2>/dev/null || true
+[ -d "$DOTFILES_DIR/waybar/.cache" ] && trash_move "$DOTFILES_DIR/waybar/.cache" || true
 for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
     src=$(get_target_path "$module")
     if [ -e "$src" ] || [ -L "$src" ]; then
@@ -28,6 +33,7 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
                 [ -e "$f" ] || continue
                 bn=$(basename "$f")
                 [ "$bn" = "backup" ] && continue
+                [ "$bn" = "trash" ] && continue
                 cp -aL "$f" "$dest/" 2>/dev/null && echo "$rel_path/$bn -> $dest/$bn" | tee -a "$LOG_FILE" && backed_any=true
             done
             # 若 by-mgr 下无非 backup 文件，仍视为已备份
