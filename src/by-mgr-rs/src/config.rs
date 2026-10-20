@@ -14,11 +14,18 @@ impl AppConfig {
     pub fn discover() -> Result<Self> {
         let self_path = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("/proc/self/exe"));
         let exe_canonical = self_path.canonicalize().unwrap_or(self_path.clone());
-        let mut repo_dir = exe_canonical
-            .parent()
-            .and_then(|p| p.parent())
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| PathBuf::from("."));
+        // 显式指定优先：BY_MGR_REPO 须通过仓库身份校验（.by-mgr-root 标记 + dotfiles 目录）
+        let env_repo = std::env::var("BY_MGR_REPO")
+            .ok()
+            .map(|v| PathBuf::from(v.trim()))
+            .filter(|p| p.join(".by-mgr-root").is_file() && p.join("dotfiles").is_dir());
+        let mut repo_dir = env_repo.unwrap_or_else(|| {
+            exe_canonical
+                .parent()
+                .and_then(|p| p.parent())
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| PathBuf::from("."))
+        });
 
         // Try readlink for installed bin (~/.local/bin/by-mgr -> repo/scripts/by-mgr)
         if !repo_dir.join("dotfiles").is_dir() {
@@ -36,7 +43,7 @@ impl AppConfig {
             for base in [exe_canonical.parent().map(|p| p.to_path_buf()), std::env::current_dir().ok()].into_iter().flatten() {
                 let mut cur = base.clone();
                 for _ in 0..6 {
-                    if cur.join("dotfiles").is_dir() {
+                    if cur.join(".by-mgr-root").is_file() && cur.join("dotfiles").is_dir() {
                         repo_dir = cur.clone();
                         break;
                     }

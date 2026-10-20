@@ -13,7 +13,7 @@ pub fn repo_edit(cfg: &AppConfig) -> Result<()> { run_lib(cfg, "repo.sh", &["edi
 
 fn repo_quiet(cfg: &AppConfig, arg: &str) -> Result<String> {
     let path = cfg.lib_path("repo.sh");
-    let out = std::process::Command::new("bash").arg(&path).arg(arg).env("BY_MGR_QUIET", "1").output()?;
+    let out = std::process::Command::new("bash").arg(&path).arg(arg).env("BY_MGR_QUIET", "1").env("BY_MGR_REPO", &cfg.repo_dir).output()?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     if !out.status.success() {

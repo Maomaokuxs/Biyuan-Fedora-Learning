@@ -83,7 +83,7 @@ pub fn snapshot(cfg: &AppConfig) -> Result<String> {
     let log_file = format!("{}/tui-snapshot.log", log_dir);
     let _ = std::fs::write(&log_file, format!("[{}] Rust snapshot 调用 lib/snapshot.sh\n", chrono::Local::now().format("%H:%M:%S")));
     let path = cfg.lib_path("snapshot.sh");
-    let out = std::process::Command::new("bash").arg(&path).output()?;
+    let out = std::process::Command::new("bash").arg(&path).env("BY_MGR_REPO", &cfg.repo_dir).output()?;
     let stdout = String::from_utf8_lossy(&out.stdout);
     let stderr = String::from_utf8_lossy(&out.stderr);
     let _ = std::fs::OpenOptions::new().create(true).append(true).open(&log_file)

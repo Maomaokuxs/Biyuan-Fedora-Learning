@@ -137,6 +137,13 @@ fn main() -> Result<()> {
                             }
                         })
                         .unwrap_or_else(|| "-".to_string());
+                    let note = if p.join("manifest.txt").exists()
+                        && !p.join(".bymgr-verified").exists()
+                    {
+                        format!("{} ⚠未校验", note)
+                    } else {
+                        note
+                    };
                     println!(
                         " {} {} {}",
                         pad(&(i + 1).to_string(), 4),

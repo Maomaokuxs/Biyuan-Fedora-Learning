@@ -4,18 +4,25 @@ BLUE='\033[0;34m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CY
 
 SCRIPT_PATH=$(readlink -f "${BASH_SOURCE[0]}")
 LIB_DIR=$(dirname "$SCRIPT_PATH")
-REPO_DIR=$(dirname "$(dirname "$LIB_DIR")")
-if [ ! -d "$REPO_DIR/dotfiles" ]; then
+# 仓库定位（身份 = 根目录 .by-mgr-root 标记 + dotfiles/ 目录，缺一不可）：
+# 1) Rust 传入/显式指定的 BY_MGR_REPO 优先
+# 2) 从 lib 位置向上找带标记的仓库根（最多 5 层）
+# 3) 本地无仓 fallback：~/.local/share/by-mgr
+REPO_DIR=""
+if [ -n "${BY_MGR_REPO:-}" ] && [ -f "$BY_MGR_REPO/.by-mgr-root" ] && [ -d "$BY_MGR_REPO/dotfiles" ]; then
+    REPO_DIR="$BY_MGR_REPO"
+fi
+if [ -z "$REPO_DIR" ]; then
     CUR="$LIB_DIR"
     for _ in 1 2 3 4 5; do
         CUR=$(dirname "$CUR")
-        [ -d "$CUR/dotfiles" ] && REPO_DIR="$CUR" && break
+        if [ -f "$CUR/.by-mgr-root" ] && [ -d "$CUR/dotfiles" ]; then REPO_DIR="$CUR"; break; fi
     done
 fi
-# 本地无仓 fallback：~/.local/share/by-mgr
-if [ ! -d "$REPO_DIR/dotfiles" ] && [ -d "$HOME/.local/share/by-mgr/dotfiles" ]; then
+if [ -z "$REPO_DIR" ] && [ -d "$HOME/.local/share/by-mgr/dotfiles" ]; then
     REPO_DIR="$HOME/.local/share/by-mgr"
 fi
+[ -z "$REPO_DIR" ] && REPO_DIR=$(dirname "$(dirname "$LIB_DIR")")
 # 临时日志目录（按你建议，每次测试后读取）
 LOG_DIR="${BY_MGR_LOG_DIR:-/tmp/by-mgr}"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
