@@ -41,6 +41,11 @@ enum Commands {
         /// 备注内容
         message: String,
     },
+    /// 回收站
+    Trash {
+        #[command(subcommand)]
+        cmd: Option<TrashCmd>,
+    },
     /// 清理快照
     Clean {
         /// 保留最近 N 个 (-k)
@@ -64,6 +69,20 @@ enum Commands {
     /// OTA 自更新
     #[command(alias = "update")]
     Ota,
+}
+
+#[derive(Subcommand)]
+enum TrashCmd {
+    /// 恢复某个批次到原位
+    Restore {
+        /// 批次标识: 编号/批次名/last
+        target: String,
+    },
+    /// 永久清空回收站（不带参数清全部）
+    Empty {
+        /// 批次标识: 编号/批次名/last（可选）
+        target: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -103,8 +122,10 @@ fn main() -> Result<()> {
             if list.is_empty() {
                 println!("（无快照）");
             } else {
-                println!(" {:<4} {:<17} {}", "编号", "时间", "备注");
-                println!(" ---- ----------------- ----");
+                // 列宽按显示宽度（中文字符算 2 列），保证表头与内容对齐
+                let pad = crate::core::utils::pad_display;
+                println!(" {} {} {}", pad("编号", 4), pad("时间", 15), "备注");
+                println!(" {} {} {}", "-".repeat(4), "-".repeat(15), "-".repeat(4));
                 for (i, p) in list.iter().enumerate() {
                     let note = core::snapshot::read_note(p)
                         .filter(|n| !n.is_empty())
@@ -117,9 +138,9 @@ fn main() -> Result<()> {
                         })
                         .unwrap_or_else(|| "-".to_string());
                     println!(
-                        " {:<4} {:<17} {}",
-                        i + 1,
-                        p.file_name().unwrap().to_string_lossy(),
+                        " {} {} {}",
+                        pad(&(i + 1).to_string(), 4),
+                        pad(&p.file_name().unwrap().to_string_lossy(), 15),
                         note
                     );
                 }
@@ -146,6 +167,13 @@ fn main() -> Result<()> {
             Some(RepoCmd::Replenish) => core::repo::repo_replenish(&cfg)?,
             Some(RepoCmd::Edit) => core::repo::repo_edit(&cfg)?,
         },
+        Commands::Trash { cmd } => match cmd {
+            None => core::trash::trash_list_cli(&cfg)?,
+            Some(TrashCmd::Restore { target }) => core::trash::trash_restore_cli(&cfg, &target)?,
+            Some(TrashCmd::Empty { target }) => {
+                core::trash::trash_empty_cli(&cfg, target.as_deref())?
+            }
+        },
         Commands::Ota => core::ota::ota(&cfg)?,
     }
     Ok(())
@@ -163,6 +191,7 @@ fn print_help() {
     println!("  deploy [stow|local]       部署配置");
     println!("  repo [export|clean|replenish|edit]  仓库管理");
     println!("  ota                   OTA 自更新");
+    println!("  trash [restore|empty] 回收站（被删文件先到这里）");
     println!();
     println!("无参数时启动 TUI；--text 强制文本模式");
 }

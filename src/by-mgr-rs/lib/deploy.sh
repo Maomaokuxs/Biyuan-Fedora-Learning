@@ -25,7 +25,7 @@ else
     echo ">> 正在部署配置 ($mode)..." >> "$LOG_FILE"
 fi
 # 清理历史遗留的 waybar 桥接软链（防 stow absolute symlink 冲突）
-[ -d "$DOTFILES_DIR/waybar/.cache" ] && rm -rf "$DOTFILES_DIR/waybar/.cache" 2>/dev/null || true
+[ -d "$DOTFILES_DIR/waybar/.cache" ] && trash_move "$DOTFILES_DIR/waybar/.cache" || true
 for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
     [[ "$module" == "bash" ]] && continue
     [[ "$module" == "by-mgr" ]] && continue  # by-mgr 独立目录，不 stow
@@ -33,7 +33,7 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
     if [ "$mode" = "stow" ]; then
         # 兼容处理：starship 的 starship_base.toml 为模板，physical 残留的实体会阻塞 stow
         if [ "$module" = "starship" ] && [ -f "$HOME/.config/starship_base.toml" ] && [ ! -L "$HOME/.config/starship_base.toml" ]; then
-            rm -f "$HOME/.config/starship_base.toml" 2>/dev/null || true
+            trash_move "$HOME/.config/starship_base.toml"
             if [ -z "${BY_MGR_QUIET:-}" ]; then
                 echo -e "  ${YELLOW}[兼容] 已清理残留 starship_base.toml${NC}" | tee -a "$LOG_FILE"
             else
@@ -41,7 +41,7 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             fi
         fi
         if [ "$module" = "plasma-apply-colorscheme" ] && [ -f "$HOME/.local/bin/plasma-apply-colorscheme" ] && [ ! -L "$HOME/.local/bin/plasma-apply-colorscheme" ]; then
-            rm -f "$HOME/.local/bin/plasma-apply-colorscheme" 2>/dev/null || true
+            trash_move "$HOME/.local/bin/plasma-apply-colorscheme"
             if [ -z "${BY_MGR_QUIET:-}" ]; then
                 echo -e "  ${YELLOW}[兼容] 已清理残留 plasma-apply-colorscheme${NC}" | tee -a "$LOG_FILE"
             else
@@ -52,7 +52,7 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
         (cd "$DOTFILES_DIR" && stow -D -t "$HOME" "$module" 2>&1 | tee -a "$LOG_FILE" || true)
         # stow 前彻底清理本地实文件残留（fastfetch 等单文件冲突）
         if [ -e "$target" ] || [ -L "$target" ]; then
-            rm -rf "$target" 2>/dev/null || true
+            trash_move "$target"
         fi
         clean_target "$target"
         if (cd "$DOTFILES_DIR" && stow -v -t "$HOME" "$module" 2>&1 | tee -a "$LOG_FILE"; test ${PIPESTATUS[0]} -eq 0); then

@@ -30,35 +30,58 @@ pub fn repo_clean_progress<F>(_cfg: &AppConfig, mut on_progress: F) -> Result<St
 where
     F: FnMut(usize, usize, &str),
 {
-    // 列出启用的仓库
-    let out = std::process::Command::new("bash")
-        .arg("-c")
-        .arg("dnf repolist --enabled 2>/dev/null | tail -n +2 | awk '{print $1}'")
+    // 列出启用的仓库：直接调用 dnf 并在 Rust 侧解析（不经 shell 拼接，杜绝注入）
+    let out = std::process::Command::new("dnf")
+        .args(["repolist", "--enabled"])
         .output()?;
     let list = String::from_utf8_lossy(&out.stdout);
-    let ids: Vec<String> = list.lines().filter(|l| !l.trim().is_empty() && !l.starts_with("Repo")).map(|s| s.trim().to_string()).collect();
+    let ids: Vec<String> = list
+        .lines()
+        .skip(1)
+        .filter_map(|l| l.split_whitespace().next())
+        .filter(|s| !s.is_empty() && !s.starts_with("Repo"))
+        .map(|s| s.to_string())
+        .collect();
     let total = ids.len();
     if total == 0 {
         return Ok("✅ 无仓库需检查".to_string());
     }
+    let is_dnf5 = std::process::Command::new("dnf5")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+        || std::process::Command::new("dnf")
+            .arg("--version")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).contains("dnf5"))
+            .unwrap_or(false);
     let mut failed = 0;
     for (i, id) in ids.iter().enumerate() {
         on_progress(i, total, id);
-        let ok = std::process::Command::new("bash")
-            .arg("-c")
-            .arg(format!("dnf --disablerepo='*' --enablerepo='{}' makecache --refresh &>/dev/null", id))
+        let ok = std::process::Command::new("dnf")
+            .args([
+                "--disablerepo=*",
+                &format!("--enablerepo={}", id),
+                "makecache",
+                "--refresh",
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
             .status()
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {
             failed += 1;
-            let _ = std::process::Command::new("bash")
-                .arg("-c")
-                .arg(format!(
-                    "if command -v dnf5 &>/dev/null; then sudo dnf config-manager setopt {}.enabled=0 2>/dev/null; else sudo dnf config-manager --set-disabled {} 2>/dev/null; fi",
-                    id, id
-                ))
-                .status();
+            if is_dnf5 {
+                let _ = std::process::Command::new("sudo")
+                    .args(["dnf", "config-manager", "setopt", &format!("{}.enabled=0", id)])
+                    .status();
+            } else {
+                let _ = std::process::Command::new("sudo")
+                    .args(["dnf", "config-manager", "--set-disabled", id])
+                    .status();
+            }
         }
         on_progress(i + 1, total, id);
     }

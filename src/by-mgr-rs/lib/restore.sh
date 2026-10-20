@@ -59,6 +59,7 @@ for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             [ -e "$f" ] || continue
             bn=$(basename "$f")
             [ "$bn" = "backup" ] && continue
+            [ "$bn" = "trash" ] && continue
             cp -a "$f" "$target/" 2>/dev/null || true
         done
         # 清理目标中不在备份中的旧文件（除 backup 外）
@@ -66,7 +67,8 @@ for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             [ -e "$f" ] || continue
             bn=$(basename "$f")
             [ "$bn" = "backup" ] && continue
-            [ -e "$backup_src/$bn" ] || rm -rf "$f"
+            [ "$bn" = "trash" ] && continue
+            [ -e "$backup_src/$bn" ] || trash_move "$f"
         done
     elif [ "$use_stow" = true ]; then
         # stow 还原：覆盖仓库文件后重新 stow 链接
@@ -93,7 +95,7 @@ for p in ".cache/by-mgr/hellwal" ".cache/by-mgr/last-wallpaper"; do
     target="$HOME/$p"
     mkdir -p "$(dirname "$target")"
     if [ -d "$backup_src" ]; then
-        rm -rf "$target" 2>/dev/null || true
+        trash_move "$target"
         cp -a "$backup_src" "$target" 2>/dev/null && echo "[$(date +%H:%M:%S)] restored $p" >> "$LOG_FILE" && restored=$((restored+1))
     else
         cp -aL "$backup_src" "$target" 2>/dev/null && echo "[$(date +%H:%M:%S)] restored $p" >> "$LOG_FILE" && restored=$((restored+1))

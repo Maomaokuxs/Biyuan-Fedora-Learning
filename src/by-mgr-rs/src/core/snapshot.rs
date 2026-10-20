@@ -21,11 +21,24 @@ pub fn write_note(dir: &Path, note: &str) -> Result<()> {
 }
 
 /// 全部快照目录（新→旧，与 list / restore 编号一致）
+/// 快照目录名格式：YYYYMMDD_HHMMSS（与 bash list_snapshots 的匹配规则对齐，
+/// 避免杂目录导致两边编号错位）
+fn is_snapshot_name(name: &str) -> bool {
+    let b = name.as_bytes();
+    name.len() == 15
+        && b[8] == b'_'
+        && b[..8].iter().all(|c| c.is_ascii_digit())
+        && b[9..].iter().all(|c| c.is_ascii_digit())
+}
+
 pub fn snapshot_dirs(cfg: &AppConfig) -> Vec<PathBuf> {
     let mut list: Vec<PathBuf> = std::fs::read_dir(&cfg.backup_root)
         .map(|it| {
             it.flatten()
-                .filter(|e| e.path().is_dir())
+                .filter(|e| {
+                    e.path().is_dir()
+                        && is_snapshot_name(&e.file_name().to_string_lossy())
+                })
                 .map(|e| e.path())
                 .collect::<Vec<_>>()
         })

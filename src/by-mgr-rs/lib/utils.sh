@@ -22,6 +22,41 @@ mkdir -p "$LOG_DIR" 2>/dev/null || true
 DOTFILES_DIR="$REPO_DIR/dotfiles"
 BACKUP_ROOT="$HOME/.config/by-mgr/backup"
 USER_CONFIG_DIR="$HOME/.config/by-mgr"
+TRASH_ROOT="$USER_CONFIG_DIR/trash"
+
+# 回收站：同一进程内所有删除归入同一批次（子进程继承批次环境变量）
+trash_ensure_batch() {
+    if [ -z "${BY_MGR_TRASH_BATCH:-}" ]; then
+        local ts d i
+        ts=$(date +%Y%m%d_%H%M%S)
+        d="$TRASH_ROOT/$ts"
+        i=1
+        while [ -e "$d" ]; do d="$TRASH_ROOT/${ts}_$i"; i=$((i+1)); done
+        mkdir -p "$d/files"
+        printf '%s\n' "${BY_MGR_TRASH_OP:-$(basename "$0" .sh)}" > "$d/op"
+        : > "$d/items.txt"
+        BY_MGR_TRASH_BATCH="$d"
+        export BY_MGR_TRASH_BATCH
+    fi
+}
+
+# 把文件/目录/软链移入回收站（替代直接 rm -rf）；移动失败才回退直删并警告
+trash_move() {
+    local p="$1"
+    [ -e "$p" ] || [ -L "$p" ] || return 0
+    trash_ensure_batch
+    local rel dest
+    rel="${p#$HOME/}"
+    [ "$rel" = "$p" ] && rel="${p#/}"
+    dest="$BY_MGR_TRASH_BATCH/files/$rel"
+    mkdir -p "$(dirname "$dest")"
+    if mv "$p" "$dest" 2>/dev/null; then
+        echo "$p" >> "$BY_MGR_TRASH_BATCH/items.txt"
+    else
+        echo "警告: 移入回收站失败，改为直接删除: $p" >&2
+        rm -rf "$p" 2>/dev/null || true
+    fi
+}
 
 if [ ! -d "$DOTFILES_DIR" ]; then
     echo -e "${RED}错误: 无法定位 dotfiles 目录，推算仓库根为: $REPO_DIR${NC}" >&2
@@ -46,9 +81,8 @@ get_target_path() {
 }
 clean_target() {
     local target="$1"
-    [ -L "$target" ] && rm -f "$target" || true
-    [ -d "$target" ] && [ ! -L "$target" ] && rm -rf "$target" || true
-    [ -f "$target" ] && [ ! -L "$target" ] && rm -f "$target" || true
+    [ -e "$target" ] || [ -L "$target" ] || return 0
+    trash_move "$target"
     return 0
 }
 enable_repo_compat() {
@@ -66,5 +100,5 @@ disable_repo_compat() {
     fi
 }
 list_snapshots() {
-    ls -d "$BACKUP_ROOT"/* 2>/dev/null | grep -E '[0-9]{8}_[0-9]+' | sort
+    find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -regextype posix-extended -regex '.*/[0-9]{8}_[0-9]{6}' 2>/dev/null | sort
 }
