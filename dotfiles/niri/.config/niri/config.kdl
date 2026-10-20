@@ -289,6 +289,7 @@ layout {
 // spawn-at-startup "waybar"
 // 经 launcher 启动：读持久化风格记录（无记录回落线上栏）
 spawn-at-startup "sh" "-c" "~/.config/niri/scripts/quickshell-launch.sh"
+spawn-at-startup "sh" "-c" "~/.config/quickshell/scripts/common/screen-guard.sh"
 // 首次图形登录补跑壁纸初始化（无头装机时装机阶段不落 init 锁，靠这行渲染首张壁纸；有锁则秒退）
 spawn-at-startup "sh" "-c" "~/.config/niri/scripts/init-wallpaper.sh"
 
