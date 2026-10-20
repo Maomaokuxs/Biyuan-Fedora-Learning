@@ -100,7 +100,7 @@ impl AppConfig {
 
     pub fn lib_path(&self, name: &str) -> std::path::PathBuf {
         let local = dirs::home_dir().unwrap().join(".local/share/by-mgr/lib").join(name);
-        if local.exists() { local } else { self.repo_dir.join("src/by-mgr-legacy/lib").join(name) }
+        if local.exists() { local } else { self.repo_dir.join("src/by-mgr-rs/lib").join(name) }
     }
 }
 
