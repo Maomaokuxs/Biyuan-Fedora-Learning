@@ -70,6 +70,9 @@ enum Commands {
     Deploy {
         /// 模式: stow | local (必须明确指定，无默认)
         mode: Option<String>,
+        /// 跳过部署前快照，直接部署
+        #[arg(long)]
+        force: bool,
     },
     /// 仓库管理
     Repo {
@@ -175,7 +178,7 @@ fn main() -> Result<()> {
         Commands::Verify { target } => core::snapshot::verify_cli(&cfg, target.as_deref())?,
         Commands::Diff { a, b } => core::snapshot::diff_cli(&cfg, &a, b.as_deref())?,
         Commands::Clean { keep, days } => core::clean::clean_cli(&cfg, keep, days)?,
-        Commands::Deploy { mode } => {
+        Commands::Deploy { mode, force } => {
             let mode = match mode {
                 Some(m) => m,
                 None => anyhow::bail!("用法: by-mgr deploy stow|local (必须明确指定模式)"),
@@ -185,7 +188,7 @@ fn main() -> Result<()> {
                 "local" => DeployMode::Local,
                 _ => anyhow::bail!("未知部署模式: {} (可用 stow|local)", mode),
             };
-            core::deploy::deploy_cli(&cfg, m)?;
+            core::deploy::deploy_cli(&cfg, m, force)?;
         }
         Commands::Repo { cmd } => match cmd {
             None => core::repo::repo_manager(&cfg)?,

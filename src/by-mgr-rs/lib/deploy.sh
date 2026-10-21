@@ -76,21 +76,31 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             fi
         fi
     else
-        # 本地部署：遇同名文件先询问是否快照
+        # 本地部署：首次覆盖已存在目标前自动创建一次快照（不询问）；BY_MGR_FORCE=1 跳过备份
         if [ -e "$target" ] || [ -L "$target" ]; then
-            if [ -z "${BY_MGR_QUIET:-}" ]; then
-                echo -e "${YELLOW}⚠️  检测到已存在 $target${NC}" | tee -a "$LOG_FILE"
-                echo -e "${YELLOW}   是否先创建快照以防误删？ [y/N]${NC}" | tee -a "$LOG_FILE"
-                read -p "   输入 y 创建快照，直接回车跳过: " ans < /dev/tty || true
-                if [[ "$ans" == "y" || "$ans" == "Y" ]]; then
-                    echo -e "${BLUE}>> 正在创建快照...${NC}" | tee -a "$LOG_FILE"
-                    bash "$SCRIPT_DIR/snapshot.sh" 2>&1 | tee -a "$LOG_FILE" || true
-                    echo -e "${GREEN}✅ 快照已创建，继续本地部署...${NC}" | tee -a "$LOG_FILE"
+            if [ -z "${deploy_backup_done:-}" ]; then
+                deploy_backup_done=1
+                if [ "${BY_MGR_FORCE:-}" = "1" ]; then
+                    if [ -z "${BY_MGR_QUIET:-}" ]; then
+                        echo -e "${CYAN}>> --force：跳过部署前快照，直接覆盖...${NC}" | tee -a "$LOG_FILE"
+                    else
+                        echo "[本地部署] --force 跳过部署前快照，直接覆盖" >> "$LOG_FILE"
+                    fi
                 else
-                    echo -e "${CYAN}>> 跳过快照，直接覆盖...${NC}" | tee -a "$LOG_FILE"
+                    if [ -z "${BY_MGR_QUIET:-}" ]; then
+                        echo -e "${BLUE}>> 部署前自动创建快照...${NC}" | tee -a "$LOG_FILE"
+                    else
+                        echo "[本地部署] 部署前自动创建快照" >> "$LOG_FILE"
+                    fi
+                    bash "$SCRIPT_DIR/snapshot.sh" 2>&1 | tee -a "$LOG_FILE"
+                    if [ "${PIPESTATUS[0]}" -eq 0 ]; then
+                        if [ -z "${BY_MGR_QUIET:-}" ]; then
+                            echo -e "${GREEN}✅ 快照已创建，继续本地部署...${NC}" | tee -a "$LOG_FILE"
+                        fi
+                    else
+                        echo -e "${YELLOW}⚠️  快照创建失败，继续部署（本次覆盖无备份）${NC}" | tee -a "$LOG_FILE"
+                    fi
                 fi
-            else
-                echo "[本地部署] 检测到已存在 $target，将直接覆盖 (quiet 模式)" >> "$LOG_FILE"
             fi
         fi
         (cd "$DOTFILES_DIR" && stow -D -t "$HOME" "$module" 2>/dev/null || true)
