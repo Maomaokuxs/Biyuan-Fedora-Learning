@@ -2,12 +2,30 @@ use anyhow::Result;
 use crate::config::AppConfig;
 use crate::core::run_lib;
 
-pub fn restore_cli(cfg: &AppConfig, arg: Option<String>) -> Result<()> {
-    // 还原前完整性提示：有清单但缺少自检通过标记的快照先警告
+pub fn restore_cli(cfg: &AppConfig, arg: Option<String>, force: bool) -> Result<()> {
+    // 还原前完整性校验：有清单的快照先按 manifest 真校验，异常默认中止（--force 放行）
     if let Some(a) = &arg {
         if let Ok(dir) = crate::core::snapshot::resolve_snapshot_dir(cfg, a.as_str()) {
-            if dir.join("manifest.txt").exists() && !dir.join(".bymgr-verified").exists() {
-                eprintln!("⚠️ 该快照未通过完整性校验，还原结果可能不完整");
+            match crate::core::snapshot::verify_snapshot(&dir) {
+                Some(rep) => {
+                    if !rep.bad.is_empty() {
+                        if force {
+                            eprintln!(
+                                "⚠️ 快照校验有 {} 个文件异常，已按 --force 继续还原",
+                                rep.bad.len()
+                            );
+                        } else {
+                            anyhow::bail!(
+                                "快照校验未通过（{} 个文件异常），已中止还原。详情: by-mgr verify {}；确需还原加 --force",
+                                rep.bad.len(),
+                                a
+                            );
+                        }
+                    }
+                }
+                None => {
+                    eprintln!("⚠️ 该快照没有文件清单（旧快照），无法校验完整性");
+                }
             }
         }
     }
