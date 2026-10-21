@@ -903,11 +903,11 @@ fn execute_action(cfg: &AppConfig, page: Page, idx: usize) -> Result<String> {
             Ok("✅ 清理完成".to_string())
         }
         (Page::Deploy, 0) => {
-            core::deploy::deploy_cli(cfg, DeployMode::Stow)?;
+            core::deploy::deploy_cli(cfg, DeployMode::Stow, false)?;
             Ok("✅ Stow 部署完成".to_string())
         }
         (Page::Deploy, 1) => {
-            core::deploy::deploy_cli(cfg, DeployMode::Local)?;
+            core::deploy::deploy_cli(cfg, DeployMode::Local, false)?;
             Ok("✅ 本地部署完成".to_string())
         }
         (Page::Deploy, 2) => {

@@ -8,7 +8,11 @@ pub enum DeployMode {
     Local,
 }
 
-pub fn deploy_cli(cfg: &AppConfig, mode: DeployMode) -> Result<()> {
+pub fn deploy_cli(cfg: &AppConfig, mode: DeployMode, force: bool) -> Result<()> {
+    // --force: 跳过部署前快照（透传给 deploy.sh）
+    if force {
+        std::env::set_var("BY_MGR_FORCE", "1");
+    }
     // 每次部署前同步至本地无仓存储
     let _ = init_local_share(cfg);
     // 执行前检查：stow 模式需先安装 stow
