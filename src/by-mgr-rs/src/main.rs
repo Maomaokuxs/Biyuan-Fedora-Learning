@@ -29,6 +29,21 @@ enum Commands {
     Restore {
         /// 快照标识: last/-1/编号/时间戳 (YYYYMMDD_HHMMSS)
         target: Option<String>,
+        /// 跳过完整性校验强行还原
+        #[arg(long)]
+        force: bool,
+    },
+    /// 校验快照完整性（按清单重算哈希）
+    Verify {
+        /// 快照标识: 编号/时间戳/last（缺省为最新）
+        target: Option<String>,
+    },
+    /// 对比两个快照的文件差异
+    Diff {
+        /// 快照 A: 编号/时间戳/last
+        a: String,
+        /// 快照 B（缺省为最新）
+        b: Option<String>,
     },
     /// 给快照设置/修改备注
     Note {
@@ -157,7 +172,9 @@ fn main() -> Result<()> {
             let name = core::snapshot::set_note(&cfg, &target, &message)?;
             println!("✅ {} 的备注已更新: {}", name, message);
         }
-        Commands::Restore { target } => core::restore::restore_cli(&cfg, target)?,
+        Commands::Restore { target, force } => core::restore::restore_cli(&cfg, target, force)?,
+        Commands::Verify { target } => core::snapshot::verify_cli(&cfg, target.as_deref())?,
+        Commands::Diff { a, b } => core::snapshot::diff_cli(&cfg, &a, b.as_deref())?,
         Commands::Clean { keep, days } => core::clean::clean_cli(&cfg, keep, days)?,
         Commands::Deploy { mode } => {
             let m = match mode.as_str() {
@@ -193,7 +210,9 @@ fn print_help() {
     println!("  snapshot [-m 备注]      创建快照");
     println!("  note <编号> <备注>       给快照设置/修改备注");
     println!("  list                  列出快照");
-    println!("  restore [TARGET]      历史还原 (last/-1/编号/时间戳)");
+    println!("  restore [TARGET] [--force]  历史还原 (last/-1/编号/时间戳)");
+    println!("  verify [TARGET]       校验快照完整性（缺省最新）");
+    println!("  diff <A> [B]          对比两个快照的文件差异");
     println!("  clean -k <N> | -d <天数>  清理快照");
     println!("  deploy [stow|local]       部署配置");
     println!("  repo [export|clean|replenish|edit]  仓库管理");

@@ -121,3 +121,143 @@ pub fn snapshot_cli(cfg: &AppConfig, note: Option<&str>) -> Result<()> {
     }
     Ok(())
 }
+
+/// 快照完整性校验结果
+pub struct VerifyReport {
+    /// manifest 中的文件总数
+    pub total: usize,
+    /// 异常文件（哈希不符或缺失），格式同 manifest 中的路径
+    pub bad: Vec<String>,
+}
+
+/// 按 manifest.txt 逐个重算 sha256 校验快照；无 manifest 时返回 None。
+/// 以 LC_ALL=C 调用 sha256sum -c，保证输出可解析（不受 locale 影响）。
+pub fn verify_snapshot(dir: &Path) -> Option<VerifyReport> {
+    let manifest = dir.join("manifest.txt");
+    if !manifest.is_file() {
+        return None;
+    }
+    let total = std::fs::read_to_string(&manifest)
+        .map(|s| s.lines().filter(|l| !l.trim().is_empty()).count())
+        .unwrap_or(0);
+    let out = std::process::Command::new("sha256sum")
+        .args(["-c", "manifest.txt"])
+        .current_dir(dir)
+        .env("LC_ALL", "C")
+        .output()
+        .ok()?;
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let mut bad = Vec::new();
+    for line in stdout.lines() {
+        if line.contains(": FAILED") {
+            bad.push(
+                line.split(": FAILED")
+                    .next()
+                    .unwrap_or(line)
+                    .trim()
+                    .to_string(),
+            );
+        }
+    }
+    Some(VerifyReport { total, bad })
+}
+
+pub fn verify_cli(cfg: &AppConfig, target: Option<&str>) -> Result<()> {
+    let dir = match target {
+        Some(t) => resolve_snapshot_dir(cfg, t)?,
+        None => snapshot_dirs(cfg)
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("没有可校验的快照"))?,
+    };
+    let name = dir.file_name().unwrap().to_string_lossy().to_string();
+    match verify_snapshot(&dir) {
+        None => anyhow::bail!("快照 {} 没有文件清单（旧快照），无法校验", name),
+        Some(rep) => {
+            if rep.bad.is_empty() {
+                println!("✅ 快照 {} 完整（{} 个文件全部通过校验）", name, rep.total);
+                Ok(())
+            } else {
+                println!(
+                    "❌ 快照 {} 有 {} 个文件异常（共 {} 个）:",
+                    name,
+                    rep.bad.len(),
+                    rep.total
+                );
+                for b in &rep.bad {
+                    println!("  {}", b);
+                }
+                anyhow::bail!("校验未通过")
+            }
+        }
+    }
+}
+
+/// 读取快照 manifest 为 路径->哈希 映射（路径去掉 ./ 前缀）
+fn read_manifest(dir: &Path) -> Option<std::collections::HashMap<String, String>> {
+    let content = std::fs::read_to_string(dir.join("manifest.txt")).ok()?;
+    let mut map = std::collections::HashMap::new();
+    for line in content.lines() {
+        let line = line.trim_end();
+        if line.is_empty() {
+            continue;
+        }
+        // 格式: <sha256><两个空格><路径>（文本模式）；二进制模式为 <空格>*<路径>
+        let (hash, path) = line.split_once("  ")?;
+        let path = path.trim_start_matches('*');
+        let path = path.strip_prefix("./").unwrap_or(path);
+        map.insert(path.to_string(), hash.trim().to_string());
+    }
+    Some(map)
+}
+
+pub fn diff_cli(cfg: &AppConfig, a: &str, b: Option<&str>) -> Result<()> {
+    let dir_a = resolve_snapshot_dir(cfg, a)?;
+    let dir_b = match b {
+        Some(t) => resolve_snapshot_dir(cfg, t)?,
+        None => snapshot_dirs(cfg)
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("没有可对比的快照"))?,
+    };
+    if dir_a == dir_b {
+        anyhow::bail!("两个快照是同一个，无需对比");
+    }
+    let name_a = dir_a.file_name().unwrap().to_string_lossy().to_string();
+    let name_b = dir_b.file_name().unwrap().to_string_lossy().to_string();
+    let ma = read_manifest(&dir_a)
+        .ok_or_else(|| anyhow::anyhow!("快照 {} 没有文件清单，无法对比（旧快照）", name_a))?;
+    let mb = read_manifest(&dir_b)
+        .ok_or_else(|| anyhow::anyhow!("快照 {} 没有文件清单，无法对比（旧快照）", name_b))?;
+    let mut added: Vec<&String> = mb.keys().filter(|k| !ma.contains_key(*k)).collect();
+    let mut removed: Vec<&String> = ma.keys().filter(|k| !mb.contains_key(*k)).collect();
+    let mut changed: Vec<&String> = ma
+        .iter()
+        .filter(|(k, h)| mb.get(*k).map(|h2| h2 != *h).unwrap_or(false))
+        .map(|(k, _)| k)
+        .collect();
+    added.sort();
+    removed.sort();
+    changed.sort();
+    println!("对比 {} → {}:", name_a, name_b);
+    if added.is_empty() && removed.is_empty() && changed.is_empty() {
+        println!("✅ 两个快照内容一致（共 {} 个文件）", ma.len());
+        return Ok(());
+    }
+    for p in &added {
+        println!("  + {}", p);
+    }
+    for p in &removed {
+        println!("  - {}", p);
+    }
+    for p in &changed {
+        println!("  ~ {}", p);
+    }
+    println!(
+        "共 {} 新增 / {} 删除 / {} 变化",
+        added.len(),
+        removed.len(),
+        changed.len()
+    );
+    Ok(())
+}
