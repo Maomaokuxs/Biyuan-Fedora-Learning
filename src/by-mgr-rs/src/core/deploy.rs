@@ -81,13 +81,22 @@ pub fn init_local_share(cfg: &AppConfig) -> Result<()> {
         return Ok(());
     }
     std::fs::create_dir_all(&dst)?;
-    for name in &["scripts", "config"] {
+    // 同步仓库内容到本地无仓存储（删仓后仍可运作的副本）；
+    // 目标已是软链时跳过（如开发测试的链接布局），不冲掉链接
+    for name in &["scripts", "config", "dotfiles"] {
         let src = cfg.repo_dir.join(name);
         let dst_path = dst.join(name);
-        if src.is_dir() {
+        if src.is_dir() && !dst_path.is_symlink() {
             let _ = crate::core::trash::trash_move(cfg, &dst_path, "deploy");
             crate::core::utils::copy_recursive(&src, &dst_path)?;
         }
+    }
+    // lib 脚本同样播种实体副本（源码在 src/by-mgr-rs/lib）
+    let lib_src = cfg.repo_dir.join("src/by-mgr-rs/lib");
+    let lib_dst = dst.join("lib");
+    if lib_src.is_dir() && !lib_dst.is_symlink() {
+        let _ = crate::core::trash::trash_move(cfg, &lib_dst, "deploy");
+        crate::core::utils::copy_recursive(&lib_src, &lib_dst)?;
     }
     // by-mgr 独立目录：~/.config/by-mgr 实目录，不再 stow 链接
     let _ = std::fs::remove_file(home.join(".config/by-mgr"));
