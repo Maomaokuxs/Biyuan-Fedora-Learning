@@ -6,6 +6,7 @@ edition = "2021"
 ratatui = "0.29"
 crossterm = "0.28"
 atty = "0.2.14"
+libc = "0.2"
 dirs = "7.0.0"
 chrono = "0.4.45"
 clap = { version = "4.5", features = ["derive"] }

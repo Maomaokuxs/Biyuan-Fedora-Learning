@@ -94,6 +94,10 @@ enum RepoCmd {
 }
 
 fn main() -> Result<()> {
+    // 恢复 SIGPIPE 默认处理：输出被管道截断（如 | head）时静默退出，不再 panic 刷屏
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
     let cli = Cli::parse();
 
     // Without subcommand: launch TUI if TTY, else help

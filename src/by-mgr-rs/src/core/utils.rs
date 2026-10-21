@@ -1,20 +1,5 @@
 use std::path::Path;
 
-/// 对应 bash clean_target()
-pub fn clean_target(target: &Path) {
-    if target.is_symlink() {
-        let _ = std::fs::remove_file(target);
-        return;
-    }
-    if target.is_dir() {
-        let _ = std::fs::remove_dir_all(target);
-        return;
-    }
-    if target.is_file() {
-        let _ = std::fs::remove_file(target);
-    }
-}
-
 /// 递归复制，保留权限，类似 cp -aL
 pub fn copy_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {
     if src.is_dir() && !src.is_symlink() {

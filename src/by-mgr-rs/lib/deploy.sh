@@ -89,13 +89,9 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
         fi
         (cd "$DOTFILES_DIR" && stow -D -t "$HOME" "$module" 2>/dev/null || true)
         clean_target "$target"
-        if [ -d "$DOTFILES_DIR/$module/.config" ]; then
-            cp -a "$DOTFILES_DIR/$module/.config/." "$HOME/.config/" 2>/dev/null || true
-        elif [ -f "$DOTFILES_DIR/$module/.config/$module.toml" ]; then
-            cp -a "$DOTFILES_DIR/$module/.config/$module.toml" "$HOME/.config/" 2>/dev/null || true
-        else
-            cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null || true
-        fi
+        # 与 stow 布局一致：模块根即家目录镜像，整树复制
+        # （旧三分支只拷 .config 的情况会漏掉 .local 等其余部分）
+        cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null || true
         if [ -z "${BY_MGR_QUIET:-}" ]; then
             echo -e "  [📁 Physical] $module" | tee -a "$LOG_FILE"
         else
