@@ -49,18 +49,16 @@ have_stow() {
     [ "$stow_state" = "yes" ]
 }
 for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
-    mod_target=$(get_target_path "$mod")
-    backup_src="${selected_time}/${mod_target#$HOME/}"
+    target=$(get_target_path "$mod")
+    backup_src="${selected_time}/${target#$HOME/}"
     [ -e "$backup_src" ] || { echo "[$(date +%H:%M:%S)] skip $mod (no backup_src)" >> "$LOG_FILE"; continue; }
     if [ -z "${BY_MGR_QUIET:-}" ]; then
         echo -e "  ${CYAN}还原: $mod${NC}" | tee -a "$LOG_FILE"
     else
         echo "[$(date +%H:%M:%S)] restore $mod" >> "$LOG_FILE"
     fi
-    target=$(get_target_path "$mod")
     mod_ok=false
-    have_stow && (cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null || true)
-    # 判断部署方式：快照中若该模块为软链则用 stow 还原，物理则本地还原
+    # 先按当前状态判形态（在任何解链接动作之前）：软链走 stow 分支保持链接形态，实体走物理分支
     use_stow=false
     if [ -L "$target" ]; then use_stow=true; fi
     if [ "$mod" = "by-mgr" ]; then
@@ -108,6 +106,8 @@ for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             fi
         fi
     else
+        # 物理还原：先解掉该模块残留的 stow 链接（含目录内嵌套链接），保证落地为纯实体，再清理拷回
+        have_stow && (cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null || true)
         clean_target "$target"
         if [ -d "$backup_src" ]; then
             if mkdir -p "$target" && cp -a "$backup_src/." "$target/"; then mod_ok=true; fi
