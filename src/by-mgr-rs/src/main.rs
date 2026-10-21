@@ -13,10 +13,6 @@ use core::DeployMode;
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
-
-    /// 文本模式（兼容旧 --text，不启动 TUI）
-    #[arg(long, global = true)]
-    text: bool,
 }
 
 #[derive(Subcommand)]
@@ -102,7 +98,7 @@ fn main() -> Result<()> {
 
     // Without subcommand: launch TUI if TTY, else help
     if cli.command.is_none() {
-        if cli.text || !atty::is(atty::Stream::Stdout) {
+        if !atty::is(atty::Stream::Stdout) {
             print_help();
             return Ok(());
         }
@@ -187,7 +183,7 @@ fn main() -> Result<()> {
 }
 
 fn print_help() {
-    println!("用法: by-mgr [COMMAND] [--text]");
+    println!("用法: by-mgr [COMMAND]");
     println!();
     println!("命令:");
     println!("  snapshot [-m 备注]      创建快照");
@@ -200,5 +196,5 @@ fn print_help() {
     println!("  ota                   OTA 自更新");
     println!("  trash [restore|empty] 回收站（被删文件先到这里）");
     println!();
-    println!("无参数时启动 TUI；--text 强制文本模式");
+    println!("无参数时启动 TUI（非终端环境下打印此帮助）");
 }
