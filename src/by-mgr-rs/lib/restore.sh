@@ -51,6 +51,7 @@ if [ -z "${BY_MGR_QUIET:-}" ]; then
 fi
 echo "[$(date +%H:%M:%S)] restore selected=$selected_time" >> "$LOG_FILE"
 restored=0
+extras=0
 failed=0
 failed_list=""
 # stow 可用性（懒检查，只查一次）：stow 还原分支强依赖它，缺失时必须判失败而非假成功
@@ -142,11 +143,19 @@ for p in ".cache/by-mgr/hellwal" ".cache/by-mgr/last-wallpaper"; do
     [ -e "$backup_src" ] || continue
     target="$HOME/$p"
     mkdir -p "$(dirname "$target")"
+    extra_ok=false
     if [ -d "$backup_src" ]; then
         trash_move "$target"
-        cp -a "$backup_src" "$target" 2>/dev/null && echo "[$(date +%H:%M:%S)] restored $p" >> "$LOG_FILE" && restored=$((restored+1))
+        if cp -a "$backup_src" "$target" 2>/dev/null; then extra_ok=true; fi
     else
-        cp -aL "$backup_src" "$target" 2>/dev/null && echo "[$(date +%H:%M:%S)] restored $p" >> "$LOG_FILE" && restored=$((restored+1))
+        if cp -aL "$backup_src" "$target" 2>/dev/null; then extra_ok=true; fi
+    fi
+    if [ "$extra_ok" = true ]; then
+        extras=$((extras+1))
+        echo "[$(date +%H:%M:%S)] restored $p" >> "$LOG_FILE"
+        if [ -z "${BY_MGR_QUIET:-}" ]; then
+            echo -e "  ${CYAN}还原: [附加] $p${NC}" | tee -a "$LOG_FILE"
+        fi
     fi
 done
 # 壁纸生效：仅 awww 渲染，不修改 waypaper 配置
@@ -161,7 +170,7 @@ if [ -f "$HOME/.cache/by-mgr/last-wallpaper" ]; then
         fi
     fi
 fi
-echo "[$(date +%H:%M:%S)] restore DONE restored=$restored failed=$failed" >> "$LOG_FILE"
+echo "[$(date +%H:%M:%S)] restore DONE restored=$restored extras=$extras failed=$failed" >> "$LOG_FILE"
 if [ "$failed" -gt 0 ]; then
     if [ -z "${BY_MGR_QUIET:-}" ]; then
         echo -e "${RED}⚠️ 还原结束：$restored 个成功，$failed 个失败:$failed_list${NC}" | tee -a "$LOG_FILE"
@@ -171,7 +180,11 @@ if [ "$failed" -gt 0 ]; then
     exit 1
 fi
 if [ -z "${BY_MGR_QUIET:-}" ]; then
-    echo -e "${GREEN}✅ 还原完成！共 $restored 模块${NC}" | tee -a "$LOG_FILE"
+    if [ "$extras" -gt 0 ]; then
+        echo -e "${GREEN}✅ 还原完成！共 $restored 模块（另还原 $extras 项附加缓存）${NC}" | tee -a "$LOG_FILE"
+    else
+        echo -e "${GREEN}✅ 还原完成！共 $restored 模块${NC}" | tee -a "$LOG_FILE"
+    fi
 else
     echo "✅ $restored" | tee -a "$LOG_FILE"
 fi
