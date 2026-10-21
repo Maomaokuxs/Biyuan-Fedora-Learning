@@ -66,13 +66,14 @@ repo_lagging_only() {
 
 clean_repos() {
     if [ -z "${BY_MGR_QUIET:-}" ]; then
-        echo ">> 正在探测并禁用 404/失效的仓库..."
+        echo ">> 正在探测 404/失效的仓库（探测阶段不修改系统）..."
     else
-        echo ">> 正在探测并禁用 404/失效的仓库..." >> "$LOG_DIR/repo.log" 2>&1
+        echo ">> 正在探测 404/失效的仓库..." >> "$LOG_DIR/repo.log" 2>&1
     fi
     _sudo_guard "仓库清理" || exit 1
-    local out
+    local out id fail_list=""
     out=$(dnf repolist --enabled 2>/dev/null || true)
+    # 第一段：只探测分类、不动系统；中断也只停在这一段，不会禁错任何仓库
     while IFS= read -r line; do
         id=$(echo "$line" | awk '{print $1}')
         [[ -z "$id" || "$id" == Repo* ]] && continue
@@ -83,16 +84,28 @@ clean_repos() {
         fi
         if dnf --disablerepo="*" --enablerepo="$id" --setopt=skip_if_unavailable=False makecache --refresh &>/dev/null; then
             [ -z "${BY_MGR_QUIET:-}" ] && echo "OK" || echo "OK" >> "$LOG_DIR/repo.log" 2>&1
+        elif repo_lagging_only "$id"; then
+            # 仓库本身正常、只是还没支持当前 Fedora 版本：只提示，不禁用
+            [ -z "${BY_MGR_QUIET:-}" ] && echo "未支持 Fedora $(rpm -E %fedora) → 保留" || echo "未支持当前 Fedora 版本 → 保留" >> "$LOG_DIR/repo.log" 2>&1
         else
-            if repo_lagging_only "$id"; then
-                # 仓库本身正常、只是还没支持当前 Fedora 版本：只提示，不禁用
-                [ -z "${BY_MGR_QUIET:-}" ] && echo "未支持 Fedora $(rpm -E %fedora) → 保留" || echo "未支持当前 Fedora 版本 → 保留" >> "$LOG_DIR/repo.log" 2>&1
-            else
-                [ -z "${BY_MGR_QUIET:-}" ] && echo "FAIL → 禁用" || echo "FAIL → 禁用" >> "$LOG_DIR/repo.log" 2>&1
-                disable_repo_compat "$id" || true
-            fi
+            [ -z "${BY_MGR_QUIET:-}" ] && echo "FAIL → 待禁用" || echo "FAIL → 待禁用" >> "$LOG_DIR/repo.log" 2>&1
+            fail_list="$fail_list $id"
         fi
     done < <(echo "$out" | tail -n +2)
+    # 第二段：名单先落盘，再统一禁用；每禁一个即时记日志，中断也有完整记录
+    if [ -n "$fail_list" ]; then
+        echo "[$(date +%H:%M:%S)] 待禁用名单:$fail_list" >> "$LOG_DIR/repo.log"
+        if [ -z "${BY_MGR_QUIET:-}" ]; then
+            echo ">> 探测完成，开始禁用失效仓库..."
+        fi
+        for id in $fail_list; do
+            disable_repo_compat "$id" || true
+            echo "[$(date +%H:%M:%S)] 已禁用: $id" >> "$LOG_DIR/repo.log"
+            if [ -z "${BY_MGR_QUIET:-}" ]; then
+                echo "  已禁用 $id"
+            fi
+        done
+    fi
     if [ -z "${BY_MGR_QUIET:-}" ]; then
         echo -e "${GREEN}✅ 清理完成${NC}"
     else

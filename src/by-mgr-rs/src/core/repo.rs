@@ -110,8 +110,8 @@ where
             .output()
             .map(|o| String::from_utf8_lossy(&o.stdout).contains("dnf5"))
             .unwrap_or(false);
-    let mut failed = 0;
     let mut lagging = 0;
+    let mut fail_ids: Vec<String> = Vec::new();
     for (i, id) in ids.iter().enumerate() {
         on_progress(i, total, id);
         let ok = std::process::Command::new("dnf")
@@ -127,22 +127,30 @@ where
             .status()
             .map(|s| s.success())
             .unwrap_or(false);
+        // 第一段只探测分类、不动系统；中断也只停在这一段
         if !ok && repo_lagging_only(id) {
             // 仓库本身正常、只是还没支持当前 Fedora 版本：只计保留，不禁用
             lagging += 1;
         } else if !ok {
-            failed += 1;
-            if is_dnf5 {
-                let _ = std::process::Command::new("sudo")
-                    .args(["dnf", "config-manager", "setopt", &format!("{}.enabled=0", id)])
-                    .status();
-            } else {
-                let _ = std::process::Command::new("sudo")
-                    .args(["dnf", "config-manager", "--set-disabled", id])
-                    .status();
-            }
+            fail_ids.push(id.clone());
         }
         on_progress(i + 1, total, id);
+    }
+    // 第二段：探测全部完成后才统一禁用
+    let mut failed = 0;
+    for id in &fail_ids {
+        let r = if is_dnf5 {
+            std::process::Command::new("sudo")
+                .args(["dnf", "config-manager", "setopt", &format!("{}.enabled=0", id)])
+                .status()
+        } else {
+            std::process::Command::new("sudo")
+                .args(["dnf", "config-manager", "--set-disabled", id])
+                .status()
+        };
+        if r.map(|st| st.success()).unwrap_or(false) {
+            failed += 1;
+        }
     }
     if failed == 0 && lagging == 0 {
         Ok("✅ 清理完成，无失效仓库".to_string())
