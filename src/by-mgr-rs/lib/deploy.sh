@@ -55,13 +55,13 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             fi
         fi
         # 先尝试回收旧链接，失败不隐藏错误（便于排查）
-        (cd "$DOTFILES_DIR" && stow -D -t "$HOME" "$module" 2>&1 | tee -a "$LOG_FILE" || true)
+        (cd "$DOTFILES_DIR" && stow -D -t "$HOME" "$module" >> "$LOG_FILE" 2>&1 || true)
         # stow 前彻底清理本地实文件残留（fastfetch 等单文件冲突）
         if [ -e "$target" ] || [ -L "$target" ]; then
             trash_move "$target"
         fi
         clean_target "$target"
-        if (cd "$DOTFILES_DIR" && stow -v -t "$HOME" "$module" 2>&1 | tee -a "$LOG_FILE"; test ${PIPESTATUS[0]} -eq 0); then
+        if (cd "$DOTFILES_DIR" && stow -v -t "$HOME" "$module" >> "$LOG_FILE" 2>&1); then
             if [ -z "${BY_MGR_QUIET:-}" ]; then
                 echo -e "  [🔗 Linked] $module" | tee -a "$LOG_FILE"
             else
