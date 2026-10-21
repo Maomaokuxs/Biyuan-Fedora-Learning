@@ -179,7 +179,7 @@ fn main() -> Result<()> {
         Commands::Deploy { mode } => {
             let m = match mode.as_str() {
                 "stow" => DeployMode::Stow,
-                "local" | "physical" | "phys" => DeployMode::Local,
+                "local" => DeployMode::Local,
                 _ => anyhow::bail!("未知部署模式: {} (可用 stow|local)", mode),
             };
             core::deploy::deploy_cli(&cfg, m)?;
