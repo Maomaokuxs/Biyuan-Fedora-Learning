@@ -26,8 +26,21 @@ elif [ -n "$arg" ]; then
     done
     [ -z "$selected_time" ] && { echo -e "${RED}❌ 未找到快照: $arg${NC}" >&2; exit 1; }
 else
+    # 与 by-mgr list 相同的表格：编号 / 时间 / 备注（含未校验标记）
     echo "可用快照:"
-    for i in "${!time_list[@]}"; do echo "  $((i+1))) $(basename "${time_list[i]}")"; done
+    echo " 编号 时间            备注"
+    echo " ---- --------------- ----"
+    for i in "${!time_list[@]}"; do
+        d="${time_list[$i]}"
+        note=""
+        if [ -f "$d/.bymgr-meta.json" ]; then
+            note=$(sed -n 's/.*"note"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$d/.bymgr-meta.json" | head -1)
+        fi
+        if [ "${#note}" -gt 30 ]; then note="${note:0:30}…"; fi
+        [ -z "$note" ] && note="-"
+        if [ -f "$d/manifest.txt" ] && [ ! -f "$d/.bymgr-verified" ]; then note="$note ⚠未校验"; fi
+        printf " %-4s %-15s %s\n" "$((i+1))" "$(basename "$d")" "$note"
+    done
     read -p "选择快照编号 (1-${#time_list[@]}, 0 取消): " choice < /dev/tty
     [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le ${#time_list[@]} ] || { echo "已取消"; exit 0; }
     selected_time="${time_list[$((choice-1))]}"
