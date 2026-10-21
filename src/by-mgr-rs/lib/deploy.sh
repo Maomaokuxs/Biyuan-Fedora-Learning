@@ -107,11 +107,24 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
         clean_target "$target"
         # 与 stow 布局一致：模块根即家目录镜像，整树复制
         # （旧三分支只拷 .config 的情况会漏掉 .local 等其余部分）
-        cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null || true
-        if [ -z "${BY_MGR_QUIET:-}" ]; then
-            echo -e "  [📁 Local] $module" | tee -a "$LOG_FILE"
+        # 复制结果必须校验：cp 失败或目标未生成都判模块失败，走结尾的失败汇总，不假报 Local
+        copy_ok=false
+        if cp -a "$DOTFILES_DIR/$module/." "$HOME/" >> "$LOG_FILE" 2>&1 && [ -e "$target" ]; then
+            copy_ok=true
+        fi
+        if [ "$copy_ok" = true ]; then
+            if [ -z "${BY_MGR_QUIET:-}" ]; then
+                echo -e "  [📁 Local] $module" | tee -a "$LOG_FILE"
+            else
+                echo "  [📁 Local] $module" >> "$LOG_FILE"
+            fi
         else
-            echo "  [📁 Local] $module" >> "$LOG_FILE"
+            failed=$((failed+1))
+            if [ -z "${BY_MGR_QUIET:-}" ]; then
+                echo -e "  ${RED}[❌ 复制失败] $module (已记录到 $LOG_FILE)${NC}" | tee -a "$LOG_FILE"
+            else
+                echo "[❌ 复制失败] $module" | tee -a "$LOG_FILE"
+            fi
         fi
     fi
 done
