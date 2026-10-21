@@ -166,8 +166,23 @@ impl AppConfig {
     }
 }
 
-/// 对应 bash get_target_path()
-pub fn get_target_path(home: &Path, module: &str) -> PathBuf {
+/// 对应 bash get_target_path()；先查 dotfiles/.bymgr-paths 覆盖表（模块名=相对HOME路径）
+pub fn get_target_path(cfg: &AppConfig, module: &str) -> PathBuf {
+    let home = home_dir().unwrap_or_default();
+    let table = cfg.dotfiles_dir.join(".bymgr-paths");
+    if let Ok(content) = std::fs::read_to_string(&table) {
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') {
+                continue;
+            }
+            if let Some((name, rel)) = line.split_once('=') {
+                if name.trim() == module {
+                    return home.join(rel.trim());
+                }
+            }
+        }
+    }
     let base = home.join(".config").join(module);
     if !base.is_dir() && home.join(format!(".config/{}.toml", module)).is_file() {
         home.join(format!(".config/{}.toml", module))

@@ -368,7 +368,7 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
                                         // 本地部署：遇同名文件先询问是否快照
                                         if mode == DeployMode::Local {
                                             let has_conflict = cfg.dotfiles_modules().iter().any(|m| {
-                                                let p = crate::config::get_target_path(&dirs::home_dir().unwrap(), m);
+                                                let p = crate::config::get_target_path(&cfg, m);
                                                 p.exists() || p.is_symlink()
                                             });
                                             if has_conflict {
