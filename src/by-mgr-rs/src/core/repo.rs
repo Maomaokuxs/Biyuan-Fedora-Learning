@@ -26,6 +26,60 @@ pub fn repo_export_quiet(cfg: &AppConfig) -> Result<String> { repo_quiet(cfg, "e
 pub fn repo_clean_quiet(cfg: &AppConfig) -> Result<String> { repo_quiet(cfg, "clean") }
 pub fn repo_replenish_quiet(cfg: &AppConfig) -> Result<String> { repo_quiet(cfg, "replenish") }
 
+/// 仓库当前版本探不通时分辨是否只是"还没支持当前版本"：
+/// URL 带 $releasever 且换上一版本能探通 → 仓库本身正常，不禁用
+fn repo_lagging_only(id: &str) -> bool {
+    let cur: u32 = std::process::Command::new("rpm")
+        .args(["-E", "%fedora"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().parse().unwrap_or(0))
+        .unwrap_or(0);
+    if cur < 2 {
+        return false;
+    }
+    // 在各仓库定义目录里找该仓库的段，确认其 URL 使用 $releasever
+    let mut uses_releasever = false;
+    'scan: for dir in ["/etc/yum.repos.d", "/usr/share/dnf5/repos.d", "/etc/dnf/repos.d"] {
+        let Ok(entries) = std::fs::read_dir(dir) else { continue };
+        for e in entries.flatten() {
+            let path = e.path();
+            if path.extension().map(|x| x != "repo").unwrap_or(true) {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else { continue };
+            let mut in_sec = false;
+            for line in text.lines() {
+                let t = line.trim();
+                if t.starts_with('[') && t.ends_with(']') {
+                    in_sec = t == format!("[{}]", id);
+                    continue;
+                }
+                if in_sec && t.contains("$releasever") {
+                    uses_releasever = true;
+                    break 'scan;
+                }
+            }
+        }
+    }
+    if !uses_releasever {
+        return false;
+    }
+    std::process::Command::new("dnf")
+        .args([
+            &format!("--releasever={}", cur - 1),
+            "--disablerepo=*",
+            &format!("--enablerepo={}", id),
+            "--setopt=skip_if_unavailable=False",
+            "makecache",
+            "--refresh",
+        ])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|st| st.success())
+        .unwrap_or(false)
+}
+
 pub fn repo_clean_progress<F>(_cfg: &AppConfig, mut on_progress: F) -> Result<String>
 where
     F: FnMut(usize, usize, &str),
@@ -57,6 +111,7 @@ where
             .map(|o| String::from_utf8_lossy(&o.stdout).contains("dnf5"))
             .unwrap_or(false);
     let mut failed = 0;
+    let mut lagging = 0;
     for (i, id) in ids.iter().enumerate() {
         on_progress(i, total, id);
         let ok = std::process::Command::new("dnf")
@@ -72,7 +127,10 @@ where
             .status()
             .map(|s| s.success())
             .unwrap_or(false);
-        if !ok {
+        if !ok && repo_lagging_only(id) {
+            // 仓库本身正常、只是还没支持当前 Fedora 版本：只计保留，不禁用
+            lagging += 1;
+        } else if !ok {
             failed += 1;
             if is_dnf5 {
                 let _ = std::process::Command::new("sudo")
@@ -86,9 +144,16 @@ where
         }
         on_progress(i + 1, total, id);
     }
-    if failed == 0 {
+    if failed == 0 && lagging == 0 {
         Ok("✅ 清理完成，无失效仓库".to_string())
     } else {
-        Ok(format!("✅ 清理完成，禁用 {} 个失效仓库", failed))
+        let mut parts = Vec::new();
+        if failed > 0 {
+            parts.push(format!("禁用 {} 个失效仓库", failed));
+        }
+        if lagging > 0 {
+            parts.push(format!("保留 {} 个未支持当前版本的仓库", lagging));
+        }
+        Ok(format!("✅ 清理完成，{}", parts.join("，")))
     }
 }

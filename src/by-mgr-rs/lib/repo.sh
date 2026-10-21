@@ -32,6 +32,38 @@ export_list() {
         echo "✅ 已导出到 $dest"
     fi
 }
+# 仓库 URL 是否使用 $releasever（版本相关仓库才谈得上"只是没跟上当前版本"）
+repo_uses_releasever() {
+    local id="$1" f in_sec=0 line
+    for f in /etc/yum.repos.d/*.repo /usr/share/dnf5/repos.d/*.repo /etc/dnf/repos.d/*.repo; do
+        [ -f "$f" ] || continue
+        in_sec=0
+        while IFS= read -r line; do
+            case "$line" in
+                "[$id]") in_sec=1 ;;
+                "["*"]") in_sec=0 ;;
+            esac
+            if [ "$in_sec" = 1 ]; then
+                case "$line" in
+                    *'$releasever'*) return 0 ;;
+                esac
+            fi
+        done < "$f"
+    done
+    return 1
+}
+
+# 当前版本探不通时分辨：URL 带 $releasever 且换上一版本能探通 → 只是没支持当前版本
+repo_lagging_only() {
+    local id="$1" cur prev
+    cur=$(rpm -E %fedora 2>/dev/null)
+    case "$cur" in ''|*[!0-9]*) return 1 ;; esac
+    prev=$((cur - 1))
+    [ "$prev" -ge 1 ] || return 1
+    repo_uses_releasever "$id" || return 1
+    dnf --releasever="$prev" --disablerepo="*" --enablerepo="$id" --setopt=skip_if_unavailable=False makecache --refresh &>/dev/null
+}
+
 clean_repos() {
     if [ -z "${BY_MGR_QUIET:-}" ]; then
         echo ">> 正在探测并禁用 404/失效的仓库..."
@@ -52,8 +84,13 @@ clean_repos() {
         if dnf --disablerepo="*" --enablerepo="$id" --setopt=skip_if_unavailable=False makecache --refresh &>/dev/null; then
             [ -z "${BY_MGR_QUIET:-}" ] && echo "OK" || echo "OK" >> "$LOG_DIR/repo.log" 2>&1
         else
-            [ -z "${BY_MGR_QUIET:-}" ] && echo "FAIL → 禁用" || echo "FAIL → 禁用" >> "$LOG_DIR/repo.log" 2>&1
-            disable_repo_compat "$id" || true
+            if repo_lagging_only "$id"; then
+                # 仓库本身正常、只是还没支持当前 Fedora 版本：只提示，不禁用
+                [ -z "${BY_MGR_QUIET:-}" ] && echo "未支持 Fedora $(rpm -E %fedora) → 保留" || echo "未支持当前 Fedora 版本 → 保留" >> "$LOG_DIR/repo.log" 2>&1
+            else
+                [ -z "${BY_MGR_QUIET:-}" ] && echo "FAIL → 禁用" || echo "FAIL → 禁用" >> "$LOG_DIR/repo.log" 2>&1
+                disable_repo_compat "$id" || true
+            fi
         fi
     done < <(echo "$out" | tail -n +2)
     if [ -z "${BY_MGR_QUIET:-}" ]; then
