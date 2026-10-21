@@ -63,9 +63,9 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
         clean_target "$target"
         if (cd "$DOTFILES_DIR" && stow -v -t "$HOME" "$module" >> "$LOG_FILE" 2>&1); then
             if [ -z "${BY_MGR_QUIET:-}" ]; then
-                echo -e "  [🔗 Linked] $module" | tee -a "$LOG_FILE"
+                echo -e "  $module" | tee -a "$LOG_FILE"
             else
-                echo "  [🔗 Linked] $module" >> "$LOG_FILE"
+                echo "  $module" >> "$LOG_FILE"
             fi
         else
             failed=$((failed+1))
@@ -114,9 +114,9 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
         fi
         if [ "$copy_ok" = true ]; then
             if [ -z "${BY_MGR_QUIET:-}" ]; then
-                echo -e "  [📁 Local] $module" | tee -a "$LOG_FILE"
+                echo -e "  $module" | tee -a "$LOG_FILE"
             else
-                echo "  [📁 Local] $module" >> "$LOG_FILE"
+                echo "  $module" >> "$LOG_FILE"
             fi
         else
             failed=$((failed+1))
@@ -149,7 +149,13 @@ done
 WALLPAPER=$(swww query 2>/dev/null | grep -oP 'image: \K.*' | head -1 || true)
 [ -z "$WALLPAPER" ] && WALLPAPER=$(awww query 2>/dev/null | grep -oP 'image: \K.*' | head -1 || true)
 if [ -n "$WALLPAPER" ] && [ -f "$HOME/.config/niri/scripts/theme-sync.sh" ]; then
-    bash "$HOME/.config/niri/scripts/theme-sync.sh" "$WALLPAPER" || true
+    # 配色管线输出统一缩进成一组（明细同时进日志），不再与部署行混排
+    if [ -z "${BY_MGR_QUIET:-}" ]; then
+        echo -e "${BLUE}>> 正在同步主题配色...${NC}" | tee -a "$LOG_FILE"
+        bash "$HOME/.config/niri/scripts/theme-sync.sh" "$WALLPAPER" 2>&1 | sed 's/^\(.\)/  \1/' | tee -a "$LOG_FILE" || true
+    else
+        bash "$HOME/.config/niri/scripts/theme-sync.sh" "$WALLPAPER" >> "$LOG_FILE" 2>&1 || true
+    fi
 fi
 if [ "$failed" -gt 0 ]; then
     if [ -z "${BY_MGR_QUIET:-}" ]; then
