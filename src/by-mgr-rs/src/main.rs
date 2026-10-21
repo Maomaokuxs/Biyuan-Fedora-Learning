@@ -68,9 +68,8 @@ enum Commands {
     },
     /// 部署配置
     Deploy {
-        /// 模式: stow | local (默认 stow)
-        #[arg(default_value = "stow")]
-        mode: String,
+        /// 模式: stow | local (必须明确指定，无默认)
+        mode: Option<String>,
     },
     /// 仓库管理
     Repo {
@@ -177,6 +176,10 @@ fn main() -> Result<()> {
         Commands::Diff { a, b } => core::snapshot::diff_cli(&cfg, &a, b.as_deref())?,
         Commands::Clean { keep, days } => core::clean::clean_cli(&cfg, keep, days)?,
         Commands::Deploy { mode } => {
+            let mode = match mode {
+                Some(m) => m,
+                None => anyhow::bail!("用法: by-mgr deploy stow|local (必须明确指定模式)"),
+            };
             let m = match mode.as_str() {
                 "stow" => DeployMode::Stow,
                 "local" => DeployMode::Local,
