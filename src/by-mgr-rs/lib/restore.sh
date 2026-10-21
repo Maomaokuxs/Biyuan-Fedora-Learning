@@ -38,6 +38,16 @@ if [ -z "${BY_MGR_QUIET:-}" ]; then
 fi
 echo "[$(date +%H:%M:%S)] restore selected=$selected_time" >> "$LOG_FILE"
 restored=0
+failed=0
+failed_list=""
+# stow 可用性（懒检查，只查一次）：stow 还原分支强依赖它，缺失时必须判失败而非假成功
+stow_state="unknown"
+have_stow() {
+    if [ "$stow_state" = "unknown" ]; then
+        if command -v stow &>/dev/null; then stow_state="yes"; else stow_state="no"; fi
+    fi
+    [ "$stow_state" = "yes" ]
+}
 for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
     mod_target=$(get_target_path "$mod")
     backup_src="${selected_time}/${mod_target#$HOME/}"
@@ -48,19 +58,21 @@ for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
         echo "[$(date +%H:%M:%S)] restore $mod" >> "$LOG_FILE"
     fi
     target=$(get_target_path "$mod")
-    (cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null || true)
+    mod_ok=false
+    have_stow && (cd "$DOTFILES_DIR" && stow -D -t ~ "$mod" 2>/dev/null || true)
     # 判断部署方式：快照中若该模块为软链则用 stow 还原，物理则本地还原
-    local use_stow=false
+    use_stow=false
     if [ -L "$target" ]; then use_stow=true; fi
     if [ "$mod" = "by-mgr" ]; then
         # by-mgr 特殊：保留 backup 目录，避免自删除
         mkdir -p "$target"
+        mod_copied=0
         for f in "$backup_src"/*; do
             [ -e "$f" ] || continue
             bn=$(basename "$f")
             [ "$bn" = "backup" ] && continue
             [ "$bn" = "trash" ] && continue
-            cp -a "$f" "$target/" 2>/dev/null || true
+            cp -a "$f" "$target/" 2>/dev/null && mod_copied=$((mod_copied+1)) || true
         done
         # 清理目标中不在备份中的旧文件（除 backup 外）
         for f in "$target"/*; do
@@ -70,22 +82,45 @@ for mod in $(ls "$DOTFILES_DIR" 2>/dev/null); do
             [ "$bn" = "trash" ] && continue
             [ -e "$backup_src/$bn" ] || trash_move "$f"
         done
-    elif [ "$use_stow" = true ]; then
-        # stow 还原：覆盖仓库文件后重新 stow 链接
-        clean_target "$target"
-        if [ -d "$backup_src" ]; then
-            cp -a "$backup_src/." "$DOTFILES_DIR/$mod/.config/" 2>/dev/null || true
+        if [ "$mod_copied" -gt 0 ] || [ -z "$(ls -A "$backup_src" 2>/dev/null)" ]; then
+            mod_ok=true
         fi
-        (cd "$DOTFILES_DIR" && stow -t ~ "$mod" 2>/dev/null || true)
+    elif [ "$use_stow" = true ]; then
+        # stow 还原：快照内容写回仓库对应位置后重新 stow 链接
+        # stow 缺失或链接未生成一律判失败，不再吞错误假成功
+        if ! have_stow; then
+            echo "[$(date +%H:%M:%S)] FAIL $mod: 需要 stow 但未安装" >> "$LOG_FILE"
+        else
+            clean_target "$target"
+            rel_target="${target#$HOME/}"
+            # 写回位置即 stow 镜像路径：仓库/<模块>/<目标相对路径>，目录拷内容、文件拷本体
+            if [ -d "$backup_src" ]; then
+                mkdir -p "$DOTFILES_DIR/$mod/$rel_target"
+                cp -a "$backup_src/." "$DOTFILES_DIR/$mod/$rel_target/" 2>/dev/null || true
+            else
+                mkdir -p "$DOTFILES_DIR/$mod/$(dirname "$rel_target")"
+                cp -a "$backup_src" "$DOTFILES_DIR/$mod/$rel_target" 2>/dev/null || true
+            fi
+            if (cd "$DOTFILES_DIR" && stow -t ~ "$mod" >> "$LOG_FILE" 2>&1) && { [ -e "$target" ] || [ -L "$target" ]; }; then
+                mod_ok=true
+            else
+                echo "[$(date +%H:%M:%S)] FAIL $mod: stow 执行失败或目标未生成" >> "$LOG_FILE"
+            fi
+        fi
     else
         clean_target "$target"
         if [ -d "$backup_src" ]; then
-            mkdir -p "$target" && cp -a "$backup_src/." "$target/"
+            if mkdir -p "$target" && cp -a "$backup_src/." "$target/"; then mod_ok=true; fi
         else
-            mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"
+            if mkdir -p "$(dirname "$target")" && cp -a "$backup_src" "$target"; then mod_ok=true; fi
         fi
     fi
-    restored=$((restored+1))
+    if [ "$mod_ok" = true ]; then
+        restored=$((restored+1))
+    else
+        failed=$((failed+1))
+        failed_list="$failed_list $mod"
+    fi
     echo "[$(date +%H:%M:%S)] restored $mod -> $target" >> "$LOG_FILE"
 done
 # 追加 .cache 配色与壁纸还原（不存在则跳过）
@@ -113,9 +148,17 @@ if [ -f "$HOME/.cache/by-mgr/last-wallpaper" ]; then
         fi
     fi
 fi
+echo "[$(date +%H:%M:%S)] restore DONE restored=$restored failed=$failed" >> "$LOG_FILE"
+if [ "$failed" -gt 0 ]; then
+    if [ -z "${BY_MGR_QUIET:-}" ]; then
+        echo -e "${RED}⚠️ 还原结束：$restored 个成功，$failed 个失败:$failed_list${NC}" | tee -a "$LOG_FILE"
+    else
+        echo "⚠️ 还原结束：$restored 个成功，$failed 个失败:$failed_list" | tee -a "$LOG_FILE"
+    fi
+    exit 1
+fi
 if [ -z "${BY_MGR_QUIET:-}" ]; then
     echo -e "${GREEN}✅ 还原完成！共 $restored 模块${NC}" | tee -a "$LOG_FILE"
 else
     echo "✅ $restored" | tee -a "$LOG_FILE"
 fi
-echo "[$(date +%H:%M:%S)] restore DONE restored=$restored" >> "$LOG_FILE"
