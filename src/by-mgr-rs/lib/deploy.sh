@@ -1,11 +1,15 @@
 #!/bin/bash
 # lib/deploy.sh — 部署配置
-# 用法: deploy.sh [stow|local] (默认 stow)
+# 用法: deploy.sh <stow|local> (必须明确指定，无默认)
 set -e
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 source "$SCRIPT_DIR/utils.sh"
 
-mode="${1:-stow}"
+mode="${1:-}"
+if [ -z "$mode" ]; then
+    echo -e "${RED}❌ 用法: deploy.sh stow|local (必须明确指定模式)${NC}" >&2
+    exit 1
+fi
 if [ "$mode" != "stow" ] && [ "$mode" != "local" ]; then
     echo -e "${RED}❌ 未知部署模式: $mode (可用 stow|local)${NC}" >&2
     exit 1
