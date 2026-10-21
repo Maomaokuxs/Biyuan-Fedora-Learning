@@ -1,11 +1,9 @@
 #!/bin/bash
-# lib/ota.sh — OTA 自更新 (兼容 Rust 二进制 + Bash 旧版)
+# lib/ota.sh — OTA 自更新（Rust 二进制：git pull + cargo build）
 set -e
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 source "$SCRIPT_DIR/utils.sh"
-RAW_URL="https://raw.githubusercontent.com/Maomaokuxs/Biyuan-Fedora-Learning/main/scripts/by-mgr"
 SELF_PATH="$REPO_DIR/scripts/by-mgr"
-TMP_FILE=$(mktemp /tmp/by-mgr-latest.XXXXXX)
 BIN_DST="$HOME/.local/bin/by-mgr"
 LOG_FILE="$LOG_DIR/ota.log"
 mkdir -p "$LOG_DIR"
@@ -86,42 +84,6 @@ if $is_rust_local; then
     exit 0
 fi
 
-# 3. 旧 Bash 单文件路径
-if [ -z "${BY_MGR_QUIET:-}" ]; then
-    echo -e "${CYAN}>> 旧 Bash 模式，单文件下载...${NC}" | tee -a "$LOG_FILE"
-else
-    echo ">> 旧 Bash 模式，单文件下载..." >> "$LOG_FILE"
-fi
-if curl -sLf "$RAW_URL" -o "$TMP_FILE" 2>/dev/null || wget -qO "$TMP_FILE" "$RAW_URL" 2>/dev/null; then
-    # 兼容 ELF 与 Bash：检查文件头
-    if head -c 4 "$TMP_FILE" | grep -q $'\x7fELF'; then
-        if [ -z "${BY_MGR_QUIET:-}" ]; then
-            echo -e "${CYAN}>> 远端为 Rust 二进制，直接部署...${NC}" | tee -a "$LOG_FILE"
-        else
-            echo ">> 远端为 Rust 二进制，直接部署..." >> "$LOG_FILE"
-        fi
-        cp -f "$TMP_FILE" "$SELF_PATH" && chmod +x "$SELF_PATH"
-        mkdir -p "$(dirname "$BIN_DST")"; cp -f "$SELF_PATH" "$BIN_DST" 2>/dev/null || true; chmod +x "$BIN_DST" 2>/dev/null || true
-        rm -f "$TMP_FILE"
-        if [ -z "${BY_MGR_QUIET:-}" ]; then
-            echo -e "${GREEN}✨ OTA 更新成功 (远端 Rust)！${NC}" | tee -a "$LOG_FILE"
-        else
-            echo "✅ OTA 更新成功 (远端 Rust)" | tee -a "$LOG_FILE"
-        fi
-    elif head -n 1 "$TMP_FILE" | grep -q "#!/bin/bash"; then
-        cp -f "$TMP_FILE" "$SELF_PATH" && chmod +x "$SELF_PATH"
-        rm -f "$TMP_FILE"
-        if [ -z "${BY_MGR_QUIET:-}" ]; then
-            echo -e "${GREEN}✨ OTA 更新成功 (Bash)！${NC}" | tee -a "$LOG_FILE"
-        else
-            echo "✅ OTA 更新成功 (Bash)" | tee -a "$LOG_FILE"
-        fi
-    else
-        echo -e "${RED}❌ 更新失败：远程文件格式不正确 (非 Bash/ELF)${NC}" | tee -a "$LOG_FILE" >&2
-        file "$TMP_FILE" 2>&1 | head -n 5 | tee -a "$LOG_FILE" >&2
-        rm -f "$TMP_FILE"; exit 1
-    fi
-else
-    echo -e "${RED}❌ 更新失败：无法连接到远程仓库${NC}" | tee -a "$LOG_FILE" >&2
-    exit 1
-fi
+# 3. 非 Rust 形态：旧 Bash 单文件版的下载更新无完整性校验，已移除该路径
+echo -e "${RED}❌ 当前 by-mgr 不是 Rust 二进制形态，OTA 已不支持，请先手动安装 Rust 版${NC}" | tee -a "$LOG_FILE" >&2
+exit 1
