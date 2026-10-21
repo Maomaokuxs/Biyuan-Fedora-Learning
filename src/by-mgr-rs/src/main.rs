@@ -191,7 +191,7 @@ fn main() -> Result<()> {
             core::deploy::deploy_cli(&cfg, m, force)?;
         }
         Commands::Repo { cmd } => match cmd {
-            None => core::repo::repo_manager(&cfg)?,
+            None => anyhow::bail!("用法: by-mgr repo export|clean|replenish|edit (必须明确指定子命令)"),
             Some(RepoCmd::Export) => core::repo::repo_export(&cfg)?,
             Some(RepoCmd::Clean) => core::repo::repo_clean(&cfg)?,
             Some(RepoCmd::Replenish) => core::repo::repo_replenish(&cfg)?,
