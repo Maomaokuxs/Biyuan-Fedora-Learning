@@ -1,0 +1,3 @@
+# 模块路径覆盖表：模块真身不在 ~/.config/<模块名> 时，在此声明相对 HOME 的路径
+# 格式: 模块名=相对路径
+plasma-apply-colorscheme=.local/bin/plasma-apply-colorscheme

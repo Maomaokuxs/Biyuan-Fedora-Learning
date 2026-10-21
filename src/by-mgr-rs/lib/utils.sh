@@ -80,6 +80,12 @@ _sudo_guard() {
 }
 get_target_path() {
     local mod="$1"
+    # 路径覆盖优先：dotfiles/.bymgr-paths（每行 模块名=相对HOME路径）
+    if [ -f "$DOTFILES_DIR/.bymgr-paths" ]; then
+        local rel
+        rel=$(awk -F= -v m="$mod" '$1 == m {print substr($0, length(m) + 2); exit}' "$DOTFILES_DIR/.bymgr-paths")
+        if [ -n "$rel" ]; then echo "$HOME/$rel"; return; fi
+    fi
     local base_path="$HOME/.config/$mod"
     if [ ! -d "$base_path" ] && [ -f "${base_path}.toml" ]; then echo "${base_path}.toml"
     elif [ ! -d "$base_path" ] && [ -f "${base_path}.conf" ]; then echo "${base_path}.conf"
