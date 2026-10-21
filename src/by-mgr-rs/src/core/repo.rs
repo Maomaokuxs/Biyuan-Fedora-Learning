@@ -63,6 +63,7 @@ where
             .args([
                 "--disablerepo=*",
                 &format!("--enablerepo={}", id),
+                "--setopt=skip_if_unavailable=False",
                 "makecache",
                 "--refresh",
             ])
