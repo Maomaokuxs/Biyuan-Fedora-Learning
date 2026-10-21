@@ -1,13 +1,15 @@
 #!/bin/bash
 # lib/deploy.sh — 部署配置
-# 用法: deploy.sh [stow|local] (默认 stow，兼容 physical)
+# 用法: deploy.sh [stow|local] (默认 stow)
 set -e
 SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
 source "$SCRIPT_DIR/utils.sh"
 
 mode="${1:-stow}"
-# 兼容 physical 旧称
-if [ "$mode" = "physical" ] || [ "$mode" = "phys" ]; then mode="local"; fi
+if [ "$mode" != "stow" ] && [ "$mode" != "local" ]; then
+    echo -e "${RED}❌ 未知部署模式: $mode (可用 stow|local)${NC}" >&2
+    exit 1
+fi
 # 执行前检查：stow 模式必须已安装 stow
 if [ "$mode" = "stow" ] && ! command -v stow &>/dev/null; then
     echo -e "${RED}❌ stow 未安装，无法执行 stow 部署${NC}" >&2
@@ -31,7 +33,7 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
     [[ "$module" == "by-mgr" ]] && continue  # by-mgr 独立目录，不 stow
     target=$(get_target_path "$module")
     if [ "$mode" = "stow" ]; then
-        # 兼容处理：starship 的 starship_base.toml 为模板，physical 残留的实体会阻塞 stow
+        # 兼容处理：starship 的 starship_base.toml 为模板，local 模式残留的实体会阻塞 stow
         if [ "$module" = "starship" ] && [ -f "$HOME/.config/starship_base.toml" ] && [ ! -L "$HOME/.config/starship_base.toml" ]; then
             trash_move "$HOME/.config/starship_base.toml"
             if [ -z "${BY_MGR_QUIET:-}" ]; then
@@ -93,9 +95,9 @@ for module in $(ls "$DOTFILES_DIR" 2>/dev/null); do
         # （旧三分支只拷 .config 的情况会漏掉 .local 等其余部分）
         cp -a "$DOTFILES_DIR/$module/." "$HOME/" 2>/dev/null || true
         if [ -z "${BY_MGR_QUIET:-}" ]; then
-            echo -e "  [📁 Physical] $module" | tee -a "$LOG_FILE"
+            echo -e "  [📁 Local] $module" | tee -a "$LOG_FILE"
         else
-            echo "  [📁 Physical] $module" >> "$LOG_FILE"
+            echo "  [📁 Local] $module" >> "$LOG_FILE"
         fi
     fi
 done
