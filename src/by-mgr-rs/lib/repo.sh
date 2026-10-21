@@ -49,7 +49,7 @@ clean_repos() {
         else
             echo "  检查 $id ..." >> "$LOG_DIR/repo.log" 2>&1
         fi
-        if dnf --disablerepo="*" --enablerepo="$id" makecache --refresh &>/dev/null; then
+        if dnf --disablerepo="*" --enablerepo="$id" --setopt=skip_if_unavailable=False makecache --refresh &>/dev/null; then
             [ -z "${BY_MGR_QUIET:-}" ] && echo "OK" || echo "OK" >> "$LOG_DIR/repo.log" 2>&1
         else
             [ -z "${BY_MGR_QUIET:-}" ] && echo "FAIL → 禁用" || echo "FAIL → 禁用" >> "$LOG_DIR/repo.log" 2>&1
