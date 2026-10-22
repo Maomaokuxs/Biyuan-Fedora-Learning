@@ -136,7 +136,10 @@ where
         }
         on_progress(i + 1, total, id);
     }
-    // 第二段：探测全部完成后才统一禁用
+    // 第二段：探测全部完成后才统一禁用；探测耗时久，先续一次 sudo 凭据防过期
+    if !fail_ids.is_empty() {
+        let _ = std::process::Command::new("sudo").arg("-v").status();
+    }
     let mut failed = 0;
     for id in &fail_ids {
         let r = if is_dnf5 {
