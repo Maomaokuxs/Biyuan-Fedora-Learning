@@ -198,11 +198,16 @@ if [ -n "$WAYLAND_DISPLAY" ] && ! $IN_KDE && ! $NO_RENDER; then
             (awww-daemon >/dev/null 2>&1 & disown)
             sleep 1
         fi
+        # Overview backdrop 专用实例（namespace=backdrop），缺了就兜底拉起，与主实例一起被 img -a 喂图
+        if ! awww query --namespace backdrop &>/dev/null; then
+            (awww-daemon --namespace backdrop >/dev/null 2>&1 & disown)
+            sleep 1
+        fi
         if [ "$WALLPAPER_CHANGED" = true ]; then
-            awww img "$WALLPAPER" --transition-type random --transition-pos center --transition-duration 2
+            awww img -a "$WALLPAPER" --transition-type random --transition-pos center --transition-duration 2
         elif ! awww query 2>/dev/null | grep -Fq "image: $WALLPAPER"; then
             _debug "daemon lost image across sessions, re-render"
-            awww img "$WALLPAPER" --transition-type random --transition-pos center --transition-duration 2
+            awww img -a "$WALLPAPER" --transition-type random --transition-pos center --transition-duration 2
         else
             _debug "wallpaper unchanged, skip awww re-render"
         fi

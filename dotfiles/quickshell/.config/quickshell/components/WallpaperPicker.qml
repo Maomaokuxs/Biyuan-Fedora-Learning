@@ -147,8 +147,8 @@ Item {
         if (!it) return;
         var p = root.filePath(it.url);
         var q = root.shQuote(p);
-        // 原来默认：awww random + theme-sync --no-render（仅同步配色，不双渲染）
-        Exec.sh("awww img " + q + " --transition-type random --transition-pos center --transition-duration 2; bash ~/.config/niri/scripts/theme-sync.sh --no-render " + q + "; notify-send \"壁纸已更换\" " + root.shQuote(root.wallBase(it.url)) + " -i " + q);
+        // 原来默认：awww random + theme-sync --no-render（仅同步配色，不双渲染）；-a 同时发给 backdrop 实例，保证 Overview 壁纸跟随
+        Exec.sh("awww img -a " + q + " --transition-type random --transition-pos center --transition-duration 2; bash ~/.config/niri/scripts/theme-sync.sh --no-render " + q + "; notify-send \"壁纸已更换\" " + root.shQuote(root.wallBase(it.url)) + " -i " + q);
         root.current = p;
         root.requestClose();
     }

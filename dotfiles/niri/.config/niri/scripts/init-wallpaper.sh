@@ -131,8 +131,9 @@ else
     else
         if [ -n "$WAYLAND_DISPLAY" ]; then
             awww query &>/dev/null || (awww-daemon >/dev/null 2>&1 & disown)
+            awww query --namespace backdrop &>/dev/null || (awww-daemon --namespace backdrop >/dev/null 2>&1 & disown)
             sleep 1
-            awww img "$FINAL_WALLPAPER" --transition-type center
+            awww img -a "$FINAL_WALLPAPER" --transition-type center
         fi
     fi
 fi
