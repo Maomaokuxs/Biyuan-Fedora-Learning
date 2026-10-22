@@ -86,6 +86,17 @@ QtObject {
     // random 落点：每次新配色抽一次，非 random 模式不用它（读端自行判断）
     property string transitionPick: "wave"
 
+    // 胶囊拖拽幽灵（shell 层覆盖窗渲染）：起拖的 Bar 实例写、覆盖窗读。
+    // dragX/dragY 是栏窗口坐标（覆盖窗与栏同屏同顶同左锚定，原点一致）。
+    property bool dragActive: false
+    property string dragScreen: ""
+    property string dragText: ""
+    property color dragBg: "transparent"
+    property color dragFg: "#ffffff"
+    property real dragX: 0
+    property real dragY: 0
+    property real dragW: 60
+
 
     // 通知文本消毒：剥掉 ANSI/OSC 转义序列与控制字符。
     // 有些发送方（如 kwrited 转发的 wall 广播）会把终端调色序列塞进正文，

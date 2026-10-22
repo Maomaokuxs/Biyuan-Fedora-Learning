@@ -84,6 +84,46 @@ ShellRoot {
         }
     }
 
+    // 胶囊拖拽幽灵覆盖窗（Overlay 层全宽透明窗）：只在本屏拖拽进行时可见，
+    // 幽灵画在栏窗口之上，不被栏的裁剪/布局约束。mask 空 Region = 输入全穿透，
+    // 拖拽事件仍由栏内 pill 的 MouseArea 独占。坐标与栏窗口同原点
+    // （同屏、同顶边、同左锚定、margins 0）；高度 160 容许指针拖出栏下沿。
+    Variants {
+        model: Quickshell.screens
+        PanelWindow {
+            required property var modelData
+            screen: modelData
+            visible: Comp.UiState.dragActive && Comp.UiState.dragScreen === modelData.name
+
+            anchors { top: true; left: true; right: true }
+            margins { top: 0; left: 0; right: 0 }
+            implicitHeight: 160
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            exclusiveZone: -1
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+            mask: Region { }
+
+            Rectangle {
+                width: Comp.UiState.dragW
+                height: 32
+                radius: 10
+                opacity: 0.92
+                color: Comp.UiState.dragBg
+                x: Comp.UiState.dragX - width / 2
+                y: Comp.UiState.dragY - 16
+                Text {
+                    anchors.centerIn: parent
+                    text: Comp.UiState.dragText
+                    color: Comp.UiState.dragFg
+                    font.family: "JetBrainsMono Nerd Font"
+                    font.pixelSize: 14
+                }
+            }
+        }
+    }
+
     // 播放卡 overlay（anomshell 模式：Overlay 层 + Ignore，不占位不挤窗口，
     // PopupWindow 在 niri 下静默不可见，故改此模式；卡片本体见 MediaPlayer.qml）
     Variants {
