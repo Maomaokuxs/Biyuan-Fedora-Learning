@@ -23,6 +23,32 @@ Rectangle {
     signal scrollUp
     signal scrollDown
 
+    // ---- 拖拽组合（顶栏胶囊区专用，dragEnabled=false 时零影响）----
+    property string pillId: ""
+    // bare：组内成员模式，不画自己的底，只画内容；底色由组容器统一画
+    property bool bare: false
+    property color bareFg: normalFg
+    property bool dragEnabled: false
+    signal dragStarted(string id)
+    signal dragMoved(real wx, real wy)
+    signal dragEnded()
+    property bool dragging: false
+    property bool suppressClick: false
+    property point pressPt: Qt.point(0, 0)
+    property int pressButton: 0
+    // 窗口坐标：逐级累加祖先 x/y。本 Qt 版本 mapToItem(null) 近似返回原点
+    // （见下方 updateAnchor 注释），不能用；顶栏祖先链无旋转/缩放，累加等价。
+    function absPos() {
+        var x = 0, y = 0, n = root;
+        var guard = 0;
+        while (n && guard++ < 100) {
+            x += n.x;
+            y += n.y;
+            n = n.parent;
+        }
+        return Qt.point(x, y);
+    }
+
     // overlay 锚点上报：设 anchorKey（如 "volAnchorX"）后，
     // pill 中心横坐标实时写入 UiState，同名 overlay 卡片锚定到其下方。
     // 为空则关闭上报，零开销。
@@ -41,7 +67,8 @@ Rectangle {
         // 本 Qt 版本传 null 近似返回原点，锚点恒 ~20，浮窗全飞左缘。
         var top = root;
         try {
-            while (top.parent)
+            var guard2 = 0;
+            while (top.parent && guard2++ < 100)
                 top = top.parent;
         } catch (e) {
             return;
@@ -71,7 +98,7 @@ Rectangle {
     // 固定宽度（>0 生效）：内容变化不改尺寸，锚定它的浮窗就不会跳。
     // 给铃铛这种计数忽有忽无的用。
     property real fixedWidth: 0
-    property real contentW: fixedWidth > 0 ? fixedWidth : label.implicitWidth + 20
+    property real contentW: fixedWidth > 0 ? fixedWidth : label.implicitWidth + (root.bare ? 8 : 20)
     property real animW: shown ? contentW : 0
     // 显隐动画：门控只管加载期，运行时交互保留收展动画
     Behavior on animW { enabled: UiState.animReady; NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
@@ -107,7 +134,7 @@ Rectangle {
             return Math.abs(Math.round((x * 2654435761) % 800));
         return Math.round(Math.abs(cx - pw / 2) * 1.2);
     }
-    color: mouse.containsMouse ? normalFg : normalBg
+    color: root.bare ? (mouse.containsMouse ? Qt.alpha(root.bareFg, 0.18) : "transparent") : (mouse.containsMouse ? normalFg : normalBg)
     Behavior on color {
         SequentialAnimation {
             PauseAnimation { duration: transDelay }
@@ -122,7 +149,7 @@ Rectangle {
         font.family: root.fontFamily
         font.pixelSize: root.textSize
         font.bold: root.bold
-        color: mouse.containsMouse ? root.normalBg : root.normalFg
+        color: root.bare ? root.bareFg : (mouse.containsMouse ? root.normalBg : root.normalFg)
         Behavior on color {
             SequentialAnimation {
                 PauseAnimation { duration: root.transDelay }
@@ -138,10 +165,48 @@ Rectangle {
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
         // 即时按压反馈：状态落地要 0.5 秒（补刷+聚合），先缩一下证明点到了；
         // scale 不触发布局，无抖动；常开（含加载期）
-        onPressed: root.scale = 0.93
-        onReleased: root.scale = 1
-        onCanceled: root.scale = 1
+        onPressed: mouseEvent => {
+            root.pressPt = Qt.point(mouseEvent.x, mouseEvent.y);
+            root.pressButton = mouseEvent.button;
+            if (!root.dragging)
+                root.scale = 0.93;
+        }
+        onPositionChanged: mouseEvent => {
+            if (!root.dragEnabled || !pressed || root.pressButton !== Qt.LeftButton)
+                return;
+            if (!root.dragging) {
+                var dx = mouseEvent.x - root.pressPt.x;
+                var dy = mouseEvent.y - root.pressPt.y;
+                if (Math.sqrt(dx * dx + dy * dy) <= 8)
+                    return;
+                root.dragging = true;
+                root.scale = 1;
+                root.dragStarted(root.pillId);
+            }
+            var ap = root.absPos();
+            root.dragMoved(ap.x + mouseEvent.x, ap.y + mouseEvent.y);
+        }
+        onReleased: {
+            root.scale = 1;
+            if (root.dragging) {
+                root.dragging = false;
+                root.suppressClick = true;
+                root.dragEnded();
+            }
+        }
+        onCanceled: {
+            root.scale = 1;
+            if (root.dragging) {
+                root.dragging = false;
+                root.suppressClick = true;
+                root.dragEnded();
+            }
+        }
         onClicked: mouseEvent => {
+            if (root.suppressClick) {
+                root.suppressClick = false;
+                return;
+            }
             if (mouseEvent.button === Qt.LeftButton) {
                 root.leftClicked();
                 if (root.clickLeft !== "")
