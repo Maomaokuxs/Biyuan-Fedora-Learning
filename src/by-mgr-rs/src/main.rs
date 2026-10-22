@@ -82,6 +82,17 @@ enum Commands {
     /// OTA 自更新
     #[command(alias = "update")]
     Ota,
+    /// 查看/设定仓库位置与模式
+    Where {
+        /// 仓库路径（设定自定义仓库）
+        path: Option<String>,
+        /// 切换到无仓库模式（保障本地模式）
+        #[arg(long)]
+        local: bool,
+        /// 清除设定，恢复智能寻找
+        #[arg(long)]
+        auto: bool,
+    },
     /// 查看运行日志（缺省列出全部日志）
     Log {
         /// 日志名: deploy/restore/snapshot/repo/ota/...
@@ -136,6 +147,9 @@ fn main() -> Result<()> {
     // log 命令只读日志文件，不依赖仓库发现/校验，提前处理
     if let Some(Commands::Log { name }) = &cli.command {
         return core::log::log_cli(name.as_deref());
+    }
+    if let Some(Commands::Where { path, local, auto }) = &cli.command {
+        return core::repo_loc::where_cli(path.as_deref(), *local, *auto);
     }
 
     let cfg = AppConfig::discover()?;
@@ -216,6 +230,7 @@ fn main() -> Result<()> {
         },
         Commands::Ota => core::ota::ota(&cfg)?,
         Commands::Log { .. } => unreachable!("log 已在仓库校验前处理"),
+        Commands::Where { .. } => unreachable!("where 已在仓库校验前处理"),
     }
     Ok(())
 }
@@ -234,6 +249,7 @@ fn print_help() {
     println!("  deploy [stow|local]       部署配置");
     println!("  repo [export|clean|replenish|edit]  仓库管理");
     println!("  log [名称]            查看运行日志（缺省列出全部）");
+    println!("  where [<路径>|--local|--auto]  仓库位置与模式");
     println!("  ota                   OTA 自更新");
     println!("  trash [restore|empty] 回收站（被删文件先到这里）");
     println!();
