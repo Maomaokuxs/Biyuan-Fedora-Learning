@@ -5,6 +5,7 @@ pub mod clean;
 pub mod deploy;
 pub mod ota;
 pub mod repo;
+pub mod log;
 pub mod editor;
 pub mod display;
 pub mod utils;

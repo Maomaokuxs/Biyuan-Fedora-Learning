@@ -222,13 +222,9 @@ pub fn run_tui(cfg: AppConfig) -> Result<()> {
                                     let start = std::time::Instant::now();
                                     let res = execute_action(&cfg, page, selected);
                                     let elapsed = start.elapsed().as_millis();
-                                    let log_dir = std::env::var("BY_MGR_LOG_DIR").unwrap_or_else(|_| {
-            dirs::home_dir()
-                .map(|h| h.join(".local/state/by-mgr").to_string_lossy().into_owned())
-                .unwrap_or_else(|| "/tmp/by-mgr".to_string())
-        });
+                                    let log_dir = crate::core::log::log_dir();
                                     let _ = std::fs::create_dir_all(&log_dir);
-                                    let _ = std::fs::write(format!("{}/tui.log", log_dir), format!("{} | elapsed {}ms | {:?}\n", chrono::Local::now().format("%H:%M:%S"), elapsed, res));
+                                    let _ = std::fs::write(log_dir.join("tui.log"), format!("{} | elapsed {}ms | {:?}\n", chrono::Local::now().format("%H:%M:%S"), elapsed, res));
                                     status = match res {
                                         Ok(msg) => format!("{} ({}ms)", msg, elapsed),
                                         Err(e) => format!("❌ {} ({}ms)", e, elapsed),

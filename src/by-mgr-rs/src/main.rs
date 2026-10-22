@@ -82,6 +82,11 @@ enum Commands {
     /// OTA 自更新
     #[command(alias = "update")]
     Ota,
+    /// 查看运行日志（缺省列出全部日志）
+    Log {
+        /// 日志名: deploy/restore/snapshot/repo/ota/...
+        name: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -126,6 +131,11 @@ fn main() -> Result<()> {
         let cfg = AppConfig::discover()?;
         ui::run_tui(cfg)?;
         return Ok(());
+    }
+
+    // log 命令只读日志文件，不依赖仓库发现/校验，提前处理
+    if let Some(Commands::Log { name }) = &cli.command {
+        return core::log::log_cli(name.as_deref());
     }
 
     let cfg = AppConfig::discover()?;
@@ -205,6 +215,7 @@ fn main() -> Result<()> {
             }
         },
         Commands::Ota => core::ota::ota(&cfg)?,
+        Commands::Log { .. } => unreachable!("log 已在仓库校验前处理"),
     }
     Ok(())
 }
@@ -222,6 +233,7 @@ fn print_help() {
     println!("  clean -k <N> | -d <天数>  清理快照");
     println!("  deploy [stow|local]       部署配置");
     println!("  repo [export|clean|replenish|edit]  仓库管理");
+    println!("  log [名称]            查看运行日志（缺省列出全部）");
     println!("  ota                   OTA 自更新");
     println!("  trash [restore|empty] 回收站（被删文件先到这里）");
     println!();
