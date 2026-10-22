@@ -78,7 +78,11 @@ pub fn set_note(cfg: &AppConfig, target: &str, note: &str) -> Result<String> {
 }
 
 pub fn snapshot(cfg: &AppConfig) -> Result<String> {
-    let log_dir = std::env::var("BY_MGR_LOG_DIR").unwrap_or_else(|_| "/tmp/by-mgr".to_string());
+    let log_dir = std::env::var("BY_MGR_LOG_DIR").unwrap_or_else(|_| {
+            dirs::home_dir()
+                .map(|h| h.join(".local/state/by-mgr").to_string_lossy().into_owned())
+                .unwrap_or_else(|| "/tmp/by-mgr".to_string())
+        });
     let _ = std::fs::create_dir_all(&log_dir);
     let log_file = format!("{}/tui-snapshot.log", log_dir);
     let _ = std::fs::write(&log_file, format!("[{}] Rust snapshot 调用 lib/snapshot.sh\n", chrono::Local::now().format("%H:%M:%S")));

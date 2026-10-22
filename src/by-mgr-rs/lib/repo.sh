@@ -98,6 +98,8 @@ clean_repos() {
         if [ -z "${BY_MGR_QUIET:-}" ]; then
             echo ">> 探测完成，开始禁用失效仓库..."
         fi
+        # 探测可能耗时很久，禁用前续一次 sudo 凭据，避免第二段因凭据过期卡住
+        sudo -v 2>/dev/null || true
         for id in $fail_list; do
             disable_repo_compat "$id" || true
             echo "[$(date +%H:%M:%S)] 已禁用: $id" >> "$LOG_DIR/repo.log"

@@ -24,7 +24,7 @@ if [ -z "$REPO_DIR" ] && [ -d "$HOME/.local/share/by-mgr/dotfiles" ]; then
 fi
 [ -z "$REPO_DIR" ] && REPO_DIR=$(dirname "$(dirname "$LIB_DIR")")
 # 临时日志目录（按你建议，每次测试后读取）
-LOG_DIR="${BY_MGR_LOG_DIR:-/tmp/by-mgr}"
+LOG_DIR="${BY_MGR_LOG_DIR:-$HOME/.local/state/by-mgr}"
 mkdir -p "$LOG_DIR" 2>/dev/null || true
 DOTFILES_DIR="$REPO_DIR/dotfiles"
 BACKUP_ROOT="$HOME/.config/by-mgr/backup"
