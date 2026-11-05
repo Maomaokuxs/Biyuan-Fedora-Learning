@@ -8,13 +8,12 @@ import Quickshell.Widgets
 // 外壳 900×600 居中，背景 Theme.bg（跟随配色，不全屏、不透明窗、不写死深棕）。
 // 顶栏只留标题 + ✕。无过渡面板、无收藏/随机/应用主按钮、无上一下张、无徽标/说明。
 // 过渡用原来默认 awww --transition-type random，UI 不选。
-// 动效：切图时仅左侧大预览做滑入 + 斜切擦除（和角色立绘登场同一节奏）。
-// 实现：旧图底层不动；新图用 Canvas 做斜切 discard（此环境 ShaderEffect 不渲染）——
-// 斜切边左侧显示新图（采样 x 随 t 左移归位 = 滑入），右侧 discard 露出底层旧图；
-// 左上梯形起帧已揭示，斜切边随 progress 从左往右扫。硬边缘，无渐变带，全程不碰 opacity。
-// Canvas 2D 路径（ShaderEffect 在此环境静默不渲染），不用 Y 轴翻页，不用淡入。
-// 新图 Ready 才开动画（避免异步未加载时纹理为空、动画白跑），超时 800ms 直接显示。
-// 右侧选图列与下方配色不动，不晃。回车应用播 awww 真过渡。原 WallpaperCard/ControlCenter 全部保留。
+// 动效（2026-10-22 按 mock 定稿参数）：窗口落下式入场——壳 opacity 0→1、y -28→0、
+// scale 0.97→1，400ms OutCubic；内容分层跟进（预览延迟 40ms、scale 1.02→1、360ms；
+// 缩略图每张延迟 60+i×20ms 封顶 120ms、y -10→0、200ms；配色条延迟 160ms、y -8→0、200ms；子元素与壳同向下落）。
+// 壳的动画只绑开关状态，不等图片解码。切图时预览只做 180ms 交叉淡化（WallpaperPreview），
+// 无位移无缩放。退出比入场快：Esc 170ms 原路收回（InCubic）；应用 180ms 淡出+下沉 10px，
+// 让位给桌面壁纸的 awww 2s 过渡。presented 状态机保证退出播完才真正隐藏窗口。
 Item {
     id: root
     property var theme
@@ -27,6 +26,29 @@ Item {
     property double lastWheelMs: 0
     property bool pickerOpen: UiState.wallpaperPickerOpen
     property double lastSwitchMs: 0
+
+    // 开关动效状态机：presented=true 期间窗口才可见（shell.qml 的 visible 绑它）；
+    // 关闭先播退出动画、播完才置 false 真正隐藏，保证退出不被 visible 瞬间切断。
+    // closeMode: "esc" 取消类关闭（Esc/✕/点背景）原路收回；"apply" 应用关闭淡出下沉。
+    property bool presented: false
+    property bool closing: false
+    property string closeMode: "esc"
+    // 入场窗口期标记：只有此期间新建的缩略图 delegate 才播错峰入场，滚动新建的不播
+    property bool entering: false
+
+    function beginClose() {
+        if (root.closing || !root.presented) return;
+        root.closing = true;
+        root.entering = false;
+        enterAnim.stop();
+        if (root.closeMode === "apply") applyExitAnim.restart();
+        else escExitAnim.restart();
+    }
+    function finishClose() {
+        root.presented = false;
+        root.closing = false;
+        root.closeMode = "esc";
+    }
     // 每个壁纸的信息：name -> {w, h, size}，由 infoProc 批量 file+stat 填充，失败则只显示名字
     property var infoMap: ({})
 
@@ -114,6 +136,15 @@ Item {
         root.requestPalette(root.selectedItem());
         preview.show(root.displayUrl(), true);
     }
+    // 双击直接应用：绕过 trySelect 的节流与同图守卫，选中即应用
+    function selectAndApply(idx) {
+        var n = root.wallFiles.length;
+        if (n <= 0 || idx < 0 || idx >= n) return;
+        root.lastSwitchMs = Date.now();
+        root.selectedIndex = idx;
+        root.requestPalette(root.selectedItem());
+        root.applySelected();
+    }
     function refreshAll() {
         root.wallFiles = [];
         root.infoMap = {};
@@ -150,6 +181,7 @@ Item {
         // 原来默认：awww random + theme-sync --no-render（仅同步配色，不双渲染）；-a 同时发给 backdrop 实例，保证 Overview 壁纸跟随
         Exec.sh("awww img -a " + q + " --transition-type random --transition-pos center --transition-duration 2; bash ~/.config/niri/scripts/theme-sync.sh --no-render " + q + "; notify-send \"壁纸已更换\" " + root.shQuote(root.wallBase(it.url)) + " -i " + q);
         root.current = p;
+        root.closeMode = "apply";
         root.requestClose();
     }
     // 取色缓存键：thumbHd 文件名即 wallthumbs 的 stat id（%d-%i-%s-%Y，含 mtime），文件一变键就变
@@ -216,8 +248,29 @@ Item {
     }
     onPickerOpenChanged: {
         if (root.pickerOpen) {
+            // 打开：停掉可能在播的退出动画，复位到入场起帧再播入场（壳不等图片解码）
+            escExitAnim.stop();
+            applyExitAnim.stop();
+            root.closing = false;
+            root.closeMode = "esc";
+            root.presented = true;
+            shellCard.opacity = 0;
+            shellShift.y = -28;
+            shellScaleT.xScale = 0.97;
+            shellScaleT.yScale = 0.97;
+            flipWrap.opacity = 0;
+            flipScaleT.xScale = 1.02;
+            flipScaleT.yScale = 1.02;
+            paletteBar.opacity = 0;
+            paletteShift.y = -8;
+            root.entering = true;
+            enterGate.restart();
+            enterAnim.restart();
             root.refreshAll();
             root.forceActiveFocus();
+        } else if (root.presented) {
+            // 关闭（含快捷键切换关）：播退出动画，播完 finishClose 才隐藏
+            root.beginClose();
         }
     }
     Component.onCompleted: {
@@ -321,10 +374,20 @@ Item {
         }
     }
 
-    // 外壳：Theme.bg，radius 16
+    // 外壳：Theme.bg，radius 16。入场/退出动效作用在这一层（位移+缩放+透明）
     ClippingRectangle {
+        id: shellCard
         anchors.fill: parent
         radius: 16
+        transform: [
+            Translate { id: shellShift; y: 0 },
+            Scale {
+                id: shellScaleT
+                origin.x: shellCard.width / 2
+                origin.y: shellCard.height / 2
+                xScale: 1; yScale: 1
+            }
+        ]
         color: root.theme.bg
         border.color: Qt.alpha(root.theme.muted, 0.35)
         border.width: 1
@@ -366,12 +429,19 @@ Item {
                 visible: root.splitEff > 0
                 clip: true
 
-                // 大预览：UI 与动效隔离（WallpaperPreview 组件），左→右裁剪揭示
+                // 大预览：UI 与动效隔离（WallpaperPreview 组件，切图只交叉淡化）；
+                // 入场时这一层延迟 40ms 以 scale 1.02→1 + 淡入放稳
                 Item {
                     id: flipWrap
                     anchors { top: parent.top; left: parent.left; right: parent.right }
                     height: root.splitEff >= 200 ? parent.height - 52 : parent.height
                     clip: true
+                    transform: Scale {
+                        id: flipScaleT
+                        origin.x: flipWrap.width / 2
+                        origin.y: flipWrap.height / 2
+                        xScale: 1; yScale: 1
+                    }
 
                     // 轻阴影（在预览卡后，静态，非动画）
                     Rectangle {
@@ -383,6 +453,11 @@ Item {
                         id: preview
                         anchors.fill: parent
                         bgColor: root.theme.mediaBg
+                    }
+                    // 大预览双击 = 应用当前选中
+                    MouseArea {
+                        anchors.fill: parent
+                        onDoubleClicked: root.applySelected()
                     }
                 }
 
@@ -426,10 +501,32 @@ Item {
                     cellWidth: Math.floor(width / cols)
                     cellHeight: Math.round((cellWidth - 12) * 9 / 16 + 12)
                     delegate: Item {
+                        id: dlg
                         required property var modelData
                         required property int index
                         width: grid.cellWidth
                         height: grid.cellHeight
+                        transform: Translate { id: dlgShift; y: 0 }
+                        // 入场错峰：仅打开窗口期新建的 delegate 播（延迟 60+i×20、封顶 120ms，
+                        // 保证末张约 320ms 完成）；滚动新建的直接静止显示
+                        Component.onCompleted: {
+                            if (root.entering) {
+                                dlg.opacity = 0;
+                                dlgShift.y = -10;
+                                dlgDelay.interval = 60 + Math.min(index, 3) * 20;
+                                dlgDelay.restart();
+                            }
+                        }
+                        Timer {
+                            id: dlgDelay
+                            repeat: false
+                            onTriggered: dlgEnter.restart()
+                        }
+                        ParallelAnimation {
+                            id: dlgEnter
+                            NumberAnimation { target: dlg; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutCubic }
+                            NumberAnimation { target: dlgShift; property: "y"; to: 0; duration: 200; easing.type: Easing.OutCubic }
+                        }
                         // 缩略图：小图用 thumb（已够），不放大
                         ClippingRectangle {
                             anchors.fill: parent
@@ -457,6 +554,7 @@ Item {
                         MouseArea {
                             anchors.fill: parent
                             onClicked: root.trySelect(index)
+                            onDoubleClicked: root.selectAndApply(index)
                         }
                     }
                     onCurrentIndexChanged: {
@@ -503,12 +601,13 @@ Item {
             }
         }
 
-        // 底部：配色预览
+        // 底部：配色预览（入场延迟 160ms 从上方 8px 落下淡入，与壳同向）
         Item {
             id: paletteBar
             anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
             anchors.leftMargin: 16; anchors.rightMargin: 16
             height: 56
+            transform: Translate { id: paletteShift; y: 0 }
             Rectangle {
                 anchors { top: parent.top; left: parent.left; right: parent.right }
                 height: 1; color: Qt.alpha(root.theme.muted, 0.25)
@@ -556,5 +655,59 @@ Item {
                 font.family: root.theme.fontFamily; font.pixelSize: 11; color: root.theme.muted
             }
         }
+    }
+
+    // ===== 开关动效（参数按 2026-10-22 mock 定稿）=====
+    // 入场：壳 400ms OutCubic（opacity 0→1、y -28→0、scale 0.97→1）；
+    // 预览延迟 40ms、360ms（opacity 0→1、scale 1.02→1）；配色条延迟 160ms、200ms（opacity 0→1、y -8→0）
+    ParallelAnimation {
+        id: enterAnim
+        ParallelAnimation {
+            NumberAnimation { target: shellCard; property: "opacity"; to: 1; duration: 400; easing.type: Easing.OutCubic }
+            NumberAnimation { target: shellShift; property: "y"; to: 0; duration: 400; easing.type: Easing.OutCubic }
+            NumberAnimation { target: shellScaleT; property: "xScale"; to: 1; duration: 400; easing.type: Easing.OutCubic }
+            NumberAnimation { target: shellScaleT; property: "yScale"; to: 1; duration: 400; easing.type: Easing.OutCubic }
+        }
+        SequentialAnimation {
+            PauseAnimation { duration: 40 }
+            ParallelAnimation {
+                NumberAnimation { target: flipWrap; property: "opacity"; to: 1; duration: 360; easing.type: Easing.OutCubic }
+                NumberAnimation { target: flipScaleT; property: "xScale"; to: 1; duration: 360; easing.type: Easing.OutCubic }
+                NumberAnimation { target: flipScaleT; property: "yScale"; to: 1; duration: 360; easing.type: Easing.OutCubic }
+            }
+        }
+        SequentialAnimation {
+            PauseAnimation { duration: 160 }
+            ParallelAnimation {
+                NumberAnimation { target: paletteBar; property: "opacity"; to: 1; duration: 200; easing.type: Easing.OutCubic }
+                NumberAnimation { target: paletteShift; property: "y"; to: 0; duration: 200; easing.type: Easing.OutCubic }
+            }
+        }
+    }
+
+    // 入场窗口期：700ms 后关闭 entering，之后滚动新建的缩略图不再播错峰
+    Timer {
+        id: enterGate
+        interval: 700
+        repeat: false
+        onTriggered: root.entering = false
+    }
+
+    // 退出（Esc 类）：170ms InCubic 原路收回（opacity→0、y→-28、scale→0.97）
+    ParallelAnimation {
+        id: escExitAnim
+        NumberAnimation { target: shellCard; property: "opacity"; to: 0; duration: 170; easing.type: Easing.InCubic }
+        NumberAnimation { target: shellShift; property: "y"; to: -28; duration: 170; easing.type: Easing.InCubic }
+        NumberAnimation { target: shellScaleT; property: "xScale"; to: 0.97; duration: 170; easing.type: Easing.InCubic }
+        NumberAnimation { target: shellScaleT; property: "yScale"; to: 0.97; duration: 170; easing.type: Easing.InCubic }
+        onFinished: root.finishClose()
+    }
+
+    // 退出（应用）：180ms 淡出 + 下沉 10px，让位桌面壁纸过渡
+    ParallelAnimation {
+        id: applyExitAnim
+        NumberAnimation { target: shellCard; property: "opacity"; to: 0; duration: 180; easing.type: Easing.InCubic }
+        NumberAnimation { target: shellShift; property: "y"; to: 10; duration: 180; easing.type: Easing.InCubic }
+        onFinished: root.finishClose()
     }
 }
