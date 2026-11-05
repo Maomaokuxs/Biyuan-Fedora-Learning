@@ -39,4 +39,9 @@ QtObject {
     readonly property string bat3: "\uF241"
     readonly property string bat4: "\uF240"
     readonly property string batCharging: "\u{F140B}"
+    // 托盘统一字形（2026-11-05 新增，fc-list ":charset=" 已验 JetBrainsMono Nerd Font 均有）：
+    readonly property string download: "\uF019"
+    readonly property string clipboard: "\uF0EA"
+    readonly property string keyboard: "\uF11C"
+    readonly property string video: "\uF03D"
 }

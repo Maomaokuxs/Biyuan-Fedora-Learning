@@ -72,17 +72,25 @@ Rectangle {
             hideDebounce.restart();
         }
     }
+    // 竖条模式：缩成封面+播放方块（横向的歌名/上下曲/进度环全部收起，
+    // 簇内其余两件由 Bar 在竖条时隐藏；竖贴是独立 Column，不动横向 Row）
+    // 歌名单行显示在播放键下方，过长截断（elide），高跟内容走。
+    property bool vertical: false
     property real fixedWidth: 190
-    property real contentW: fixedWidth > 0 ? fixedWidth : row.implicitWidth + 20
+    property real contentW: vertical ? UiState.tileW : (fixedWidth > 0 ? fixedWidth : row.implicitWidth + 20)
+    property real contentH: vertical ? vCol.implicitHeight + 6 : 32
+    property string trackTitle: (root.player && root.player.trackTitle) || ""
     property real animW: shown ? contentW : 0
+    property real animH: shown ? contentH : 0
     Behavior on animW { enabled: UiState.animReady; NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+    Behavior on animH { enabled: UiState.animReady; NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
     Behavior on opacity { enabled: UiState.animReady; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
     visible: opacity > 0.01
     opacity: shown ? 1 : 0
-    height: 32
+    height: vertical ? contentH : 32
     width: contentW
     Layout.preferredWidth: animW
-    Layout.preferredHeight: 32
+    Layout.preferredHeight: vertical ? animH : 32
     radius: 10
     clip: true
     color: mouse.containsMouse ? normalFg : normalBg
@@ -99,6 +107,7 @@ Rectangle {
 
     Row {
         id: row
+        visible: !root.vertical
         anchors.left: parent.left
         anchors.leftMargin: 4
         anchors.verticalCenter: parent.verticalCenter
@@ -274,6 +283,92 @@ Rectangle {
                 }
             }
         }
+
+    // 竖贴：封面在上、播放键在下（与横向播放键同逻辑，独立一套控件，
+    // 不与横向 Row 抢子项；上下曲/进度环竖条时不画，歌名样式 B 拆两行）
+    Column {
+        id: vCol
+        anchors.centerIn: parent
+        spacing: 3
+        visible: root.vertical
+        Rectangle {
+            width: 24; height: 24
+            radius: 7
+            color: "transparent"
+            clip: true
+            anchors.horizontalCenter: parent.horizontalCenter
+            Image {
+                anchors.fill: parent
+                source: (root.player && root.player.trackArtUrl) || ""
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: false
+                smooth: true
+                mipmap: true
+                visible: status === Image.Ready
+            }
+            Text {
+                anchors.centerIn: parent
+                text: "♪"
+                font.pixelSize: 14
+                color: mouse.containsMouse ? root.normalBg : root.normalFg
+                visible: !root.player || !root.player.trackArtUrl
+            }
+        }
+        Item {
+            id: vPlayWrap
+            width: 24; height: 24
+            anchors.horizontalCenter: parent.horizontalCenter
+            property bool hovered: false
+            Rectangle {
+                anchors.centerIn: parent
+                width: 24; height: 24
+                radius: 12
+                color: mouse.containsMouse ? root.normalBg : root.normalFg
+                opacity: vPlayWrap.hovered ? 0.9 : 1
+            }
+            Text {
+                anchors.centerIn: parent
+                text: (root.player && root.player.isPlaying) ? Icons.pause : Icons.play
+                font.family: "JetBrainsMono Nerd Font"
+                font.pixelSize: 14
+                font.bold: true
+                color: mouse.containsMouse ? root.normalFg : root.normalBg
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+            }
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                onEntered: vPlayWrap.hovered = true
+                onExited: vPlayWrap.hovered = false
+                onClicked: {
+                    var pl = root.player;
+                    if (!pl) return;
+                    if (pl.isPlaying) {
+                        if (pl.canTogglePlaying) pl.togglePlaying();
+                        else if (pl.canPause) pl.pause();
+                    } else {
+                        if (pl.canPlay) pl.play();
+                        else if (pl.canTogglePlaying) pl.togglePlaying();
+                    }
+                    mouse.accepted = true;
+                }
+            }
+        }
+        // 歌名单行：无歌名时隐藏、不占位；过长截断
+        Text {
+            visible: root.trackTitle !== ""
+            width: UiState.tileW - 2
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: root.trackTitle
+            font.family: "JetBrainsMono Nerd Font"
+            font.pixelSize: 10
+            color: mouse.containsMouse ? root.normalBg : root.normalFg
+            horizontalAlignment: Text.AlignHCenter
+            elide: Text.ElideRight
+        }
+    }
 
     MouseArea {
         id: mouse

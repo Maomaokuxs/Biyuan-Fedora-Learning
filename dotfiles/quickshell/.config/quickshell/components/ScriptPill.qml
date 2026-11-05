@@ -29,7 +29,8 @@ Pill {
         id: poller
         interval: root.pollInterval
         repeat: true
-        running: root.execCmd !== ""
+        // 冻结（已收纳且抽屉关闭）时停轮询：不置 runner，脚本不再跑
+        running: root.execCmd !== "" && !root.frozen
         triggeredOnStart: true
         onTriggered: runner.running = true
     }
@@ -37,16 +38,21 @@ Pill {
     // 交互后即时补刷：滚轮/点击只管发命令不管显示，不补刷就得等下一个轮询周期
     // （内置屏 2s、外接屏 30s）。200ms 快刷 + 2.5s 慢刷（cover ddcutil 类慢命令），
     // restart() 顺带防抖，连续滚轮只刷最后一次。
-    function refresh() { refreshFast.restart(); refreshSlow.restart(); }
+    function refresh() {
+        if (root.frozen)
+            return;
+        refreshFast.restart();
+        refreshSlow.restart();
+    }
     Timer {
         id: refreshFast
         interval: 200
-        onTriggered: { if (!runner.running) runner.running = true; }
+        onTriggered: { if (!root.frozen && !runner.running) runner.running = true; }
     }
     Timer {
         id: refreshSlow
         interval: 2500
-        onTriggered: { if (!runner.running) runner.running = true; }
+        onTriggered: { if (!root.frozen && !runner.running) runner.running = true; }
     }
     onScrollUp: root.refresh()
     onScrollDown: root.refresh()

@@ -2,12 +2,15 @@ import QtQuick
 import Quickshell.Io
 import "../components" as Comp
 
-// Niri 工作区弹性指示器：暗色小方块，active 展宽 42px（对齐 waybar CSS）
-Row {
+// Niri 工作区弹性指示器：暗色小方块，active 展宽 42px（对齐 waybar CSS）。
+// 竖条时变竖向圆点列（active 纵向展长、其余圆点在列内居中）。
+Item {
     id: root
     property var theme
     property string screenName: ""
-    spacing: 3
+    property bool vertical: false
+    implicitWidth: vertical ? wsCol.implicitWidth : wsRow.implicitWidth
+    implicitHeight: vertical ? wsCol.implicitHeight : wsRow.implicitHeight
     // ListModel 原位更新：同 idx 的 delegate 存活，宽度动画才能播；
     // 若每次换新数组，Repeater 重建全部 delegate，切换直接闪现毫无动画。
     ListModel { id: wsModel }
@@ -158,8 +161,26 @@ Row {
         onTriggered: eventStream.running = true
     }
 
-    Repeater {
-        model: wsModel
+    Row {
+        id: wsRow
+        spacing: 3
+        visible: !root.vertical
+        Repeater {
+            model: root.vertical ? [] : wsModel
+            delegate: wsDot
+        }
+    }
+    Column {
+        id: wsCol
+        spacing: 1
+        visible: root.vertical
+        Repeater {
+            model: root.vertical ? wsModel : []
+            delegate: wsDot
+        }
+    }
+    Component {
+        id: wsDot
         Rectangle {
             required property int idx
             required property bool active
@@ -169,11 +190,17 @@ Row {
             // pill 在鼠标下滑来滑去 → entered/exited 疯狂互触发 = 全体颤抖。
             // scale 只影响自身绘制，不触发布局，无反馈环。
             property bool hovered: false
-            width: isActive ? 36 : 14
-            height: isActive ? 24 : 20
+            // 横向 active 展宽、竖向 active 展长（宽高互换），其余圆点不变；
+            // 居中锚只能给交叉轴：Row 里只留垂直居中、Column 里只留水平居中。
+            // 注意：本构建不会忽略布局方向上的锚——Row 孩子一旦挂了
+            // horizontalCenter 就会脱离顺序排布、全叠在 Row 中心，且不再计入
+            // Row 隐含宽度（2026-11-05 顶栏重叠的根因），故两方向的锚必须互斥。
+            width: root.vertical ? (isActive ? 24 : 14) : (isActive ? 36 : 14)
+            height: root.vertical ? (isActive ? 36 : 20) : (isActive ? 24 : 20)
             scale: (hovered && !isActive) ? 1.2 : 1
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-            anchors.verticalCenter: parent.verticalCenter
+            anchors.verticalCenter: root.vertical ? undefined : parent.verticalCenter
+            anchors.horizontalCenter: root.vertical ? parent.horizontalCenter : undefined
             radius: isActive ? 6 : 4
             color: isActive ? root.theme.fg : Qt.alpha(root.theme.fg, 0.35)
             Behavior on width { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }

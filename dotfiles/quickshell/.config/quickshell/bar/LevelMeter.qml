@@ -23,8 +23,10 @@ Comp.Pill {
     // 暂停留 baseline 在屏上（和其它音频模块一致）；
     // 播时必现（效果 off 则显示空窗，中键照常进选择卡）；
     // 尾闸只藏后面的跟随者，不管自己。效果开关只管内容。
-    forceHidden: !root.hasPlayer || Comp.BarState.flagM
+    forceHidden: !root.hasPlayer || Comp.BarState.flagM || root.vertical
 
+    // 竖条时整块收起（簇里只剩封面+播放方块），由 Bar 传入
+    property bool vertical: false
     property string vizEff: Comp.UiState.vizEffect
     // 显隐的门是有播放器（暂停也算）：暂停留 baseline 在屏上，只有人走茶凉才藏
     property bool hasPlayer: Comp.SpectrumState.hasPlayer

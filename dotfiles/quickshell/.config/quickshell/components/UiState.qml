@@ -1,6 +1,8 @@
 pragma Singleton
 
 import QtQuick
+import Quickshell
+import Quickshell.Io
 
 // 跨窗口 UI 状态：Variants delegate 是隔离作用域，bar 里的点击
 // 无法直接点亮 overlay 窗口，经此单例中转。
@@ -50,6 +52,45 @@ QtObject {
     // 注意：不要在绑定里调方法读 anchorMap（如之前的 anchorFor），
     // 本 quickshell 版本绑定不追踪单例方法内部的属性读取，只求值一次。
     // 读端一律直接下标（直接读 anchorMap 才会被追踪）。
+    // 锚点 Y（竖条用）：结构与 anchorMap 同构 {key: {screenName: y}}，
+    // Pill.updateAnchor 在上报 X 的同时上报胶囊中心 Y，竖条面板沿长轴夹取读它。
+    property var anchorMapY: ({})
+    function setAnchorY(key: string, screen: string, y: real) {
+        if (key === "" || screen === "")
+            return;
+        var m = Object.assign({}, root.anchorMapY);
+        var sub = Object.assign({}, m[key]);
+        sub[screen] = y;
+        m[key] = sub;
+        root.anchorMapY = m;
+    }
+    // 抽屉模式中文名：胶囊 id → 中文名，未命中回落 id 本身。
+    // （bar 模式不查这张表；drawerName/drawerIcon 是 id 的纯函数，
+    // 只读字面量表、不读任何响应式属性，绑定调它们无妨。）
+    function drawerName(id: string): string {
+        var m = {
+            "updates": "更新", "weather": "天气", "audio": "声音", "bri": "亮度",
+            "cpu": "处理器", "pp": "性能", "mem": "内存", "net": "网络",
+            "bt": "蓝牙", "bat": "电池", "clock": "时钟", "bell": "通知",
+            "tray": "托盘", "fcitx": "输入法", "inhibit": "勿扰",
+            "cc": "控制中心", "power": "电源",
+            "pick": "取色", "clip": "剪贴板", "gamma": "夜灯",
+            "theme": "主题", "wall": "壁纸", "screen": "屏幕",
+            "rec": "录屏", "shot": "截图"
+        };
+        return m[id] !== undefined ? m[id] : id;
+    }
+    // 抽屉模式兜底图标：pillText 首码点不是图标时用。纯文字型
+    // （时钟的 hh:mm）与状态值型（输入法的「中」/「EN」是状态
+    // 不是图标）走这里；字形已过 fc-list 校验，确在
+    // JetBrainsMono Nerd Font 内含（F017 时钟、F11C 键盘）。
+    function drawerIcon(id: string): string {
+        if (id === "clock")
+            return "\uF017";
+        if (id === "fcitx")
+            return "\uF11C";
+        return "";
+    }
     // 弹窗几何注册表：调位置只改这里，不碰卡片样式。
     // anchor: anchorMap 的键；w: 卡片宽（居中即 锚点 - w/2）。
     // 注意：读端必须直接下标（见 anchorMap 注释），禁止包 anchorFor 方法。
@@ -60,6 +101,7 @@ QtObject {
         bri: { anchor: "briAnchorX", w: 280 },
         wall: { anchor: "wallAnchorX", w: 560 },
         cc: { anchor: "ccAnchorX", w: 460 },
+        weather: { anchor: "weatherAnchorX", w: 372 },
         notif: { w: 420 }
     })
     // 启动动画门：false 时所有 Pill 显隐直接到位（加载期数据陆续到达，
@@ -96,6 +138,69 @@ QtObject {
     property real dragX: 0
     property real dragY: 0
     property real dragW: 60
+    property real dragH: 32
+
+    // 收纳抽屉双模式：stowPersistent=false 是临时模式（任意区起拖时自动打开，
+    // 落位后预约自动收起）；=true 是持久模式（在顶栏背景上向下拖打开、
+    // 向上拖关闭，不自动收）。按屏分键（同 dragScreen 模式），
+    // 另一屏的实例不跟着展开/解冻。
+    property bool stowOpen: false
+    property bool stowPersistent: false
+    property string stowScreen: ""
+    // 搬家模式（第三段）：栏背景空白处向屏内拉过 110px 进入；moveEdge 为
+    // 指针最近边（松手即停靠该边，走同一 setBarDirection）；同边松手不换
+    // 方向、只按抽屉规则（向内 >24 已在 24px 处开了持久抽屉）。单屏拖拽，
+    // 故用全局状态（与拖拽幽灵 drag* 同款）；预览窗读它显示最近边。
+    property bool moveActive: false
+    property string moveScreen: ""
+    property string moveEdge: "top"
+
+    // 临时模式落位后自动收起：两个区的控制器在 dragEnd 正常收尾时统一调
+    // scheduleStowClose()，300ms 后关闭（让落位结果先被看见）；
+    // 延迟期内任一区开始新拖拽会调 cancelStowClose() 取消，避免连续整理时被关掉。
+    // 注：本单例是 QtObject、无默认子属性，Timer 只能以属性对象形式持有
+    property Timer stowCloseTimer: Timer {
+        interval: 300
+        repeat: false
+        onTriggered: { root.stowOpen = false; root.stowPersistent = false; }
+    }
+    function scheduleStowClose() { stowCloseTimer.restart(); }
+    function cancelStowClose() { stowCloseTimer.stop(); }
+
+    // 顶栏方向：top/bottom/left/right，落盘 ~/.cache/by-mgr/qs-bar-direction。
+    // 方向是全局状态（双屏同向），barWin/Bar/ToolsGroup/面板全部读它；
+    // top 时一切行为与改前一致（回归守门）。FileView/Process 以属性对象
+    // 形式持有（与 stowCloseTimer 同款，单例无默认子属性）。
+    property string barDirection: "top"
+    readonly property bool barVertical: barDirection === "left" || barDirection === "right"
+    readonly property bool barBottom: barDirection === "bottom"
+    // 竖贴宽度：与启动器（Fedora 徽标块）同宽。启动器宽 = 18px 徽标字形宽 + 20，
+    // 实测约 35px；Bar 用 Binding 把 launcherPill.width 实时喂进来，单点来源；
+    // Pill/MusicInfo 竖条 contentW 与托盘/块 holder 竖条宽都读它。默认 35 兜底。
+    property real tileW: 35
+    // 天气面板弹出方向：bar 在哪边、面板就往屏内哪边弹（PopupReveal 的
+    // direction 参数，内容不旋转，只换弹出方向与生长原点）
+    readonly property string panelDir: barDirection === "bottom" ? "up" : (barDirection === "left" ? "right" : (barDirection === "right" ? "left" : "down"))
+    property FileView directionFile: FileView {
+        path: Quickshell.env("HOME") + "/.cache/by-mgr/qs-bar-direction"
+        onLoaded: {
+            var d = text().trim();
+            if (d === "top" || d === "bottom" || d === "left" || d === "right")
+                root.barDirection = d;
+        }
+    }
+    property Process directionWriter: Process {
+        command: ["bash", "-c", "true"]
+    }
+    function setBarDirection(d: string) {
+        if (d !== "top" && d !== "bottom" && d !== "left" && d !== "right")
+            return;
+        if (d === root.barDirection)
+            return;
+        root.barDirection = d;
+        root.directionWriter.command = ["bash", "-c", "printf '%s' '" + d + "' > ~/.cache/by-mgr/qs-bar-direction"];
+        root.directionWriter.running = true;
+    }
 
 
     // 通知文本消毒：剥掉 ANSI/OSC 转义序列与控制字符。
@@ -125,6 +230,8 @@ QtObject {
             root.notifOpen = false;
         if (except !== "cc")
             root.ccOpen = false;
+        if (except !== "weather")
+            root.weatherOpen = false;
         if (except !== "sidebar") {
             root.sidebarOpen = false;
             root.sidebarWallpaper = false;
@@ -198,6 +305,16 @@ QtObject {
         }
     }
 
+    function toggleWeather(screenName: string) {
+        if (root.weatherOpen && root.weatherScreen === screenName)
+            root.weatherOpen = false;
+        else {
+            root.weatherScreen = screenName;
+            root.weatherOpen = true;
+            root.closeOthers("weather");
+        }
+    }
+
     function toggleCC(screenName: string) {
         if (root.ccOpen && root.ccScreen === screenName)
             root.ccOpen = false;
@@ -228,6 +345,10 @@ QtObject {
             root.closeOthers("wallpicker");
         }
     }
+
+    // 天气面板（锚点下拉，动画在 PopupReveal，内容在 WeatherPanel）
+    property bool weatherOpen: false
+    property string weatherScreen: ""
 
     // 通知中心
     property bool notifOpen: false
