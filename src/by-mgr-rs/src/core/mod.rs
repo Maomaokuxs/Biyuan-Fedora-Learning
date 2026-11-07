@@ -7,6 +7,7 @@ pub mod ota;
 pub mod repo;
 pub mod log;
 pub mod repo_loc;
+pub mod deps;
 pub mod editor;
 pub mod display;
 pub mod utils;

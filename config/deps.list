@@ -1,0 +1,42 @@
+# by-mgr 依赖包清单：每行一个配置模块，冒号后是该模块功能需要的 RPM 包名（空格分隔）。
+# 格式：模块: 包 包 包；# 开头为注释；每行上方的注释说明每个包的用途。
+# 检查命令：by-mgr deps（可加模块名只查一个）；另有 font: 字体名、service: 进程名两种行
+# by-mgr：stow=部署/还原时链接配置
+by-mgr: stow
+# fastfetch：系统信息展示
+fastfetch: fastfetch
+# kitty：终端本体
+kitty: kitty
+# mako：通知守护
+mako: mako
+# niri：niri=合成器本体；awww=壁纸；kanshi=屏幕切换；fcitx5=输入法；hellwal=壁纸取色；hypridle=空闲管理；hyprlock=锁屏；quickshell=顶栏；copyq=剪贴板历史；kf6-kded=KDE 守护；polkit-kde=授权代理；python3-pillow=theme-sync 取色
+niri: niri awww kanshi fcitx5 hellwal hypridle hyprlock quickshell copyq kf6-kded polkit-kde python3-pillow
+# plasma-apply-colorscheme：kde-material-you-colors=配色分发
+plasma-apply-colorscheme: kde-material-you-colors
+# quickshell：quickshell=壳本体；grim/slurp/swappy=截图；wl-clipboard=剪贴板读写；playerctl=音乐控制；pulseaudio-utils=音量（pactl）；wireplumber=音量（wpctl）；brightnessctl=内屏亮度；ddcutil=外屏亮度；gammastep=夜灯；hyprpicker=取色；power-profiles-daemon=性能模式；jq=脚本解析 JSON；fcitx5=输入法状态；kanshi=屏幕切换；awww=壁纸；waypaper=壁纸选择；rofi=菜单/启动器；ffmpeg=壁纸缩略图与频谱；ImageMagick=壁纸缩略图；libnotify=通知发送；PackageKit=更新检查；bluez=蓝牙
+quickshell: quickshell grim slurp swappy wl-clipboard playerctl pulseaudio-utils wireplumber brightnessctl ddcutil gammastep hyprpicker power-profiles-daemon jq fcitx5 kanshi awww waypaper rofi ffmpeg ImageMagick libnotify PackageKit bluez
+# rofi：rofi=启动器本体；playerctl=音乐菜单控制
+rofi: rofi playerctl
+# starship：提示符
+starship: starship
+# swappy：截图标注
+swappy: swappy
+# waybar：waybar=栏本体；ddcutil=外屏亮度；playerctl=音乐控制；power-profiles-daemon=性能模式；rofi=菜单；slurp=截图选区；wl-clipboard=剪贴板读写；hyprpicker=取色；PackageKit=更新检查；fcitx5=输入法状态
+waybar: waybar ddcutil playerctl power-profiles-daemon rofi slurp wl-clipboard hyprpicker PackageKit fcitx5
+# waypaper：壁纸选择器
+waypaper: waypaper
+# xdg-desktop-portal：门户本体；xdg-desktop-portal-wlr=截图/录屏后端
+xdg-desktop-portal: xdg-desktop-portal xdg-desktop-portal-wlr
+
+# --- 字体（fc-list 检查族名；字体在 ~/.local/share/fonts，不走 RPM）---
+font: JetBrainsMono Nerd Font
+font: Sarasa Gothic SC
+font: JetBrains Mono
+font: Iosevka Nerd Font
+# --- 服务（检查守护进程是否在运行；只列常驻的，quickshell/waybar/mako 随当前模式切换的不列）---
+service: fcitx5
+service: kanshi
+service: awww-daemon
+service: copyq
+service: kded6
+service: polkit-kde-authentication-agent-1

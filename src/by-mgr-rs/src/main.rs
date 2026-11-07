@@ -93,6 +93,11 @@ enum Commands {
         #[arg(long)]
         auto: bool,
     },
+    /// 检查配置文件所需软件包是否已安装
+    Deps {
+        /// 只检查指定模块（缺省全部）
+        module: Option<String>,
+    },
     /// 查看运行日志（缺省列出全部日志）
     Log {
         /// 日志名: deploy/restore/snapshot/repo/ota/...
@@ -229,6 +234,7 @@ fn main() -> Result<()> {
             }
         },
         Commands::Ota => core::ota::ota(&cfg)?,
+        Commands::Deps { module } => core::deps::deps_cli(&cfg, module.as_deref())?,
         Commands::Log { .. } => unreachable!("log 已在仓库校验前处理"),
         Commands::Where { .. } => unreachable!("where 已在仓库校验前处理"),
     }
@@ -249,6 +255,7 @@ fn print_help() {
     println!("  deploy [stow|local]       部署配置");
     println!("  repo [export|clean|replenish|edit]  仓库管理");
     println!("  log [名称]            查看运行日志（缺省列出全部）");
+    println!("  deps [模块]           检查配置文件所需软件包是否已安装");
     println!("  where [<路径>|--local|--auto]  仓库位置与模式");
     println!("  ota                   OTA 自更新");
     println!("  trash [restore|empty] 回收站（被删文件先到这里）");
