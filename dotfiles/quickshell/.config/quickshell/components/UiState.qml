@@ -93,12 +93,13 @@ QtObject {
     }
     // 弹窗几何注册表：调位置只改这里，不碰卡片样式。
     // anchor: anchorMap 的键；w: 卡片宽（居中即 锚点 - w/2）。
+    // vw/vh: 竖条用卡片宽高（竖卡贴栏外侧、沿长轴对齐胶囊中心）。
     // 注意：读端必须直接下标（见 anchorMap 注释），禁止包 anchorFor 方法。
     property var popupGeom: ({
         media: { anchor: "mediaAnchorX", w: 360 },
         viz: { anchor: "vizAnchorX", w: 480 },
-        vol: { anchor: "volAnchorX", w: 280 },
-        bri: { anchor: "briAnchorX", w: 280 },
+        vol: { anchor: "volAnchorX", w: 280, vw: 64, vh: 240 },
+        bri: { anchor: "briAnchorX", w: 280, vw: 64, vh: 240 },
         wall: { anchor: "wallAnchorX", w: 560 },
         cc: { anchor: "ccAnchorX", w: 460 },
         weather: { anchor: "weatherAnchorX", w: 372 },

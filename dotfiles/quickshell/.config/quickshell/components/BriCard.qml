@@ -7,12 +7,14 @@ Item {
     id: root
     property var theme
     property bool isExternal: false
+    property bool vertical: false
     signal requestClose
 
-    width: 280
-    height: 68
-    implicitWidth: 280
-    implicitHeight: 68
+    // 横向 280×68（顶栏用）；竖向 64×240（竖条用）：图标上、竖滑杆中、百分比下。
+    width: vertical ? 64 : 280
+    height: vertical ? 240 : 68
+    implicitWidth: width
+    implicitHeight: height
 
     property int pct: 50
     property bool busy: false
@@ -71,11 +73,13 @@ Item {
         clip: true
 
         Row {
+            visible: !root.vertical
             anchors.fill: parent
             anchors.margins: 12
             spacing: 10
 
             Text {
+                id: hIcon
                 anchors.verticalCenter: parent.verticalCenter
                 text: "󰃟"
                 font.pixelSize: 18
@@ -99,6 +103,7 @@ Item {
             }
 
             Text {
+                id: hPct
                 anchors.verticalCenter: parent.verticalCenter
                 width: 48
                 text: root.pct + "%"
@@ -118,6 +123,66 @@ Item {
                     anchors.margins: -6
                     onClicked: root.requestClose()
                 }
+            }
+        }
+
+        // 竖向：图标上、竖滑杆中、百分比下、关闭钮底（图标与百分比复用横向的文本）
+        Text {
+            id: vIcon
+            visible: root.vertical
+            anchors.top: parent.top
+            anchors.topMargin: 12
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: hIcon.text
+            font.pixelSize: 18
+            font.family: root.theme.fontFamily
+            color: root.theme.fg
+        }
+        SliderBar {
+            id: vSlider
+            visible: root.vertical
+            anchors.top: vIcon.bottom
+            anchors.topMargin: 10
+            anchors.bottom: vPct.top
+            anchors.bottomMargin: 8
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: 32
+            vertical: true
+            theme: root.theme
+            value01: root.pct / 100
+            enabled: !root.busy
+            onMoved: ratio => {
+                root.pct = Math.round(ratio * 100);
+            }
+            onReleased: ratio => {
+                root.pct = Math.round(ratio * 100);
+                root.commit(root.pct);
+            }
+        }
+        Text {
+            id: vPct
+            visible: root.vertical
+            anchors.bottom: vClose.top
+            anchors.bottomMargin: 8
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: hPct.text
+            font.pixelSize: 13
+            font.family: root.theme.fontFamily
+            color: root.theme.fg
+        }
+        Text {
+            id: vClose
+            visible: root.vertical
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 10
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: "✕"
+            font.pixelSize: 12
+            color: root.theme.muted
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -6
+                onClicked: root.requestClose()
             }
         }
     }
