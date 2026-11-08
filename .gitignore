@@ -41,6 +41,7 @@ dotfiles/mako/.config/mako/config
 dotfiles/starship/.config/starship.toml
 dotfiles/waybar/.config/waybar/scripts/weather.conf
 dotfiles/waybar/.config/waybar/scripts/__pycache__/
+dotfiles/quickshell/.config/quickshell/scripts/common/__pycache__/
 dotfiles/by-mgr/.config/by-mgr/weather.conf
 src/by-mgr-rs/target/
 src/by-mgr-rs/Cargo.lock
