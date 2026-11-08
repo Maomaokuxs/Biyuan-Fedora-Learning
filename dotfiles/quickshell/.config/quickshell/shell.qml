@@ -171,33 +171,70 @@ ShellRoot {
             // 背景拖手势（抽屉持久开关 + 搬家）：位于全部内容之下，
             // 胶囊/工作区/音乐等内容都在其上、先拿到自己的事件，不受影响；
             // 纯点击不触发任何事。向屏内分量：左栏 dx、右栏 -dx、顶栏 dy、
-            // 底栏 -dy。向屏内拉过 24px → 本屏抽屉持久打开；向屏外拉过
-            // 24px → 关闭（一次按压只触发一次开关）；继续向屏内拉过
-            // 110px → 搬家模式（栏浮起 + 目标边停靠预览，指针最近边实时
-            // 更新）；松手：搬家模式下停靠最近边（同边不换方向、抽屉保持
-            // 24px 处已开的状态），未进搬家则按 24px 开关结果处理。
-            // 注意：拉过 110px 时指针已出栏窗（开抽屉时窗高仅 94/窗宽仅
-            // 118），靠 MouseArea 的按压抓取继续收事件，松手才放。
+            // 底栏 -dy。长按抓取：背景按下后起 400ms 计时，按住不动（位移
+            // 不到 24px）计时到 → 进入"已抓住"（栏底色变亮 + 整体缩放
+            // 1.03，与搬家同款提示），只有已抓住的拖动才能进搬家；
+            // 未抓住的往里拉：拉过 24px 立刻持久打开抽屉，松手落在
+            // 24–110px 区间内也开；未抓住的拉就算冲过 110px 也不进搬家、
+            // 抽屉保持打开。一旦拖动超过 24px 就取消长按计时，不中途变
+            // 搬家。已抓住的拖动拉过 110px → 进搬家模式（已开的抽屉立刻
+            // 关上）；松手停靠最近边（同边不换方向）。向屏外拉过 24px →
+            // 关闭（一次按压只触发一次开关）。搬家模式：栏浮起 + 目标边停靠
+            // 预览，指针最近边实时更新。注意：拉过 110px 时指针已出栏窗
+            // （开抽屉时窗高仅 94/窗宽仅 118），靠 MouseArea 的按压抓取
+            // 继续收事件，松手才放。
             MouseArea {
+                id: bgMouse
                 anchors.fill: parent
                 z: 0
                 property real pressY: 0
                 property real pressX: 0
                 property bool fired: false
                 property bool moveStarted: false
-                onPressed: { pressY = mouse.y; pressX = mouse.x; fired = false; moveStarted = false; }
-                onPositionChanged: {
-                    var dy = mouse.y - pressY;
-                    var dx = mouse.x - pressX;
+                // 本次按压是否已长按抓住（只有已抓住的拖动才能进搬家）
+                property bool grabbed: false
+                // 本次按压向屏内拉到的分量（松手时判断用）
+                property real curInward: 0
+                // 本次按压至今的指针位移（长按计时到时须不到 24px）
+                property real curDisp: 0
+                // 长按抓取计时：按下后 400ms 到且位移不到 24px → 已抓住；
+                // 一旦拖动超过 24px 就取消，不中途变搬家。
+                Timer {
+                    id: grabTimer
+                    interval: 400
+                    repeat: false
+                    onTriggered: {
+                        if (!bgMouse.fired && !bgMouse.moveStarted
+                            && bgMouse.curDisp < 24) {
+                            bgMouse.grabbed = true;
+                        }
+                    }
+                }
+                function bgPress(x: real, y: real) {
+                    pressX = x; pressY = y;
+                    fired = false; moveStarted = false; grabbed = false;
+                    curInward = 0; curDisp = 0;
+                    grabTimer.stop();
+                    grabTimer.start();
+                }
+                function bgMove(x: real, y: real) {
+                    var dy = y - pressY;
+                    var dx = x - pressX;
                     // 向屏内分量：左栏 dx、右栏 -dx、顶栏 dy、底栏 -dy
                     var inward = barWin.barLeft ? dx : barWin.barVertical ? -dx : barWin.barBottom ? -dy : dy;
+                    curInward = inward;
+                    curDisp = Math.hypot(dx, dy);
+                    // 一旦拖动超过 24px，取消长按计时（已是开抽屉的手势，
+                    // 不中途变搬家；已抓住的不受影响，计时已触发过）
+                    if (curDisp > 24)
+                        grabTimer.stop();
                     if (moveStarted) {
                         // 搬家进行中：只更新最近边（屏坐标 = 窗坐标 + 窗原点；
                         // 顶/左原点 0，底为屏高-窗高、右为屏宽-窗宽）
                         var ox = barWin.barDir === "right" ? (modelData.width || 0) - barWin.winW : 0;
                         var oy = barWin.barBottom ? (modelData.height || 0) - barWin.winH : 0;
-                        var sx = mouse.x + ox;
-                        var sy = mouse.y + oy;
+                        var sx = x + ox;
+                        var sy = y + oy;
                         var sw = modelData.width || 0;
                         var sh = modelData.height || 0;
                         var dT = sy, dB = sh - sy, dL = sx, dR = sw - sx;
@@ -209,7 +246,8 @@ ShellRoot {
                         return;
                     }
                     if (!fired) {
-                        if (inward > 24 && !barWin.stowOpenHere) {
+                        if (inward > 24 && !barWin.stowOpenHere && !grabbed) {
+                            // 未抓住的往里拉：拉过 24px 立刻持久开抽屉
                             fired = true;
                             Comp.UiState.stowScreen = modelData.name;
                             Comp.UiState.stowPersistent = true;
@@ -222,21 +260,43 @@ ShellRoot {
                             Comp.UiState.cancelStowClose();
                         }
                     }
-                    if (inward > 110) {
+                    if (inward > 110 && grabbed) {
+                        // 已抓住的拖动才进搬家：已开的抽屉立刻关上
+                        if (barWin.stowOpenHere) {
+                            Comp.UiState.stowOpen = false;
+                            Comp.UiState.stowPersistent = false;
+                            Comp.UiState.cancelStowClose();
+                        }
                         moveStarted = true;
                         Comp.UiState.moveScreen = modelData.name;
                         Comp.UiState.moveEdge = barWin.barDir;
                         Comp.UiState.moveActive = true;
                     }
                 }
-                onReleased: {
+                function bgRelease() {
+                    grabTimer.stop();
+                    var wasGrabbed = grabbed;
+                    grabbed = false;
                     if (moveStarted) {
                         moveStarted = false;
                         Comp.UiState.moveActive = false;
                         if (Comp.UiState.moveEdge !== barWin.barDir)
                             Comp.UiState.setBarDirection(Comp.UiState.moveEdge);
+                        return;
+                    }
+                    // 松手在 24–110px 区间内、抽屉还没开、且未抓住：松手即开
+                    // （小幅度快拉仍能开抽屉；已抓住的短拖是取消的搬家，不开抽屉）
+                    if (!fired && !wasGrabbed && curInward > 24 && curInward <= 110 && !barWin.stowOpenHere) {
+                        fired = true;
+                        Comp.UiState.stowScreen = modelData.name;
+                        Comp.UiState.stowPersistent = true;
+                        Comp.UiState.stowOpen = true;
+                        Comp.UiState.cancelStowClose();
                     }
                 }
+                onPressed: bgPress(mouse.x, mouse.y)
+                onPositionChanged: bgMove(mouse.x, mouse.y)
+                onReleased: bgRelease()
             }
 
             // 栏底色（原窗口 color 的角色）：只盖栏带 46，z=3 在抽屉与阴影之上，
@@ -248,8 +308,8 @@ ShellRoot {
                 width: barWin.barVertical ? 56 : parent.width
                 height: barWin.barVertical ? parent.height : 46
                 z: 3
-                // 搬家浮起提示：本屏搬家时底色微亮（与 scale 1.03 同款触发）
-                color: (Comp.UiState.moveActive && Comp.UiState.moveScreen === modelData.name) ? Qt.lighter(barTheme.bg, 1.08) : barTheme.bg
+                // 搬家浮起提示：本屏搬家或已长按抓住时底色微亮（与 scale 1.03 同款触发）
+                color: ((Comp.UiState.moveActive && Comp.UiState.moveScreen === modelData.name) || bgMouse.grabbed) ? Qt.lighter(barTheme.bg, 1.08) : barTheme.bg
             }
 
             // 顶栏投在抽屉上的阴影：固定在栏带朝抽屉的那边、高 12，黑色由 0.28
@@ -276,8 +336,8 @@ ShellRoot {
                 y: barWin.barVertical ? 0 : barWin.barBandY + 7
                 width: barWin.barVertical ? 56 : parent.width - 8
                 height: barWin.barVertical ? parent.height : 32
-                // 搬家浮起提示：本屏搬家时栏整体轻微缩放浮起（供用户评判手感）
-                scale: (Comp.UiState.moveActive && Comp.UiState.moveScreen === modelData.name) ? 1.03 : 1
+                // 搬家浮起提示：本屏搬家或已长按抓住时栏整体轻微缩放浮起（供用户评判手感）
+                scale: ((Comp.UiState.moveActive && Comp.UiState.moveScreen === modelData.name) || bgMouse.grabbed) ? 1.03 : 1
                 Behavior on scale { NumberAnimation { duration: 150 } }
                 z: 4
                 theme: barTheme
@@ -547,7 +607,8 @@ ShellRoot {
         }
     }
 
-    // 音量滑动条 overlay：锚到音量 pill 下方
+    // 音量滑动条 overlay：横向锚到音量 pill 下方；竖向贴栏外侧、对齐胶囊中心
+    // （天气面板同款地基：anchorMapY 取胶囊中心 Y，沿长轴夹取、上下缘各留 8px）
     Variants {
         model: Quickshell.screens
         PanelWindow {
@@ -557,10 +618,14 @@ ShellRoot {
 
             Theme { id: volTheme }
 
-            anchors { top: Comp.UiState.barDirection !== "bottom"; bottom: Comp.UiState.barDirection === "bottom"; left: true }
-            margins { top: Comp.UiState.barDirection === "bottom" ? 0 : 52; bottom: Comp.UiState.barDirection === "bottom" ? 52 : 0; left: Math.max(0, ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.vol.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.vol.w / 2) }
-            implicitWidth: 280
-            implicitHeight: 68
+            property bool isVert: Comp.UiState.barDirection === "left" || Comp.UiState.barDirection === "right"
+            property real anchorY: ((Comp.UiState.anchorMapY[Comp.UiState.popupGeom.vol.anchor] || {})[modelData.name] || 0)
+            property real cardW: isVert ? Comp.UiState.popupGeom.vol.vw : Comp.UiState.popupGeom.vol.w
+            property real cardH: isVert ? Comp.UiState.popupGeom.vol.vh : 68
+            anchors { top: Comp.UiState.barDirection !== "bottom"; bottom: Comp.UiState.barDirection === "bottom"; left: Comp.UiState.barDirection !== "right"; right: Comp.UiState.barDirection === "right" }
+            margins { top: isVert ? Math.max(8, Math.min(anchorY - cardH / 2, (modelData.height || 99999) - cardH - 8)) : (Comp.UiState.barDirection === "bottom" ? 0 : 52); bottom: Comp.UiState.barDirection === "bottom" ? 52 : 0; left: isVert ? (Comp.UiState.barDirection === "left" ? 62 : 0) : Math.max(0, ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.vol.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.vol.w / 2); right: Comp.UiState.barDirection === "right" ? 62 : 0 }
+            implicitWidth: cardW
+            implicitHeight: cardH
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
@@ -569,6 +634,7 @@ ShellRoot {
             Comp.VolCard {
                 anchors.fill: parent
                 theme: volTheme
+                vertical: isVert
                 onRequestClose: Comp.UiState.volOpen = false
             }
         }
@@ -631,7 +697,8 @@ ShellRoot {
         }
     }
 
-    // 亮度滑动条 overlay：锚到亮度 pill 下方
+    // 亮度滑动条 overlay：横向锚到亮度 pill 下方；竖向贴栏外侧、对齐胶囊中心
+    // （天气面板同款地基：anchorMapY 取胶囊中心 Y，沿长轴夹取、上下缘各留 8px）
     Variants {
         model: Quickshell.screens
         PanelWindow {
@@ -641,10 +708,14 @@ ShellRoot {
 
             Theme { id: briTheme }
 
-            anchors { top: Comp.UiState.barDirection !== "bottom"; bottom: Comp.UiState.barDirection === "bottom"; left: true }
-            margins { top: Comp.UiState.barDirection === "bottom" ? 0 : 52; bottom: Comp.UiState.barDirection === "bottom" ? 52 : 0; left: Math.max(0, ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.bri.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.bri.w / 2) }
-            implicitWidth: 280
-            implicitHeight: 68
+            property bool isVert: Comp.UiState.barDirection === "left" || Comp.UiState.barDirection === "right"
+            property real anchorY: ((Comp.UiState.anchorMapY[Comp.UiState.popupGeom.bri.anchor] || {})[modelData.name] || 0)
+            property real cardW: isVert ? Comp.UiState.popupGeom.bri.vw : Comp.UiState.popupGeom.bri.w
+            property real cardH: isVert ? Comp.UiState.popupGeom.bri.vh : 68
+            anchors { top: Comp.UiState.barDirection !== "bottom"; bottom: Comp.UiState.barDirection === "bottom"; left: Comp.UiState.barDirection !== "right"; right: Comp.UiState.barDirection === "right" }
+            margins { top: isVert ? Math.max(8, Math.min(anchorY - cardH / 2, (modelData.height || 99999) - cardH - 8)) : (Comp.UiState.barDirection === "bottom" ? 0 : 52); bottom: Comp.UiState.barDirection === "bottom" ? 52 : 0; left: isVert ? (Comp.UiState.barDirection === "left" ? 62 : 0) : Math.max(0, ((Comp.UiState.anchorMap[Comp.UiState.popupGeom.bri.anchor] || {})[modelData.name] || 0) - Comp.UiState.popupGeom.bri.w / 2); right: Comp.UiState.barDirection === "right" ? 62 : 0 }
+            implicitWidth: cardW
+            implicitHeight: cardH
             color: "transparent"
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
@@ -654,6 +725,7 @@ ShellRoot {
                 anchors.fill: parent
                 theme: briTheme
                 isExternal: Comp.UiState.briExternal
+                vertical: isVert
                 onRequestClose: Comp.UiState.briOpen = false
             }
         }

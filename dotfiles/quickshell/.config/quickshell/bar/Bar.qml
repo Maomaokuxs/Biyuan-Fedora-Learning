@@ -36,7 +36,12 @@ Item {
     ColumnLayout {
         id: vLay
         anchors.fill: parent
-        spacing: 1
+        // 竖条两端边距：上区顶边、下区底边各离屏边 10px（与两侧边距
+        // (56-34.8)/2≈10.6 对齐）；20px 从中间弹性间隔的余量里出，
+        // 锚点+边距，不写死 y、不按屏高算死
+        anchors.topMargin: 10
+        anchors.bottomMargin: 10
+        spacing: 2 // 块间间距 +1：上区各块之间 1→2
         visible: root.vertical
     }
     // 方向切换时的布局孩子搬运：激活布局接 6 件（胶囊区取激活的那个），
@@ -519,15 +524,16 @@ Item {
         return false;
     }
     // 冻结（已收纳 && 本屏抽屉关闭）：可真停的只有带 per-pill exec 的 ScriptPill
-    // （updates/weather/audio/briExt/fcitx）与时钟秒表；其余 pill 的文案来自
+    // （updates/weather/audio/briExt）与时钟秒表；其余 pill 的文案来自
     // BarState 共享轮询（单进程喂全栏 + 双屏共用），无法按 pill 拆，保持运行。
+    // fcitx 不冻结：托盘里的输入法格读 fcitxPill.pillText 的实时值，冻住就停在
+    // 上次的“中”、切英文也看不见（2026-11-08 实测：切 keyboard-us 后托盘仍显示中）。
     function applyFrozen() {
         var f = !root.stowOpenHere;
         updatesPill.frozen = f && root.stowHas("updates");
         weatherPill.frozen = f && root.stowHas("weather");
         audioPill.frozen = f && root.stowHas("audio");
         briExtPill.frozen = f && root.stowHas("bri");
-        fcitxPill.frozen = f && root.stowHas("fcitx");
         clockPill.frozen = f && root.stowHas("clock");
     }
     // 抽屉打开：收纳中的 ScriptPill 各补刷一次，时钟立即对时
@@ -2516,7 +2522,7 @@ Item {
     // 切换时旧 delegate 销毁送仓库、新 delegate 领养，与既有重建路径一致）
     Column {
         id: pillZoneV
-        spacing: 1
+        spacing: 2 // 块间间距 +1：下区各槽之间 1→2
         visible: false
         Layout.alignment: Qt.AlignHCenter
         Repeater {

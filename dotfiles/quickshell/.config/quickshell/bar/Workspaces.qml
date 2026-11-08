@@ -190,13 +190,14 @@ Item {
             // pill 在鼠标下滑来滑去 → entered/exited 疯狂互触发 = 全体颤抖。
             // scale 只影响自身绘制，不触发布局，无反馈环。
             property bool hovered: false
-            // 横向 active 展宽、竖向 active 展长（宽高互换），其余圆点不变；
+            // 横向 active 展宽；竖向 active 与非 active 都是横矩形（宽大于高）、
+            // 高亮 32×20、非高亮 24×16，高亮宽 8、高 4，略大一圈；
             // 居中锚只能给交叉轴：Row 里只留垂直居中、Column 里只留水平居中。
             // 注意：本构建不会忽略布局方向上的锚——Row 孩子一旦挂了
             // horizontalCenter 就会脱离顺序排布、全叠在 Row 中心，且不再计入
             // Row 隐含宽度（2026-11-05 顶栏重叠的根因），故两方向的锚必须互斥。
-            width: root.vertical ? (isActive ? 24 : 14) : (isActive ? 36 : 14)
-            height: root.vertical ? (isActive ? 36 : 20) : (isActive ? 24 : 20)
+            width: root.vertical ? (isActive ? 32 : 24) : (isActive ? 36 : 14)
+            height: root.vertical ? (isActive ? 20 : 16) : (isActive ? 24 : 20)
             scale: (hovered && !isActive) ? 1.2 : 1
             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
             anchors.verticalCenter: root.vertical ? undefined : parent.verticalCenter
