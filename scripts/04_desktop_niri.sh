@@ -76,13 +76,13 @@ install_desktop_niri() {
     # 3. 执行补全安装
     # 核心：niri (窗口管理器), waybar (状态栏), rofi (2.x 原生 Wayland 启动器)
     # 美化：awww (壁纸后端), hellwal (色彩方案生成), kde-material-you-colors (KDE M3配色), starship (终端美化)，cava（终端可视化音乐实现）
-    # 功能：fcitx5 (输入法), dolphin (文件管理), mako (通知通知), hyprlock/idle (锁屏与休眠)，gwenview（图片查看器），
+    # 功能：fcitx5 (输入法), kanshi (屏幕切换), dolphin (文件管理), mako (通知通知), hyprlock/idle (锁屏与休眠)，gwenview（图片查看器），
     # blueman（蓝牙管理工具），btop（资源占用查看工具)，kate（文本编辑器）,ddcutil(显示器亮度调整)，NetworkManager-tui（nmtui 网络连接工具）
     # kwallet libsecret（密钥及管理工具）ncdu(终端磁盘文件占用查看器) ranger（终端文件管理器）
     
     local niri_pkgs=(
         niri waybar quickshell rofi stow unzip kitty 
-        fastfetch jq awww hellwal 
+        fastfetch jq awww hellwal kanshi 
         waypaper starship hyprlock hypridle 
         gpu-screen-recorder libnotify mako 
         grim slurp ImageMagick wl-clipboard copyq hyprpicker
