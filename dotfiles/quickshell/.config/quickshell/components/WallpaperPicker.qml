@@ -5,6 +5,7 @@ import Quickshell.Widgets
 
 // 壁纸选择器：左大预览 + 可拖竖线 + 右缩略图网格（1~3 列随宽） + 下配色预览。
 // 竖线可拖：往左拖网格变宽、列数变多，拖到 0 预览消失变纯网格；位置持久化到 ~/.cache/by-mgr/qs-picker-split。
+// PgUp/PgDn 在 4 档间跳（大预览宽 0/320/480/630），←/→ 单步选图，↑/↓ 跳一行；拖竖线全程无极、松手存精确值；档位只走 PgUp/PgDn。
 // 外壳 900×600 居中，背景 Theme.bg（跟随配色，不全屏、不透明窗、不写死深棕）。
 // 顶栏只留标题 + ✕。无过渡面板、无收藏/随机/应用主按钮、无上一下张、无徽标/说明。
 // 过渡用原来默认 awww --transition-type random，UI 不选。
@@ -57,11 +58,13 @@ Item {
     readonly property real splitMax: Math.max(0, mainArea.width - 232)
     readonly property real splitEff: root.splitW < 0 ? Math.max(0, mainArea.width - 240) : Math.max(0, Math.min(root.splitW, root.splitMax))
 
+    // 布局档位：大预览宽（第 4 档 630 ≈ 当前默认 628），只走 PgUp/PgDn；拖竖线全程无极、松手存精确值
+    readonly property var gears: [0, 320, 480, 630]
+
     // 配色预览（跟随选中壁纸，不读 global-palette.env）：空 = 未算出，UI 回落 Theme 色
     property var previewPalette: ({})
     property var paletteCache: ({})
     property string paletteWantKey: ""
-    property string paletteWantSmall: ""
     property string paletteWantOrig: ""
     property string paletteBusyKey: ""
 
@@ -70,6 +73,27 @@ Item {
     }
     function saveSplit() {
         Exec.sh("printf '%s' " + Math.round(root.splitEff) + " > ~/.cache/by-mgr/qs-picker-split");
+    }
+    function saveSplitValue(v) {
+        Exec.sh("printf '%s' " + Math.round(v) + " > ~/.cache/by-mgr/qs-picker-split");
+    }
+    // PgUp/PgDn 切档位：不在档上时去相邻的下一档（PgDn 往高、PgUp 往低），在档上时去相邻档；到头不动；
+    // 滑动只走 gearAnim（不用 Behavior，拖动也要经 splitW）
+    function stepGear(d) {
+        if (root.splitW < 0) root.splitW = root.splitEff;
+        var w = Math.round(root.splitEff);
+        var target = -1;
+        if (d > 0) {
+            for (var i = 0; i < root.gears.length; i++)
+                if (root.gears[i] > w) { target = root.gears[i]; break; }
+        } else {
+            for (var j = root.gears.length - 1; j >= 0; j--)
+                if (root.gears[j] < w) { target = root.gears[j]; break; }
+        }
+        if (target < 0 || target === Math.round(root.splitW)) return;
+        gearAnim.to = target;
+        gearAnim.restart();
+        root.saveSplitValue(target);
     }
     function filePath(url) {
         return String(url || "").replace(/^file:\/\//, "");
@@ -194,8 +218,8 @@ Item {
         if (p && p[kind]) return p[kind];
         return root.theme[kind];
     }
-    // 选中哪张就算哪张的 hellwal 四色：hellwal -j 只输出 JSON、跳过模板，不应用壁纸、不写 global-palette.env。
-    // 不传 -v（不反色），默认深色：BG 深色、FG 浅色、ACCENT 主色、MUTED 低饱和同系色。
+    // 选中哪张就算哪张的最终四色：调 theme-sync.sh --preview <原图>，与实际应用
+    // 同一段取色 + 昼夜后处理 + 对比度守卫，干跑只输出 JSON，不写盘、不动主题。
     function requestPalette(item) {
         if (!item) return;
         var key = root.paletteKeyFor(item);
@@ -203,21 +227,14 @@ Item {
         var hit = root.paletteCache[key];
         if (hit) { root.previewPalette = hit; return; }
         root.paletteWantKey = key;
-        root.paletteWantSmall = root.filePath(String(item.thumbHd || item.thumb || item.url || ""));
         root.paletteWantOrig = root.filePath(String(item.url || ""));
         if (!paletteProc.running) root.startPalette();
     }
     function startPalette() {
         root.paletteBusyKey = root.paletteWantKey;
-        var small = root.paletteWantSmall;
         var orig = root.paletteWantOrig;
-        // 回落链（复用 theme-sync 思路）：HD 缩略图 -> 原图 -> ffmpeg 转 png 再取；只取 JSON，不落地
-        var script = "J=$(hellwal --no-cache --skip-term-colors -i " + root.shQuote(small) + " -j 2>/dev/null); " +
-            "if [ -z \"$J\" ]; then J=$(hellwal --no-cache --skip-term-colors -i " + root.shQuote(orig) + " -j 2>/dev/null); fi; " +
-            "if [ -z \"$J\" ]; then T=$(mktemp /tmp/by-mgr-pal-XXXXXX.png); " +
-            "if timeout 30 ffmpeg -y -loglevel error -i " + root.shQuote(orig) + " -frames:v 1 \"$T\" 2>/dev/null && [ -s \"$T\" ]; then " +
-            "J=$(hellwal --no-cache --skip-term-colors -i \"$T\" -j 2>/dev/null); fi; rm -f \"$T\"; fi; " +
-            "printf '%s' \"$J\"";
+        // 传原图：theme-sync 自己做工作小图与 webp/avif 回退，预览与实际输入图统一
+        var script = "bash ~/.config/niri/scripts/theme-sync.sh --preview " + root.shQuote(orig) + " 2>/dev/null";
         paletteProc.command = ["bash", "-c", script];
         paletteProc.running = true;
     }
@@ -225,6 +242,17 @@ Item {
         if (!text || key === "") return;
         try {
             var j = JSON.parse(text);
+            // theme-sync.sh --preview 的扁平输出：最终四色（已含昼夜后处理+对比度守卫）
+            if (j.bg && j.fg && j.accent && j.muted) {
+                var res = { bg: String(j.bg), fg: String(j.fg), accent: String(j.accent), muted: String(j.muted) };
+                var m = Object.assign({}, root.paletteCache);
+                m[key] = res;
+                root.paletteCache = m;
+                // 只接受当前选中的结果，旧请求后到不覆盖新选中
+                if (key === root.paletteKeyFor(root.selectedItem()))
+                    root.previewPalette = res;
+                return;
+            }
             var sp = j.special || {};
             var co = j.colors || {};
             var bg = String(sp.background || co.color0 || "#1e1e2e");
@@ -233,13 +261,13 @@ Item {
             var mu = String(co.color8 || co.color0 || "#45475a");
             if (bg === "#000000" || bg === "#111111") bg = "#1e1e2e";
             if (mu === "#000000" || mu === "#111111") mu = "#2a2b3c";
-            var res = { bg: bg, fg: fg, accent: ac, muted: mu };
-            var m = Object.assign({}, root.paletteCache);
-            m[key] = res;
-            root.paletteCache = m;
+            var res2 = { bg: bg, fg: fg, accent: ac, muted: mu };
+            var m2 = Object.assign({}, root.paletteCache);
+            m2[key] = res2;
+            root.paletteCache = m2;
             // 只接受当前选中的结果，旧请求后到不覆盖新选中
             if (key === root.paletteKeyFor(root.selectedItem()))
-                root.previewPalette = res;
+                root.previewPalette = res2;
         } catch (e) {}
     }
     function copyColor(hex, label) {
@@ -329,7 +357,7 @@ Item {
         }
     }
 
-    // 选中壁纸的 hellwal 取色（只取 JSON 预览，不应用、不写 global-palette.env）
+    // 选中壁纸的取色预览：theme-sync.sh --preview 干跑同一套算法（只输出最终四色 JSON，不应用、不写 global-palette.env）
     Process {
         id: paletteProc
         stdout: StdioCollector {
@@ -353,6 +381,10 @@ Item {
             root.tryStep(-grid.cols); event.accepted = true;
         } else if (event.key === Qt.Key_Down) {
             root.tryStep(grid.cols); event.accepted = true;
+        } else if (event.key === Qt.Key_PageUp) {
+            root.stepGear(-1); event.accepted = true;
+        } else if (event.key === Qt.Key_PageDown) {
+            root.stepGear(1); event.accepted = true;
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) {
             root.applySelected(); event.accepted = true;
         } else if (event.key === Qt.Key_Escape) {
@@ -588,6 +620,7 @@ Item {
                     cursorShape: Qt.SizeHorCursor
                     property real grabDelta: 0
                     onPressed: (mouse) => {
+                        gearAnim.stop();
                         var p = mapToItem(mainArea, mouse.x, mouse.y);
                         grabDelta = (root.splitEff + 12) - p.x;
                     }
@@ -596,6 +629,7 @@ Item {
                         var p = mapToItem(mainArea, mouse.x, mouse.y);
                         root.splitW = Math.max(0, Math.min(p.x + grabDelta - 12, root.splitMax));
                     }
+                    // 松手存精确值（无极，不吸附到档位）
                     onReleased: root.saveSplit()
                 }
             }
@@ -650,11 +684,19 @@ Item {
                 }
             }
             Text {
+                id: hintText
                 anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                text: "回车应用 · Esc 关闭"
+                text: "PgUp/PgDn 档位 · ← → 选图 · 回车应用 · Esc 关闭"
                 font.family: root.theme.fontFamily; font.pixelSize: 11; color: root.theme.muted
             }
         }
+    }
+
+    // 档位滑动：200ms OutCubic，只动 splitW；拖动按住时先停它（见 divider onPressed）
+    NumberAnimation {
+        id: gearAnim
+        target: root; property: "splitW"
+        duration: 200; easing.type: Easing.OutCubic
     }
 
     // ===== 开关动效（参数按 2026-10-22 mock 定稿）=====
