@@ -10,13 +10,18 @@ if [ -z "$BY_MGR_NICED" ]; then
     exec nice -n 19 ionice -c 3 bash "$0" "$@"
 fi
 
-# 用法: theme-sync.sh [--debug] [--no-render] [wallpaper]
+# 用法: theme-sync.sh [--debug] [--no-render] [--preview] [wallpaper]
 # --no-render: 调用方（如 waypaper）已自行渲染壁纸时，跳过 awww 切换动画，仅同步配色
-DEBUG=false; NO_RENDER=false; WALLPAPER_ARG=""
+# --preview: 干跑模式：只跑取色 + 昼夜后处理 + 对比度守卫，算出最终四色后以
+#   JSON {"bg","fg","accent","muted"} 打印到 stdout 就退出；不写盘、不动 KDE/GTK/
+#   kitty/fcitx、不发通知、不渲染壁纸、不改 last-wallpaper / waypaper 配置。
+#   stdout 除这一行 JSON 外不输出任何内容（失败时静默 exit 1）。
+DEBUG=false; NO_RENDER=false; PREVIEW=false; WALLPAPER_ARG=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --debug)     DEBUG=true ;;
         --no-render) NO_RENDER=true ;;
+        --preview)   PREVIEW=true ;;
         *)           WALLPAPER_ARG="$1" ;;
     esac
     shift
@@ -103,7 +108,7 @@ if [ -n "$WALLPAPER_ARG" ] && [ -f "$WALLPAPER_ARG" ]; then
     WALLPAPER=$(readlink -f "$WALLPAPER_ARG")
     _debug "wallpaper arg provided: $WALLPAPER_ARG"
 else
-    echo ">> 未提供壁纸路径，尝试自动检测..."
+    if ! $PREVIEW; then echo ">> 未提供壁纸路径，尝试自动检测..."; fi
     WALLPAPER=$(detect_wallpaper)
 fi
 
@@ -116,8 +121,10 @@ _debug "active bar: $BAR"
 
 if [ -z "$WALLPAPER" ] || [ ! -f "$WALLPAPER" ]; then
     _debug "wallpaper detected: $WALLPAPER"
-    echo -e "\033[0;31m错误: 无法获取壁纸路径。\033[0m"
-    notify-send -i dialog-error "主题同步失败" "无法获取壁纸路径" -t 5000 2>/dev/null &
+    if ! $PREVIEW; then
+        echo -e "\033[0;31m错误: 无法获取壁纸路径。\033[0m"
+        notify-send -i dialog-error "主题同步失败" "无法获取壁纸路径" -t 5000 2>/dev/null &
+    fi
     exit 1
 fi
 
@@ -164,13 +171,17 @@ if [ "$WALLPAPER" == "$last_wp" ]; then
     WALLPAPER_CHANGED=false
 else
     WALLPAPER_CHANGED=true
-    echo "$WALLPAPER" > "$HOME/.cache/by-mgr/last-wallpaper.tmp.$$"
-    mv -f "$HOME/.cache/by-mgr/last-wallpaper.tmp.$$" "$HOME/.cache/by-mgr/last-wallpaper"
+    # --preview 不写 last-wallpaper：预览只是算算色，不能让系统以为壁纸换了
+    if ! $PREVIEW; then
+        echo "$WALLPAPER" > "$HOME/.cache/by-mgr/last-wallpaper.tmp.$$"
+        mv -f "$HOME/.cache/by-mgr/last-wallpaper.tmp.$$" "$HOME/.cache/by-mgr/last-wallpaper"
+    fi
     # 回写 waypaper 配置：换壁纸入口有多条（随机脚本/rofi/waypaper UI），
     # 但昼夜切换走自动检测时优先读 waypaper config.ini；此处统一回写，
     # 否则检测到过期路径会把壁纸拽回旧图（A→B 后切昼夜跳回 A 的根因）。
+    # --preview 不碰此文件。
     WAYPAPER_INI="$HOME/.config/waypaper/config.ini"
-    if [ -f "$WAYPAPER_INI" ]; then
+    if ! $PREVIEW && [ -f "$WAYPAPER_INI" ]; then
         WP_SHORT="${WALLPAPER/#$HOME/\~}"
         WP_ESC=$(printf '%s' "$WP_SHORT" | sed 's/[&|\\]/\\&/g')
         if grep -q '^[[:space:]]*wallpaper[[:space:]]*=' "$WAYPAPER_INI"; then
@@ -192,7 +203,10 @@ fi
 # Wayland 壁纸渲染：仅在非 KDE 环境且调用方未自行渲染时执行
 # 壁纸未变化时跳过重渲染（9K 图一次 2.7 秒），只做配色同步；
 # 但跨会话 daemon 不保留状态：当前没在显示这张图就必须重渲染，否则新登录黑屏
-if [ -n "$WAYLAND_DISPLAY" ] && ! $IN_KDE && ! $NO_RENDER; then
+# --preview 不渲染（只算色），也不打印任何内容
+if $PREVIEW; then
+    _debug "preview mode: skip awww render"
+elif [ -n "$WAYLAND_DISPLAY" ] && ! $IN_KDE && ! $NO_RENDER; then
     if command -v awww &> /dev/null; then
         # awww 0.12+ 没有 init 子命令：daemon 不在就起一个（起完等 1 秒再发图）
         if ! awww query &>/dev/null; then
@@ -223,7 +237,11 @@ fi
 # ==========================================
 # 1. 内存取色与拦截兜底
 # ==========================================
-echo ">> 正在分析壁纸色彩 (内存处理)..."
+if ! $PREVIEW; then echo ">> 正在分析壁纸色彩 (内存处理)..."; fi
+# --preview 时跳过终端调色板广播：hellwal 默认会把算出的调色板以 wall
+# 广播出去，kded6 的 kwrited 会转成“本地系统消息服务”通知 → 提示音。
+# 预览只是算算色，不需要发声；正常换壁纸保留广播（换壁纸的提示音）。
+if $PREVIEW; then HELLWAL_TERM=(--skip-term-colors); else HELLWAL_TERM=(); fi
 # hellwal 的解码器不支持 webp/avif，且扩展名经常是伪装的（png 实为 webp 等）。
 # 策略：先直接解码，失败则无条件用 ffmpeg 转码为 png 后重试。
 convert_to_png() {
@@ -231,24 +249,26 @@ convert_to_png() {
     command -v ffmpeg &>/dev/null && timeout 30 ffmpeg -y -loglevel error -i "$src" -frames:v 1 "$dst" 2>/dev/null && [ -s "$dst" ]
 }
 
-JSON_DATA=$(hellwal -i "$WORK_SMALL" -j 2>/dev/null)
+JSON_DATA=$(hellwal "${HELLWAL_TERM[@]}" -i "$WORK_SMALL" -j 2>/dev/null)
 if [ -z "$JSON_DATA" ] && [ "$WORK_SMALL" != "$WALLPAPER" ]; then
     _debug "small image decode failed, retry original"
-    JSON_DATA=$(hellwal -i "$WALLPAPER" -j 2>/dev/null)
+    JSON_DATA=$(hellwal "${HELLWAL_TERM[@]}" -i "$WALLPAPER" -j 2>/dev/null)
 fi
 if [ -z "$JSON_DATA" ]; then
     _debug "direct decode failed, converting via ffmpeg"
     TMP_PNG=$(mktemp /tmp/by-mgr-XXXXXX.png)
     if convert_to_png "$WALLPAPER" "$TMP_PNG"; then
-        JSON_DATA=$(hellwal -i "$TMP_PNG" -j 2>/dev/null)
+        JSON_DATA=$(hellwal "${HELLWAL_TERM[@]}" -i "$TMP_PNG" -j 2>/dev/null)
     fi
     [ -n "$TMP_PNG" ] && rm -f "$TMP_PNG"
 fi
 _debug "hellwal returned $(echo $JSON_DATA | wc -c) bytes"
 
 if [ -z "$JSON_DATA" ]; then
-    echo -e "\033[0;31mhellwal 无法解析该壁纸（格式不支持或文件损坏），已保留原配色。\033[0m"
-    notify-send -i dialog-error "主题同步失败" "hellwal 无法解析: $(basename "$WALLPAPER")" -t 5000 2>/dev/null &
+    if ! $PREVIEW; then
+        echo -e "\033[0;31mhellwal 无法解析该壁纸（格式不支持或文件损坏），已保留原配色。\033[0m"
+        notify-send -i dialog-error "主题同步失败" "hellwal 无法解析: $(basename "$WALLPAPER")" -t 5000 2>/dev/null &
+    fi
     exit 1
 fi
 
@@ -337,7 +357,7 @@ PY
 fi
 
 if [[ ! "$BG" =~ ^# ]] || [[ ! "$ACCENT" =~ ^# ]]; then
-    echo -e "\033[0;31m提取颜色失败。\033[0m"
+    if ! $PREVIEW; then echo -e "\033[0;31m提取颜色失败。\033[0m"; fi
     exit 1
 fi
 
@@ -375,6 +395,14 @@ ACCENT=$(echo "$ADJ" | cut -d' ' -f1)
 MUTED=$(echo "$ADJ" | cut -d' ' -f2)
 _debug "contrast guard: ACCENT=$ACCENT MUTED=$MUTED"
 
+# --preview 干跑出口：最终四色已算出（与实际应用同一段取色 + 昼夜后处理 +
+# 对比度守卫），只打印这一行 JSON 到 stdout 就退出；之后 KDE/GTK/kitty/fcitx
+# 分发与 global-palette.env 落盘一概不跑。
+if $PREVIEW; then
+    printf '{"bg":"%s","fg":"%s","accent":"%s","muted":"%s"}\n' "$BG" "$FG" "$ACCENT" "$MUTED"
+    exit 0
+fi
+
 echo -e "\033[0;32m调色板生成成功！\033[0m"
 _debug "colors: BG=$BG FG=$FG ACCENT=$ACCENT MUTED=$MUTED"
 echo "   背景: $BG | 文字: $FG | 强调色: $ACCENT | 辅色: $MUTED"
@@ -404,7 +432,7 @@ elif command -v kde-material-you-colors &>/dev/null; then
     (setsid timeout -k 5 20 kde-material-you-colors -f "$KDE_SMALL" $KDE_MODE >/dev/null 2>&1 &)
     _debug "kde-material-you-colors (niri) called ($KDE_MODE)"
 fi
-[ "$KDE_SMALL" != "$WALLPAPER" ] && (sleep 60; rm -f "$KDE_SMALL") &>/dev/null &
+if [ "$KDE_SMALL" != "$WALLPAPER" ]; then (sleep 60; rm -f "$KDE_SMALL") >/dev/null 2>&1 & fi
 
 # ==========================================
 # 2. 核心：生成全系统唯一的中央色彩数据库
