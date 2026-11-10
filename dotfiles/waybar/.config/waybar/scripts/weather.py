@@ -75,7 +75,7 @@ def fetch_weather():
         headers = {'User-Agent': 'Mozilla/5.0'}
         loc = get_location()
         # 国内免 key：优先 sojson（需城市编码），编码由本地 weather.conf 的 LOCATION 决定，未配置编码则走 wttr.in 兜底（支持任意城市名）
-        # 本地编码文件 weather.conf 可追加 CITY_CODE=101010100 形式，或直接用 wttr.in 无需编码
+        # 本地编码文件 weather.conf 可追加 CITY_CODE=101010100 形式（以北京为例），或直接用 wttr.in 无需编码
         code = ""
         try:
             with open(CONF) as f:
