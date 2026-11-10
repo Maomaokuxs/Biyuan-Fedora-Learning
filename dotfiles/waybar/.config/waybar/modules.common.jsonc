@@ -44,7 +44,7 @@
     "format": "{}",
     "return-type": "json",
     "interval": 2,
-    "exec": "if [ -f ~/.cache/by-mgr/waybar_system_hidden ]; then echo '{\"text\":\"\",\"class\":\"hidden\"}'; else echo '{\"text\":\"󰤨\",\"tooltip\":\"Network\"}'; fi",
+    "exec": "bash ~/.config/quickshell/scripts/network.sh",
     "on-click": "kitty -e nmtui",
     "tooltip": true
   },
