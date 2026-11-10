@@ -11,13 +11,13 @@ setup_greetd_niri() {
 
     # --- 1. 安装基础组件 ---
     echo -e "${YELLOW}>> Installing greetd and tuigreet...${NC}"
-    sudo dnf install -y greetd tuigreet
+    x sudo dnf install -y greetd tuigreet
 
     # --- 2. 权限分配 ---
     # 强制指定用户为 greetd，并确保其拥有硬件加速权限
     local g_user="greetd"
     echo -e "${YELLOW}>> Setting hardware permissions for $g_user...${NC}"
-    sudo usermod -aG video,render "$g_user"
+    hx sudo usermod -aG video,render "$g_user"
 
     # --- 3. 智能内核参数配置 (VM 环境下跳过) ---
     if ! is_vm; then
@@ -29,19 +29,19 @@ setup_greetd_niri() {
             echo -e "${CYAN}>> NVIDIA GPU detected. Applying fixes...${NC}"
             local params="nvidia-drm.modeset=1 nvidia_drm.fbdev=1 ibt=off"
             if ! grep -q "nvidia-drm.modeset=1" "$grub_file"; then
-                sudo sed -i "/^GRUB_CMDLINE_LINUX=/ s/\"$/ $params\"/" "$grub_file"
+                hx sudo sed -i "/^GRUB_CMDLINE_LINUX=/ s/\"$/ $params\"/" "$grub_file"
                 updated=true
             fi
         elif lspci | grep -qiE "amd|ati"; then
             if ! grep -q "amdgpu.modeset=1" "$grub_file"; then
-                sudo sed -i "/^GRUB_CMDLINE_LINUX=/ s/\"$/ amdgpu.modeset=1\"/" "$grub_file"
+                hx sudo sed -i "/^GRUB_CMDLINE_LINUX=/ s/\"$/ amdgpu.modeset=1\"/" "$grub_file"
                 updated=true
             fi
         fi
 
         if [ "$updated" = true ]; then
             echo -e "${YELLOW}>> Rebuilding GRUB configuration...${NC}"
-            sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+            hx sudo grub2-mkconfig -o /boot/grub2/grub.cfg
         fi
     else
         echo -e "${YELLOW}>> Skipping GPU kernel parameters (VM detected).${NC}"
@@ -60,9 +60,9 @@ EOF
 
     # --- 5. 设置启动目标与启用服务 ---
     echo -e "${YELLOW}>> Finalizing system services...${NC}"
-    sudo systemctl set-default graphical.target
+    hx sudo systemctl set-default graphical.target
     sudo systemctl disable gdm sddm lightdm plasmalogin &> /dev/null
-    sudo systemctl enable greetd
+    hx sudo systemctl enable greetd
 
     echo -e "${GREEN}✅ Greetd deployment complete!${NC}"
 }

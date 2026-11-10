@@ -12,13 +12,13 @@ ensure_rpmfusion() {
 
     if ! dnf repolist | grep -qi "rpmfusion-free"; then
         echo -e "${YELLOW}>> [Action] RPM Fusion Free is missing. Adding...${NC}"
-        sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+        x sudo dnf install -y "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
         repo_added=true
     fi
 
     if ! dnf repolist | grep -qi "rpmfusion-nonfree"; then
         echo -e "${YELLOW}>> [Action] RPM Fusion Non-Free is missing. Adding...${NC}"
-        sudo dnf install -y "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
+        x sudo dnf install -y "https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm"
         repo_added=true
     fi
 
@@ -42,11 +42,9 @@ execute_installation() {
     local pkgs=("$@")
     
     echo -e "${YELLOW}>> Deploying $target_name Drivers...${NC}"
-    # 打印时展示附加参数
-    echo -e "${CYAN}>> Command: sudo dnf install -y $extra_opts ${pkgs[*]}${NC}"
-    
+    # 命令由 v() 展示并确认，这里不再重复打印
     # 尝试批量安装（带上 extra_opts）
-    if ! sudo dnf install -y $extra_opts "${pkgs[@]}"; then
+    if ! v sudo dnf install -y $extra_opts "${pkgs[@]}"; then
         echo -e "${RED}⚠️  Installation encountered errors. Running fallback check...${NC}"
         # 兜底机制：逐个检查哪个包失败了
         for pkg in "${pkgs[@]}"; do
@@ -67,7 +65,7 @@ install_amd_drivers() {
     execute_installation "AMD Vulkan" mesa-vulkan-drivers vulkan-loader libva-utils
     
     # 步骤 2：安装 Freeworld 硬件加速驱动（传入 --allowerasing 参数）
-    execute_installation "AMD (Freeworld)" "--allowerasing" mesa-va-drivers-freeworld mesa-vdpau-drivers-freeworld
+    execute_installation "AMD (Freeworld)" "--allowerasing" mesa-va-drivers-freeworld
 }
 
 # 安装最新的 intel-media-driver，确保 Intel 核显或独显的视频硬解正常
@@ -99,12 +97,12 @@ install_nvidia_drivers() {
     fi
     local _fail=()
     for _k in "${_targets[@]}"; do
-        sudo dnf install -y "kernel-devel-$_k" --skip-unavailable
-        sudo akmods --force --kernels "$_k"
+        x sudo dnf install -y "kernel-devel-$_k" --skip-unavailable
+        x sudo akmods --force --kernels "$_k"
         # 注：模块为压缩格式 nvidia.ko.xz，通配匹配
         if ls "/lib/modules/$_k/extra/nvidia/nvidia.ko"* 2>/dev/null | grep -q .; then
             echo -e "${GREEN}✅ NVIDIA kmod ready for $_k.${NC}"
-            sudo dracut --kver "$_k" -f
+            x sudo dracut --kver "$_k" -f
         else
             echo -e "${RED}❌ NVIDIA kmod MISSING for $_k — 别进这个内核。${NC}"
             _fail+=("$_k")
@@ -141,7 +139,7 @@ setup_gpu_drivers() {
     fi
 
     # 硬件扫描（pciutils 最小化系统未必有，先保再扫）
-    command -v lspci &>/dev/null || sudo dnf install -y pciutils
+    command -v lspci &>/dev/null || x sudo dnf install -y pciutils
     # 自动检测出你是 AMD、Intel 还是 NVIDIA（或者两者都有，比如笔记本的核显+独显组合）
     echo -e "${CYAN}>> Scanning PCI buses for graphics hardware...${NC}"
     local gpu_info

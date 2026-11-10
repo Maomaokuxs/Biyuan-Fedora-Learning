@@ -106,12 +106,12 @@ setup_base() {
     else
         echo -e "${YELLOW}>> Refreshing package cache and upgrading system...${NC}"
         # 使用 --refresh 强制刷新元数据，确保获取到最新的补丁
-        sudo dnf upgrade -y --refresh
+        hx sudo dnf upgrade -y --refresh
     fi
 
     # --- 3. 初始化家目录结构 --- #
     echo -e "${YELLOW}>> Initializing standard user directories...${NC}"
-    sudo dnf install -y xdg-user-dirs
+    x sudo dnf install -y xdg-user-dirs
 
     # 强制英文家目录：不跟随系统 locale，避免生成 桌面/文档 等中文目录
     # （终端、脚本、waypaper 全用英文路径；GNOME 登录时只补缺失不改名，不会弹回去）
@@ -152,12 +152,11 @@ setup_base() {
     # JetBrains Mono（原生）、jetbrainsmono-nerd-fonts（图标，waybar/kitty 必需）、
     # sarasa-gothic-fonts（更纱黑体，中文终端对齐）、Noto Emoji/CJK
     local pkgs=(
-        dnf-plugins-core figlet git curl wget
-        fzf
+        dnf-plugins-core git curl
         jetbrains-mono-fonts-all.noarch
         jetbrainsmono-nerd-fonts.noarch
         sarasa-gothic-fonts.noarch
-        fontawesome-6-free-fonts.noarch
+        fontawesome-7-free-fonts.noarch
         google-noto-sans-yi-fonts.noarch
         google-noto-emoji-fonts.noarch
         google-noto-sans-cjk-fonts.noarch
@@ -165,14 +164,28 @@ setup_base() {
     
     echo -e "${YELLOW}>> Installing base tools and official repository fonts...${NC}"
     # 字体包版本间常改名/缺包，用 --skip-unavailable 保流程不炸，缺的下面验出来单独报
-    sudo dnf install -y "${pkgs[@]}" --skip-unavailable
+    x sudo dnf install -y "${pkgs[@]}" --skip-unavailable
+
+    # --- 1.1 装完验包：--skip-unavailable 会静默跳过，缺啥点名，不带过 ---
+    echo -e "${CYAN}>> Verifying packages...${NC}"
+    local miss_pkgs=()
+    for p in "${pkgs[@]}"; do
+        rpm -q "$p" &>/dev/null || miss_pkgs+=("$p")
+    done
+    if [ ${#miss_pkgs[@]} -eq 0 ]; then
+        echo -e "${GREEN}✅ All packages installed.${NC}"
+    else
+        echo -e "${YELLOW}⚠️  以下包缺失（源里没有或网络失败），请手动补装：${NC}"
+        printf '   - %s\n' "${miss_pkgs[@]}"
+        echo -e "${CYAN}   sudo dnf install -y ${miss_pkgs[*]}${NC}"
+    fi
 
     # --- 3.5 字体验收入口：缺啥报啥，不静默带过 --- #
     echo -e "${CYAN}>> Verifying fonts...${NC}"
     local missing=()
     fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd Font" || missing+=("jetbrainsmono-nerd-fonts（图标，waybar/kitty 会掉图标）")
     fc-list 2>/dev/null | grep -qi "Sarasa" || missing+=("sarasa-gothic-fonts（中文终端对齐）")
-    fc-list 2>/dev/null | grep -qi "Font Awesome 6 Free" || missing+=("fontawesome-6-free-fonts（kitty 图标区）")
+    fc-list 2>/dev/null | grep -qi "Font Awesome 7 Free" || missing+=("fontawesome-7-free-fonts（kitty 图标区）")
     fc-list 2>/dev/null | grep -qi "Noto Sans Yi" || missing+=("google-noto-sans-yi-fonts（彝文歌词）")
     fc-list 2>/dev/null | grep -qi "Noto Sans CJK" || missing+=("google-noto-sans-cjk-fonts（中文）")
     if [ ${#missing[@]} -eq 0 ]; then
@@ -212,18 +225,6 @@ setup_base() {
         echo -e "${GREEN}✅ 字体资产部署完成。${NC}"
     else
         echo -e "${RED}❌ 错误: 找不到源目录或目录下无文件: $SOURCE_FONTS_DIR${NC}"
-    fi
-
-    # --- 5. 硬件访问组：ddcutil 外屏亮度要读 /dev/i2c-*，缺组即 EACCES ---
-    if getent group i2c >/dev/null 2>&1; then
-        if id -nG "$USER" 2>/dev/null | grep -qw i2c; then
-            echo -e "${GREEN}✅ 已在 i2c 组。${NC}"
-        else
-            sudo usermod -aG i2c "$USER"
-            echo -e "${YELLOW}⚠️  已加入 i2c 组，需重登录生效（ddcutil 外屏亮度）。${NC}"
-        fi
-    else
-        echo -e "${YELLOW}⚠️  无 i2c 组（ddcutil 未装？），跳过。${NC}"
     fi
 
     echo -e "${GREEN}✅ Base environment and font configuration successful.${NC}"
